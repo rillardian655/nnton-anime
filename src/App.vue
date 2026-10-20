@@ -24,14 +24,15 @@
       @close="selectedAnimeModal = null" 
     />
 
-    <!-- Mobile Bottom Navigation Bar -->
+    <!-- Mobile Bottom Navigation Bar (Hidden on Watch View for maximum video screen) -->
     <MobileBottomNav 
+      v-if="$route.path !== '/watch'"
       :currentTab="activeTab" 
       @selectTab="onTabSelected" 
     />
 
-    <!-- Footer -->
-    <footer class="site-footer">
+    <!-- Footer (Hidden on Watch View) -->
+    <footer v-if="$route.path !== '/watch'" class="site-footer">
       <div class="footer-container">
         <div class="footer-top">
           <div class="footer-brand">

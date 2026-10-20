@@ -86,7 +86,7 @@
             v-model="searchQuery" 
             @input="onSearchInput"
             @focus="isSearchOpen = true"
-            placeholder="Cari anime (Bleach, Solo Leveling, One Piece...)" 
+            placeholder="Cari judul, misal frieren" 
             autocomplete="off" 
           />
           <span class="search-shortcut" v-if="!searchQuery">/</span>
@@ -752,7 +752,92 @@ onUnmounted(() => {
     display: none;
   }
   .header-search-wrapper {
-    max-width: 220px;
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-header {
+    height: 56px;
+  }
+
+  .header-container {
+    padding: 0 0.75rem;
+    gap: 0.6rem;
+  }
+
+  .brand-logo {
+    gap: 0.35rem;
+  }
+
+  .brand-icon-img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .brand-text-wrap {
+    font-size: 1.15rem;
+  }
+
+  .brand-kanji {
+    display: none;
+  }
+
+  .header-search-wrapper {
+    flex: 1;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .search-input-box {
+    padding: 0.38rem 0.65rem;
+    gap: 0.4rem;
+    background: #18181c;
+    border-color: #2a2e3d;
+  }
+
+  .search-input-box input {
+    font-size: 0.8rem;
+  }
+
+  .search-shortcut {
+    display: none;
+  }
+
+  .admin-badge-btn {
+    display: none;
+  }
+
+  .profile-trigger-btn {
+    padding: 0;
+    background: transparent;
+    border: none;
+    gap: 0;
+  }
+
+  .profile-trigger-btn svg {
+    display: none;
+  }
+
+  .user-details-pill {
+    display: none;
+  }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.88rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .login-btn {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    border-radius: 9999px;
+  }
+
+  .login-btn span {
+    display: inline;
   }
 }
 </style>

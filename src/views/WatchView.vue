@@ -1,18 +1,13 @@
 <template>
   <div class="watch-page-container">
-    <!-- Main Left Column -->
     <div class="theater-main">
       
-      <!-- Top Breadcrumb Bar -->
+      <!-- Top Breadcrumb Bar (Clean mobile-native back link) -->
       <div class="theater-breadcrumb-bar">
         <router-link to="/" class="bc-link">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          <span>Kembali ke Beranda</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <span class="bc-anime-title">{{ anime?.title?.english || anime?.title?.romaji || 'Kembali ke Beranda' }}</span>
         </router-link>
-        <span class="bc-sep">/</span>
-        <span class="bc-title" v-if="anime">{{ anime.title?.english || anime.title?.romaji }}</span>
-        <span class="bc-sep">/</span>
-        <span class="bc-ep">Episode {{ currentEpisode }}</span>
       </div>
 
       <!-- Video Player Viewport -->
@@ -34,12 +29,39 @@
           @seeked="onVideoSeeked"
         ></video>
 
+        <!-- Floating Skip Opening Overlay Button (Appears during opening 0:00 - 3:00) -->
+        <transition name="fade-scale">
+          <button 
+            v-if="canShowSkipOpOverlay" 
+            class="skip-op-overlay-btn" 
+            @click.stop="skipOpening(false)"
+            title="Lompati lagu opening 85 detik"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <polygon points="11 4 21 12 11 20 11 4"></polygon>
+            </svg>
+            <span>Lewati Opening (+85s)</span>
+          </button>
+        </transition>
+
+        <!-- Toast Notification (Opening dilewati +85s) -->
+        <transition name="toast-slide">
+          <div v-if="showSkipToast" class="player-action-toast">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <polygon points="11 4 21 12 11 20 11 4"></polygon>
+            </svg>
+            <span>{{ skipToastMessage }}</span>
+          </div>
+        </transition>
+
         <!-- Floating Resume Prompt Banner -->
         <div v-if="showResumeBanner" class="watch-resume-banner">
           <div class="resume-banner-info">
             <div>
               <p class="resume-title">Lanjutkan Tontonan?</p>
-              <p class="resume-subtitle">Sebelumnya menonton sampai menit <strong>{{ formatTime(savedResumeTime) }}</strong> ({{ resumePercentage }}%)</p>
+              <p class="resume-subtitle">Sebelumnya sampai menit <strong>{{ formatTime(savedResumeTime) }}</strong> ({{ resumePercentage }}%)</p>
             </div>
           </div>
           <div class="resume-banner-actions">
@@ -64,29 +86,122 @@
         </div>
       </div>
 
-      <!-- Server & Stream Status Notice + Real-time Watch Progress Tracker -->
-      <div class="stream-notice-row">
-        <div class="player-server-notice">
-          <span>{{ streamStatusText || `Memuat informasi stream Episode ${currentEpisode}...` }}</span>
-          <span class="badge-tag badge-genre" v-if="isBufferingStable" style="font-size: 0.72rem; margin-left: 6px;">Buffer Cepat Aktif</span>
-          <a 
-            v-if="activeDirectUrl" 
-            :href="activeDirectUrl" 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            class="btn btn-secondary btn-sm btn-m3u8"
-            title="Buka link m3u8 asli di tab baru"
-          >
-            M3U8 Asli ↗
-          </a>
+      <!-- Episode Heading, Total Count & Actions Row (Matching User's Screenshot) -->
+      <div class="theater-title-row">
+        <div class="title-left">
+          <h1 class="episode-heading">
+            Episode {{ currentEpisode }}
+            <span class="total-ep-accent">{{ totalEpisodes }} ep</span>
+          </h1>
         </div>
-        
-        <div class="watch-progress-badge" v-if="watchDuration > 0">
-          Posisi: <strong style="color: #fff; margin-left: 3px;">{{ formatTime(watchCurrentTime) }}</strong> / {{ formatTime(watchDuration) }} ({{ watchPercentage }}% <span v-if="bufferAheadSec > 0" class="buffer-text">• Buffer {{ bufferAheadSec }}s</span>)
+        <div class="title-actions">
+          <button class="btn-skip-pill" @click="skipOpening(false)" title="Lompati lagu intro opening 85 detik">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <polygon points="11 4 21 12 11 20 11 4"></polygon>
+            </svg>
+            <span>Skip Opening</span>
+          </button>
+          <button class="btn-fav-pill" @click="handleToggleFavorite" :class="{ 'is-saved': isFav }" :title="isFav ? 'Tersimpan di koleksi' : 'Simpan ke koleksi'">
+            <svg width="14" height="14" viewBox="0 0 24 24" :fill="isFav ? '#ff4d2e' : 'none'" :stroke="isFav ? '#ff4d2e' : 'currentColor'" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            <span>{{ isFav ? 'Tersimpan' : 'Koleksi' }}</span>
+          </button>
         </div>
       </div>
 
-      <!-- Quick Episode Navigator & Auto-Next Toggle -->
+      <!-- Versi (Server / Audio Dub) & Stream Settings Row (Matches Miru screenshot) -->
+      <div class="theater-version-container">
+        <div class="version-item">
+          <label class="version-label">Versi</label>
+          <div class="version-select-box">
+            <select 
+              v-model="selectedSourceIndex" 
+              @change="switchSource(selectedSourceIndex)" 
+              class="version-native-select"
+            >
+              <option 
+                v-for="(src, idx) in currentSources" 
+                :key="idx" 
+                :value="idx"
+              >
+                {{ src.is_subtitles_original ? 'Tanpa nama · audio Jepang, sub RU nempel' : (src.title || 'Server Alternatif') }}
+              </option>
+            </select>
+            <div class="version-chevron">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quality selector -->
+        <div class="version-item" v-if="availableVideos.length > 0">
+          <label class="version-label">Resolusi</label>
+          <div class="version-select-box">
+            <select 
+              v-model="selectedQuality" 
+              @change="switchQuality(selectedQuality)" 
+              class="version-native-select"
+            >
+              <option v-for="v in availableVideos" :key="v.quality" :value="Number(v.quality)">
+                {{ v.quality }}p HD
+              </option>
+            </select>
+            <div class="version-chevron">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtitle selector -->
+        <div class="version-item" v-if="subtitlesList.length > 0">
+          <label class="version-label">Subtitle</label>
+          <div class="version-select-box">
+            <select 
+              v-model="selectedSubIndex" 
+              @change="switchSubtitle(selectedSubIndex)" 
+              class="version-native-select"
+            >
+              <option :value="-1">Mati (Tanpa Subtitle)</option>
+              <option v-for="(sub, sIdx) in subtitlesList" :key="sIdx" :value="sIdx">
+                {{ sub.label }}
+              </option>
+            </select>
+            <div class="version-chevron">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Episode Picker Grid (Matches Miru buttons: 1, 2, 3... right under Versi) -->
+      <div class="theater-episodes-section">
+        <!-- If total episodes > 25, show range chunks -->
+        <div class="ep-chunk-tabs" v-if="episodeChunks.length > 1">
+          <button 
+            v-for="(chunk, cIdx) in episodeChunks" 
+            :key="cIdx"
+            class="chunk-tab-btn"
+            :class="{ active: currentChunkIndex === cIdx }"
+            @click="currentChunkIndex = cIdx"
+          >
+            {{ chunk.label }}
+          </button>
+        </div>
+
+        <div class="theater-ep-cards-grid">
+          <button 
+            v-for="ep in visibleEpisodes" 
+            :key="ep.num"
+            class="ep-card-btn"
+            :class="{ active: currentEpisode === ep.num }"
+            @click="switchEpisode(ep.num)"
+          >
+            {{ ep.num }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Episode Quick Navigation & Auto Options -->
       <div class="ep-nav-toolbar">
         <div class="ep-nav-buttons">
           <button 
@@ -108,72 +223,37 @@
           </button>
         </div>
 
-        <label class="auto-next-label">
-          <input type="checkbox" v-model="autoNext" style="accent-color: #e50914;" />
-          <span>Putar Otomatis Episode Selanjutnya</span>
-        </label>
+        <div class="player-switches-group">
+          <label class="auto-switch-label">
+            <input type="checkbox" v-model="autoSkipOp" @change="onAutoSkipOpChanged" style="accent-color: #ff4d2e;" />
+            <span>Auto-Skip Opening (+85s)</span>
+          </label>
+          <label class="auto-switch-label">
+            <input type="checkbox" v-model="autoNext" style="accent-color: #ff4d2e;" />
+            <span>Putar Otomatis Next</span>
+          </label>
+        </div>
       </div>
 
-      <!-- Player Stream Settings: Audio Track, Quality, Subtitles -->
-      <div class="theater-controls-bar">
-        <!-- Audio Dub Track -->
-        <div class="control-row">
-          <span class="control-row-label">Audio Dub</span>
-          <div class="control-row-chips" v-if="currentSources.length > 0">
-            <button 
-              v-for="(src, idx) in currentSources" 
-              :key="idx" 
-              class="chip-btn" 
-              :class="{ active: selectedSourceIndex === idx }"
-              @click="switchSource(idx)"
-            >
-              {{ src.is_subtitles_original ? 'Original Sub (Jepang)' : src.title }}
-            </button>
-          </div>
-          <span v-else class="control-empty-text">Memuat daftar pengisi suara...</span>
+      <!-- Real-time Watch Progress Tracker & Stream Status Notice -->
+      <div class="stream-notice-row">
+        <div class="player-server-notice">
+          <span>{{ streamStatusText || `Memuat stream Episode ${currentEpisode}...` }}</span>
+          <span class="badge-tag badge-genre" v-if="isBufferingStable" style="font-size: 0.72rem; margin-left: 6px;">Buffer Stabil</span>
+          <a 
+            v-if="activeDirectUrl" 
+            :href="activeDirectUrl" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            class="btn btn-secondary btn-sm btn-m3u8"
+            title="Buka link m3u8 asli di tab baru"
+          >
+            M3U8 Asli ↗
+          </a>
         </div>
-
-        <!-- Video Resolution -->
-        <div class="control-row">
-          <span class="control-row-label">Resolusi</span>
-          <div class="control-row-chips" v-if="availableVideos.length > 0">
-            <button 
-              v-for="v in availableVideos" 
-              :key="v.quality" 
-              class="chip-btn" 
-              :class="{ active: selectedQuality === Number(v.quality) }"
-              @click="switchQuality(Number(v.quality))"
-            >
-              {{ v.quality }}p
-            </button>
-          </div>
-          <span v-else class="control-empty-text">Pilihan resolusi otomatis</span>
-        </div>
-
-        <!-- Subtitles Track -->
-        <div class="control-row">
-          <span class="control-row-label">Subtitle</span>
-          <div class="control-row-chips">
-            <button 
-              class="chip-btn" 
-              :class="{ active: selectedSubIndex === -1 }"
-              @click="switchSubtitle(-1)"
-            >
-              Mati
-            </button>
-            <button 
-              v-for="(sub, sIdx) in subtitlesList" 
-              :key="sIdx" 
-              class="chip-btn" 
-              :class="{ active: selectedSubIndex === sIdx }"
-              @click="switchSubtitle(sIdx)"
-            >
-              {{ sub.label }}
-            </button>
-            <span v-if="isSearchingSubtitles" class="control-empty-text">
-              <span class="spinner-tiny"></span> Mencari SubtitleCat...
-            </span>
-          </div>
+        
+        <div class="watch-progress-badge" v-if="watchDuration > 0">
+          Posisi: <strong style="color: #fff; margin-left: 3px;">{{ formatTime(watchCurrentTime) }}</strong> / {{ formatTime(watchDuration) }} ({{ watchPercentage }}% <span v-if="bufferAheadSec > 0" class="buffer-text">• Buffer {{ bufferAheadSec }}s</span>)
         </div>
       </div>
 
@@ -181,17 +261,8 @@
       <div class="watch-info-card" v-if="anime">
         <div class="watch-info-header">
           <div class="watch-title-group">
-            <h1 class="anime-main-title">{{ anime.title?.english || anime.title?.romaji }}</h1>
+            <h2 class="anime-main-title">{{ anime.title?.english || anime.title?.romaji }}</h2>
             <p class="anime-alt-title">{{ anime.title?.romaji }} <span v-if="anime.title?.native">({{ anime.title?.native }})</span></p>
-          </div>
-
-          <div class="watch-header-actions">
-            <button class="btn btn-secondary btn-sm" @click="handleToggleFavorite">
-              <svg width="15" height="15" viewBox="0 0 24 24" :fill="isFav ? '#e50914' : 'none'" :stroke="isFav ? '#e50914' : 'currentColor'" stroke-width="2">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-              </svg>
-              <span>{{ isFav ? 'Tersimpan di Koleksi' : 'Simpan Koleksi' }}</span>
-            </button>
           </div>
         </div>
 
@@ -205,7 +276,7 @@
           <span class="badge-tag badge-genre" v-if="anime.studios?.nodes?.[0]?.name">
             {{ anime.studios.nodes[0].name }}
           </span>
-          <span class="badge-tag badge-genre badge-ep-count">{{ totalEpisodes }} Episode Rilis</span>
+          <span class="badge-tag badge-genre badge-ep-count">{{ totalEpisodes }} Episode</span>
         </div>
 
         <!-- Dedicated Genre Tags Row -->
@@ -228,8 +299,6 @@
           <span class="arm-tag" v-if="armMapping.myanimelist">MAL: {{ armMapping.myanimelist }}</span>
           <span class="arm-tag" v-if="armMapping.themoviedb">TMDB: {{ armMapping.themoviedb }}</span>
           <span class="arm-tag" v-if="armMapping.imdb">IMDb: {{ armMapping.imdb }}</span>
-          <span class="arm-tag" v-if="armMapping.anidb">AniDB: {{ armMapping.anidb }}</span>
-          <span class="arm-tag" v-if="armMapping.kitsu">Kitsu: {{ armMapping.kitsu }}</span>
         </div>
 
         <!-- Synopsis with Real-time Translation -->
@@ -295,41 +364,6 @@
       </div>
 
     </div>
-
-    <!-- Right Sidebar (Real-time Episodes List) -->
-    <aside class="theater-sidebar">
-      <div class="sidebar-section-title">
-        <span>Daftar Episode</span>
-        <span class="badge-tag badge-genre">{{ totalEpisodes }} Episode Rilis</span>
-      </div>
-
-      <!-- Episode Notice if Ongoing -->
-      <div v-if="airingNotice" class="sidebar-airing-notice">
-        <span class="live-dot"></span>
-        <span>{{ airingNotice }}</span>
-      </div>
-
-      <!-- Search / Filter for Episodes -->
-      <input 
-        type="text" 
-        v-model="epSearchQuery" 
-        placeholder="Cari nomor ep..." 
-        class="ep-search-sidebar"
-      />
-
-      <!-- Episodes Grid -->
-      <div class="watch-episodes-grid">
-        <button 
-          v-for="ep in filteredEpisodes" 
-          :key="ep.num"
-          class="watch-ep-pill"
-          :class="{ active: currentEpisode === ep.num }"
-          @click="switchEpisode(ep.num)"
-        >
-          Ep {{ ep.num }}
-        </button>
-      </div>
-    </aside>
   </div>
 </template>
 
@@ -369,6 +403,59 @@ const episodesList = ref([]);
 const epSearchQuery = ref('');
 const autoNext = ref(true);
 const airingNotice = ref('');
+
+// Skip Opening & Mobile Episode Chunking
+const autoSkipOp = ref(localStorage.getItem('anipulse_auto_skip_op') === 'true');
+const showSkipToast = ref(false);
+const skipToastMessage = ref('');
+const hasAutoSkippedThisEp = ref(false);
+const currentChunkIndex = ref(0);
+
+const canShowSkipOpOverlay = computed(() => {
+  return watchCurrentTime.value > 0.5 && watchCurrentTime.value <= 180 && !isLoadingStream.value;
+});
+
+const episodeChunks = computed(() => {
+  const chunks = [];
+  const total = totalEpisodes.value || 1;
+  const chunkSize = 25;
+  for (let i = 0; i < total; i += chunkSize) {
+    const start = i + 1;
+    const end = Math.min(i + chunkSize, total);
+    chunks.push({
+      start,
+      end,
+      label: `${start} - ${end}`
+    });
+  }
+  return chunks;
+});
+
+const visibleEpisodes = computed(() => {
+  if (totalEpisodes.value <= 25) {
+    return episodesList.value;
+  }
+  const chunk = episodeChunks.value[currentChunkIndex.value];
+  if (!chunk) return episodesList.value;
+  return episodesList.value.filter(e => e.num >= chunk.start && e.num <= chunk.end);
+});
+
+function onAutoSkipOpChanged() {
+  localStorage.setItem('anipulse_auto_skip_op', autoSkipOp.value ? 'true' : 'false');
+}
+
+function skipOpening(isAuto = false) {
+  const videoEl = videoRef.value;
+  if (!videoEl) return;
+  const target = Math.min((videoEl.duration || Infinity), videoEl.currentTime + 85);
+  videoEl.currentTime = target;
+  hasAutoSkippedThisEp.value = true;
+  skipToastMessage.value = isAuto ? 'Auto-Skip: Lewati Opening (+85s)' : 'Opening dilewati (+85s)';
+  showSkipToast.value = true;
+  setTimeout(() => {
+    showSkipToast.value = false;
+  }, 2200);
+}
 
 const currentSources = ref([]);
 const selectedSourceIndex = ref(0);
@@ -558,6 +645,7 @@ async function loadEpisodeStream(ep) {
   isLoadingStream.value = true;
   showPlayOverlay.value = false;
   showResumeBanner.value = false;
+  hasAutoSkippedThisEp.value = false;
   loadingMessage.value = `Menghubungkan ke Kodik HLS (Episode ${ep})...`;
   streamStatusText.value = `Menghubungkan ke server stream (Episode ${ep})...`;
 
@@ -766,6 +854,15 @@ function switchEpisode(epNum) {
   currentEpisode.value = epNum;
   lastSavedTime.value = 0;
   showResumeBanner.value = false;
+  hasAutoSkippedThisEp.value = false;
+
+  // Keep chunk tab in sync
+  if (totalEpisodes.value > 25) {
+    const idx = Math.floor((epNum - 1) / 25);
+    if (idx >= 0 && idx < episodeChunks.value.length) {
+      currentChunkIndex.value = idx;
+    }
+  }
 
   // Update URL without full refresh
   router.replace({ query: { ...route.query, ep: epNum } });
@@ -787,6 +884,12 @@ function onTimeUpdate() {
   const dur = videoEl.duration;
   watchCurrentTime.value = cur;
   watchDuration.value = dur;
+
+  // Auto-skip opening if enabled and during intro (1s - 6s)
+  if (autoSkipOp.value && !hasAutoSkippedThisEp.value && cur >= 1 && cur <= 6) {
+    hasAutoSkippedThisEp.value = true;
+    skipOpening(true);
+  }
 
   // Calculate buffer ahead
   let buffered = 0;
@@ -1053,26 +1156,15 @@ onUnmounted(() => {
 
 <style scoped>
 .watch-page-container {
-  max-width: 1600px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 1.5rem 1.75rem 4rem;
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: 2rem;
-  align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .watch-page-container {
-    grid-template-columns: 1fr;
-    padding: 1rem 1.25rem 3rem;
-  }
+  padding: 1.25rem 1.5rem 4rem;
 }
 
 .theater-main {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.15rem;
   min-width: 0;
 }
 
@@ -1081,35 +1173,25 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.85rem;
-  color: #94a3b8;
-  flex-wrap: wrap;
 }
 
 .bc-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   color: #94a3b8;
-  transition: color 0.15s;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 .bc-link:hover {
   color: #fff;
 }
 
-.bc-sep {
-  color: #475569;
-}
-
-.bc-title {
+.bc-anime-title {
   color: #cbd5e1;
-  font-weight: 600;
-}
-
-.bc-ep {
-  color: #e50914;
-  font-weight: 700;
 }
 
 /* Player Viewport */
@@ -1119,9 +1201,9 @@ onUnmounted(() => {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
-  border: 1px solid #2a3044;
+  border: 1px solid #1e2230;
   aspect-ratio: 16 / 9;
-  max-height: 75vh;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1133,6 +1215,56 @@ onUnmounted(() => {
   object-fit: contain;
   background: #000;
   display: block;
+}
+
+/* Floating Skip Opening Button */
+.skip-op-overlay-btn {
+  position: absolute;
+  bottom: 4.5rem;
+  right: 1.5rem;
+  background: rgba(18, 20, 28, 0.92);
+  border: 1px solid #ff4d2e;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0.55rem 1.15rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 22px rgba(255, 77, 46, 0.45);
+  z-index: 30;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.skip-op-overlay-btn:hover {
+  background: #ff4d2e;
+  transform: scale(1.05);
+  box-shadow: 0 8px 28px rgba(255, 77, 46, 0.65);
+}
+
+.player-action-toast {
+  position: absolute;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(12, 14, 20, 0.95);
+  border: 1px solid #ff4d2e;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 35;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
 }
 
 .player-loader {
@@ -1170,12 +1302,12 @@ onUnmounted(() => {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: #e50914;
+  background: #ff4d2e;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 30px rgba(229, 9, 20, 0.6);
+  box-shadow: 0 0 30px rgba(255, 77, 46, 0.6);
   padding-left: 5px;
   transition: transform 0.2s;
 }
@@ -1196,7 +1328,7 @@ onUnmounted(() => {
   bottom: 4.5rem;
   left: 1.5rem;
   background: rgba(18, 20, 28, 0.95);
-  border: 1px solid #e50914;
+  border: 1px solid #ff4d2e;
   border-radius: 8px;
   padding: 0.75rem 1rem;
   display: flex;
@@ -1235,7 +1367,261 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-/* Stream Notice Bar */
+/* Episode Title & Total Count Row (Miru style) */
+.theater-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.episode-heading {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.total-ep-accent {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ff4d2e;
+}
+
+.title-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-skip-pill {
+  background: rgba(255, 77, 46, 0.12);
+  border: 1px solid rgba(255, 77, 46, 0.35);
+  color: #ff4d2e;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: all 0.2s ease;
+}
+
+.btn-skip-pill:hover {
+  background: #ff4d2e;
+  color: #fff;
+  border-color: #ff4d2e;
+}
+
+.btn-fav-pill {
+  background: #18181c;
+  border: 1px solid #2a2e3d;
+  color: #cbd5e1;
+  padding: 0.45rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: all 0.2s ease;
+}
+
+.btn-fav-pill:hover, .btn-fav-pill.is-saved {
+  background: rgba(255, 77, 46, 0.15);
+  border-color: #ff4d2e;
+  color: #fff;
+}
+
+/* Versi (Server / Audio Dub) Container (Matches Miru screenshot) */
+.theater-version-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem;
+}
+
+.version-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.version-label {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.version-select-box {
+  position: relative;
+  background: #18181c;
+  border: 1px solid #2a2e3d;
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.version-select-box:hover, .version-select-box:focus-within {
+  border-color: #ff4d2e;
+}
+
+.version-native-select {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 0.65rem 2rem 0.65rem 0.85rem;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+  cursor: pointer;
+}
+
+.version-native-select option {
+  background: #12141c;
+  color: #fff;
+}
+
+.version-chevron {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+/* Episode Picker Cards Grid (Miru buttons: 1, 2, 3...) */
+.theater-episodes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ep-chunk-tabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.chunk-tab-btn {
+  background: #18181c;
+  border: 1px solid #2a2e3d;
+  color: #94a3b8;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.chunk-tab-btn.active {
+  background: rgba(255, 77, 46, 0.2);
+  border-color: #ff4d2e;
+  color: #fff;
+}
+
+.theater-ep-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 0.6rem;
+}
+
+.ep-card-btn {
+  height: 52px;
+  background: #18181c;
+  border: 1px solid #2a2e3d;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.ep-card-btn:hover {
+  background: #242938;
+  border-color: #3b4257;
+  transform: translateY(-1px);
+}
+
+.ep-card-btn.active {
+  background: #ff4d2e !important;
+  border-color: #ff4d2e !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(255, 77, 46, 0.45);
+}
+
+/* Ep Nav Toolbar */
+.ep-nav-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  background: #12141c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #1e2230;
+}
+
+.ep-nav-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.85rem;
+}
+
+.player-switches-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.auto-switch-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Stream Notice Row */
 .stream-notice-row {
   display: flex;
   align-items: center;
@@ -1273,110 +1659,6 @@ onUnmounted(() => {
   color: #10b981;
 }
 
-/* Ep Nav Toolbar */
-.ep-nav-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  background: #12141c;
-  padding: 0.75rem 1.25rem;
-  border-radius: 8px;
-  border: 1px solid #1e2230;
-}
-
-.ep-nav-buttons {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.nav-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  padding: 0.45rem 0.85rem;
-}
-
-.auto-next-label {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.82rem;
-  cursor: pointer;
-  color: #94a3b8;
-  user-select: none;
-}
-
-/* Controls Bar */
-.theater-controls-bar {
-  background: #12141c;
-  border: 1px solid #1e2230;
-  border-radius: 10px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.control-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.control-row-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #94a3b8;
-  min-width: 90px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.control-row-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.chip-btn {
-  background: #181b26;
-  border: 1px solid #2a3044;
-  color: #cbd5e1;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.3rem 0.65rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.chip-btn:hover {
-  background: #242938;
-  color: #fff;
-  border-color: #3b4257;
-}
-
-.chip-btn.active {
-  background: #e50914;
-  color: #fff;
-  border-color: #e50914;
-  font-weight: 700;
-}
-
-.control-empty-text {
-  font-size: 0.8rem;
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 /* Info Card */
 .watch-info-card {
   background: #12141c;
@@ -1397,7 +1679,7 @@ onUnmounted(() => {
 }
 
 .anime-main-title {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.25;
 }
@@ -1440,9 +1722,9 @@ onUnmounted(() => {
 }
 
 .badge-ep-count {
-  background: rgba(229, 9, 20, 0.12);
+  background: rgba(255, 77, 46, 0.12);
   color: #ff6b72;
-  border-color: rgba(229, 9, 20, 0.3);
+  border-color: rgba(255, 77, 46, 0.3);
   font-weight: 700;
 }
 
@@ -1472,9 +1754,9 @@ onUnmounted(() => {
 }
 
 .genre-pill:hover {
-  background: #e50914;
+  background: #ff4d2e;
   color: #fff;
-  border-color: #e50914;
+  border-color: #ff4d2e;
 }
 
 .watch-arm-badges {
@@ -1597,9 +1879,9 @@ onUnmounted(() => {
 }
 
 .legal-badge:hover {
-  background: #e50914;
+  background: #ff4d2e;
   color: #fff;
-  border-color: #e50914;
+  border-color: #ff4d2e;
 }
 
 /* Recs Grid */
@@ -1659,107 +1941,11 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* Right Sidebar */
-.theater-sidebar {
-  background: #12141c;
-  border: 1px solid #1e2230;
-  border-radius: 12px;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.15rem;
-  position: sticky;
-  top: 5rem;
-  max-height: calc(100vh - 6.5rem);
-  overflow-y: auto;
-}
-
-.sidebar-section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.sidebar-airing-notice {
-  background: #181b26;
-  border: 1px solid rgba(229, 9, 20, 0.35);
-  padding: 0.6rem 0.85rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  color: #fca5a5;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ef4444;
-  box-shadow: 0 0 6px #ef4444;
-  animation: pulse 1.5s infinite;
-}
-
-.ep-search-sidebar {
-  background: #181b26;
-  border: 1px solid #2a3044;
-  color: #fff;
-  padding: 0.45rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.82rem;
-  outline: none;
-  width: 100%;
-}
-
-.ep-search-sidebar:focus {
-  border-color: #e50914;
-}
-
-.watch-episodes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-  gap: 0.5rem;
-  max-height: 480px;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-}
-
-.watch-ep-pill {
-  background: #181b26;
-  border: 1px solid #2a3044;
-  color: #94a3b8;
-  padding: 0.6rem 0.35rem;
-  border-radius: 6px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.watch-ep-pill:hover {
-  background: #1f2433;
-  color: #fff;
-  border-color: #3b4257;
-}
-
-.watch-ep-pill.active {
-  background: #e50914;
-  color: #fff;
-  font-weight: 700;
-  border-color: #e50914;
-}
-
 .spinner {
   width: 32px;
   height: 32px;
   border: 3px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #e50914;
+  border-top-color: #ff4d2e;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   display: inline-block;
@@ -1787,5 +1973,93 @@ onUnmounted(() => {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Animations for Skip Opening */
+.fade-scale-enter-active, .fade-scale-leave-active {
+  transition: all 0.2s ease;
+}
+.fade-scale-enter-from, .fade-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.toast-slide-enter-active, .toast-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-slide-enter-from, .toast-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -12px);
+}
+
+/* Mobile Responsiveness matching the native Miru screenshot */
+@media (max-width: 768px) {
+  .watch-page-container {
+    padding: 0 0 3.5rem 0;
+  }
+
+  .theater-main {
+    gap: 0.85rem;
+  }
+
+  .theater-breadcrumb-bar {
+    padding: 0.65rem 0.85rem 0.15rem 0.85rem;
+  }
+
+  .theater-player-box {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .skip-op-overlay-btn {
+    bottom: 3.5rem;
+    right: 0.75rem;
+    font-size: 0.78rem;
+    padding: 0.45rem 0.85rem;
+  }
+
+  .theater-title-row {
+    padding: 0 0.85rem;
+  }
+
+  .episode-heading {
+    font-size: 1.45rem;
+  }
+
+  .theater-version-container {
+    padding: 0 0.85rem;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .theater-episodes-section {
+    padding: 0 0.85rem;
+  }
+
+  .theater-ep-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .ep-card-btn {
+    height: 48px;
+    font-size: 1.05rem;
+  }
+
+  .ep-nav-toolbar {
+    margin: 0 0.85rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .stream-notice-row {
+    padding: 0 0.85rem;
+  }
+
+  .watch-info-card {
+    margin: 0 0.85rem;
+    padding: 1rem;
+    border-radius: 10px;
+  }
 }
 </style>
