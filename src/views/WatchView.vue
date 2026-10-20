@@ -29,21 +29,13 @@
                 @ended="onVideoEnded"
               ></video>
 
-              <!-- Cinematic Loading Overlay -->
+              <!-- Minimalist Player Loading Overlay -->
               <div v-if="isLoadingStream" class="player-loading-overlay">
                 <div class="cinema-loader-core">
                   <div class="loader-orbit orbit-1"></div>
                   <div class="loader-orbit orbit-2"></div>
-                  <div class="loader-center-dot">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#e50914">
-                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                  </div>
                 </div>
-                <div class="loader-status-wrap">
-                  <p class="loader-title">{{ loadingMessage || 'Menyiapkan Stream...' }}</p>
-                  <span class="loader-sub">Menghubungkan ke node server CDN VIP Sub Indo</span>
-                </div>
+                <p class="loader-title">{{ loadingMessage || 'Memuat video...' }}</p>
               </div>
 
               <!-- Resume Prompt Banner -->

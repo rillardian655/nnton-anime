@@ -231,7 +231,7 @@ function onSearchInput() {
   searchDebounce = setTimeout(async () => {
     try {
       const res = await searchAnime(searchQuery.value.trim(), {}, 1, 6);
-      searchResults.value = res.media || [];
+      searchResults.value = Array.isArray(res) ? res : (res?.media || []);
     } catch (e) {
       console.warn('Search error:', e);
       searchResults.value = [];

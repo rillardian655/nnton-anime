@@ -16,9 +16,6 @@
       />
     </main>
 
-    <!-- App Splash Loading Screen -->
-    <AppSplashLoader />
-
     <!-- Global Modals -->
     <LoginModal />
     <InviteModal />
@@ -89,7 +86,6 @@ import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import HeaderNav from './components/HeaderNav.vue';
 import MobileBottomNav from './components/MobileBottomNav.vue';
-import AppSplashLoader from './components/AppSplashLoader.vue';
 import LoginModal from './components/LoginModal.vue';
 import InviteModal from './components/InviteModal.vue';
 import AnimeDetailModal from './components/AnimeDetailModal.vue';

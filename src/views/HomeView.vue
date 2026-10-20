@@ -335,13 +335,14 @@ async function fetchCurrentList() {
       animeList.value = historyList.value;
     } else if (currentTab.value === 'season') {
       const res = await getPopularThisSeason(1, 24);
-      animeList.value = res.media || [];
+      animeList.value = Array.isArray(res) ? res : (res?.media || []);
     } else if (currentTab.value === 'top-rated') {
       const res = await getTopRated(1, 24);
-      animeList.value = res.media || [];
+      animeList.value = Array.isArray(res) ? res : (res?.media || []);
     } else if (currentTab.value === 'airing') {
       const res = await getAiringSchedule(1, 24);
-      animeList.value = (res.airingSchedules || []).map(s => s.media).filter(Boolean);
+      const rawList = Array.isArray(res) ? res : (res?.airingSchedules || []);
+      animeList.value = rawList.map(s => s.media || s).filter(Boolean);
     } else {
       // Default trending / genre search
       if (selectedGenre.value !== 'ALL' || selectedFormat.value !== 'ALL' || selectedSort.value !== 'TRENDING_DESC') {
@@ -351,11 +352,11 @@ async function fetchCurrentList() {
           sort: selectedSort.value
         };
         const res = await searchAnime('', filters, 1, 24);
-        animeList.value = res.media || [];
+        animeList.value = Array.isArray(res) ? res : (res?.media || []);
       } else {
         const res = await getTrendingAnime(1, 24);
-        animeList.value = res.media || [];
-        if (heroAnimeList.value.length === 0) {
+        animeList.value = Array.isArray(res) ? res : (res?.media || []);
+        if (heroAnimeList.value.length === 0 && animeList.value.length > 0) {
           heroAnimeList.value = animeList.value.slice(0, 6);
         }
       }
@@ -377,7 +378,14 @@ function startHeroCarousel() {
   }, 6000);
 }
 
-// Watch route query changes
+// Watch tab from props and route query
+watch(() => props.tab, (newTab) => {
+  if (newTab && newTab !== currentTab.value) {
+    currentTab.value = newTab;
+    fetchCurrentList();
+  }
+});
+
 watch(() => route.query.tab, (newTab) => {
   if (newTab && newTab !== currentTab.value) {
     currentTab.value = newTab;
