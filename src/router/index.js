@@ -26,6 +26,18 @@ const routes = [
     component: InviteView
   },
   {
+    path: '/anime',
+    redirect: to => ({ path: '/watch', query: to.query })
+  },
+  {
+    path: '/anime.html',
+    redirect: to => ({ path: '/watch', query: to.query })
+  },
+  {
+    path: '/watch.html',
+    redirect: to => ({ path: '/watch', query: to.query })
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/'
   }

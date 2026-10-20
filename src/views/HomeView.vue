@@ -77,7 +77,7 @@
             v-for="item in historyList.slice(0, 4)" 
             :key="item.id" 
             class="continue-card"
-            @click="navigateToWatch(item.id, item.lastEpisode || 1)"
+            @click="navigateToWatch(item.id, item.episode || item.lastEpisode || 1)"
           >
             <div class="continue-thumb-wrap">
               <img :src="getSafeImageUrl(item.coverImage)" :alt="item.title" class="continue-thumb" />
@@ -91,8 +91,8 @@
             <div class="continue-info">
               <h4 class="continue-title">{{ item.title }}</h4>
               <div class="continue-ep-meta">
-                <span>Episode {{ item.lastEpisode || 1 }}</span>
-                <span v-if="item.formattedTime">• {{ item.formattedTime }}</span>
+                <span>Episode {{ item.episode || item.lastEpisode || 1 }}</span>
+                <span v-if="item.timeFormatted || item.formattedTime">• {{ item.timeFormatted || item.formattedTime }}</span>
               </div>
             </div>
           </div>
@@ -189,18 +189,26 @@
               class="card-poster" 
               loading="lazy"
             />
-            <div class="poster-badge-score" v-if="anime.averageScore">
+            <div class="poster-badge-score" v-if="anime.averageScore && currentTab !== 'history'">
               ★ {{ (anime.averageScore / 10).toFixed(1) }}
             </div>
+            <div class="poster-badge-score" v-else-if="currentTab === 'history' && anime.timeFormatted">
+              ⏱ {{ anime.timeFormatted }}
+            </div>
             <div class="poster-badge-ep">
-              {{ anime.episodes ? `${anime.episodes} Ep` : (anime.status === 'RELEASING' ? 'Ongoing' : 'HD') }}
+              {{ currentTab === 'history' ? `Ep ${anime.episode || 1}` : (anime.episodes ? `${anime.episodes} Ep` : (anime.status === 'RELEASING' ? 'Ongoing' : 'HD')) }}
+            </div>
+
+            <!-- Card Progress Bar on History -->
+            <div class="card-poster-progress" v-if="currentTab === 'history' && anime.progress">
+              <div class="progress-fill" :style="{ width: `${anime.progress}%` }"></div>
             </div>
 
             <!-- Hover Play Action -->
             <div class="card-hover-overlay">
               <button 
                 class="hover-play-btn" 
-                @click.stop="navigateToWatch(anime.id, 1)"
+                @click.stop="navigateToWatch(anime.id, currentTab === 'history' ? (anime.episode || 1) : 1)"
                 title="Tonton Sekarang"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
