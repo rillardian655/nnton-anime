@@ -119,12 +119,18 @@
               @change="switchSource(selectedSourceIndex)" 
               class="version-native-select"
             >
+              <option v-if="isLoadingStream && currentSources.length === 0" disabled :value="0">
+                Memuat server stream...
+              </option>
+              <option v-else-if="currentSources.length === 0" disabled :value="0">
+                Server tidak tersedia
+              </option>
               <option 
                 v-for="(src, idx) in currentSources" 
                 :key="idx" 
                 :value="idx"
               >
-                {{ src.is_subtitles_original ? 'Tanpa nama · audio Jepang, sub RU nempel' : (src.title || 'Server Alternatif') }}
+                {{ src.title || (src.is_subtitles_original ? 'Kodik (Sub Original)' : `Server ${idx + 1}`) }}
               </option>
             </select>
             <div class="version-chevron">
@@ -143,7 +149,7 @@
               class="version-native-select"
             >
               <option v-for="v in availableVideos" :key="v.quality" :value="Number(v.quality)">
-                {{ v.quality }}p HD
+                {{ v.quality }}p {{ v.type === 'mp4' ? 'Direct MP4' : 'HD' }}
               </option>
             </select>
             <div class="version-chevron">
@@ -562,8 +568,9 @@ function computeEpisodeCount(details) {
 // Query YummyAnime server for exact stream episodes
 async function fetchYummyEpisodes(details) {
   const searchTerm = details.title?.english || details.title?.romaji;
+  const altTerm = details.title?.romaji || '';
   try {
-    const res = await fetch(apiUrl(`/api/yummy/episodes?q=${encodeURIComponent(searchTerm)}`));
+    const res = await fetch(apiUrl(`/api/yummy/episodes?q=${encodeURIComponent(searchTerm)}&alt=${encodeURIComponent(altTerm)}`));
     const data = await res.json();
     if (data.episodes && data.episodes.length > 0) {
       let validEps = data.episodes.map(e => ({
@@ -656,19 +663,19 @@ async function loadEpisodeStream(ep) {
     // 1. Fetch Subtitles in parallel
     fetchSubtitles(title, altTitle, ep);
 
-    // 2. Fetch Streams from backend
-    let res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&ep=${ep}`));
+    // 2. Fetch Streams from backend with primary and alt titles
+    let res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}`));
     let data = await res.json();
 
-    // Fallback to Romaji title if empty
+    // Fallback to Romaji title explicitly if empty
     if ((!data.sources || data.sources.length === 0) && altTitle && altTitle !== title) {
       res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}`));
       data = await res.json();
     }
 
-    // Fallback to cleaned title (without Season suffix)
+    // Fallback to cleaned title (without Season or subtitle suffix)
     if (!data.sources || data.sources.length === 0) {
-      const simplified = title.replace(/\s+(Season|\bS\b|\bPart\b|\bII\b|\b2nd\b).*$/i, '').trim();
+      const simplified = title.split(':')[0].replace(/\s+(Season|\bS\b|\bPart\b|\bII\b|\b2nd\b).*$/i, '').trim();
       if (simplified && simplified !== title && simplified !== altTitle) {
         res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(simplified)}&ep=${ep}`));
         data = await res.json();
@@ -676,8 +683,8 @@ async function loadEpisodeStream(ep) {
     }
 
     if (!data.sources || data.sources.length === 0) {
-      loadingMessage.value = `Episode ${ep} belum tersedia di server Kodik.`;
-      streamStatusText.value = `Episode ${ep} belum tersedia di server Kodik.`;
+      loadingMessage.value = `Episode ${ep} belum tersedia di server streaming.`;
+      streamStatusText.value = `Episode ${ep} belum tersedia di server streaming.`;
       isLoadingStream.value = false;
       return;
     }
@@ -714,13 +721,11 @@ function playSelectedSource() {
   // Match quality
   let video = source.videos.find(v => Number(v.quality) === selectedQuality.value);
   if (!video) {
-    video = source.videos[source.videos.length - 1];
+    video = source.videos[0];
     selectedQuality.value = Number(video.quality);
   }
 
-  streamStatusText.value = `Memutar: ${source.title} (${video.quality}p HLS)`;
-
-  // Destroy previous HLS instance
+  // Destroy previous HLS instance if any
   if (hlsInstance) {
     hlsInstance.destroy();
     hlsInstance = null;
@@ -735,8 +740,44 @@ function playSelectedSource() {
     isLoadingStream.value = false;
   }, 3500);
 
-  // Use direct Kodik Solodcdn URL as primary/reliable stream (supports CORS: * and full HTTPS)
-  // Fallback to apiUrl(video.url) if needed
+  const isMp4 = video.type === 'mp4' || (video.direct_url && video.direct_url.includes('.mp4')) || (video.url && video.url.includes('.mp4'));
+
+  if (isMp4) {
+    streamStatusText.value = `Memutar: ${source.title} (${video.quality}p MP4)`;
+    const playUrl = apiUrl(video.url) || video.direct_url;
+
+    videoEl.pause();
+    videoEl.removeAttribute('src');
+    videoEl.src = playUrl;
+    videoEl.load();
+
+    const onCanPlay = () => {
+      isLoadingStream.value = false;
+      checkResumeProgress();
+      videoEl.play().catch(e => {
+        console.log('Autoplay deferred by browser:', e);
+        showPlayOverlay.value = true;
+      });
+      videoEl.removeEventListener('canplay', onCanPlay);
+    };
+    videoEl.addEventListener('canplay', onCanPlay);
+
+    const onError = () => {
+      console.warn('Proxy MP4 error, falling back to direct URL:', video.direct_url);
+      if (video.direct_url && videoEl.src !== video.direct_url) {
+        videoEl.src = video.direct_url;
+        videoEl.load();
+        videoEl.play().catch(e => {
+          showPlayOverlay.value = true;
+        });
+      }
+      videoEl.removeEventListener('error', onError);
+    };
+    videoEl.addEventListener('error', onError);
+    return;
+  }
+
+  streamStatusText.value = `Memutar: ${source.title} (${video.quality}p HLS)`;
   const streamUrl = video.direct_url || apiUrl(video.url);
 
   if (Hls.isSupported()) {

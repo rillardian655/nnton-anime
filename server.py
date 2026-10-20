@@ -36,6 +36,7 @@ socket.getaddrinfo = _ipv4_first_getaddrinfo
 from anicli_api.source.yummy_anime import Extractor
 from anicli_api.player.kodik import Kodik
 from anicli_api.source.anilibria import Extractor as AnilibriaExtractor
+from anicli_api.source.animevost import Extractor as AnimevostExtractor
 
 app = FastAPI(title="AniPulse Backend - anicli-api & Kodik Core")
 
@@ -148,6 +149,7 @@ app.add_middleware(
 # Shared anicli Extractors & Kodik Engine
 yummy_extractor = Extractor()
 anilibria_extractor = AnilibriaExtractor()
+animevost_extractor = AnimevostExtractor()
 kodik_player = Kodik()
 
 # Known high-speed Kodik Season mappings for reliable streaming
@@ -315,61 +317,148 @@ async def search_yummy(q: str = Query(..., description="Anime search query")):
 
 
 @app.get("/api/yummy/episodes")
-async def get_yummy_episodes(q: str = Query(...)):
-    """Search anime and retrieve all episodes via anicli-api"""
+async def get_yummy_episodes(q: str = Query(...), alt: Optional[str] = Query(None)):
+    """Search anime and retrieve all episodes via anicli-api across multiple providers"""
     clean_q = q.strip()
     if not clean_q:
         return {"episodes": []}
 
     try:
         loop = asyncio.get_event_loop()
-        # Find anime
-        results = await loop.run_in_executor(None, yummy_extractor.search, clean_q)
-        if not results:
-            return {"episodes": [], "message": f"Tidak ditemukan anime '{clean_q}' di YummyAnime"}
+        candidates = [clean_q]
+        if alt and alt.strip() and alt.strip() not in candidates:
+            candidates.append(alt.strip())
+        if ":" in clean_q:
+            c1 = clean_q.split(":")[0].strip()
+            if c1 and c1 not in candidates:
+                candidates.append(c1)
+        if alt and ":" in alt:
+            c2 = alt.split(":")[0].strip()
+            if c2 and c2 not in candidates:
+                candidates.append(c2)
 
-        first = results[0]
-        anime = await loop.run_in_executor(None, first.get_anime)
-        episodes = await loop.run_in_executor(None, anime.get_episodes)
+        # 1. Try Animevost (extremely fast & comprehensive)
+        for cand in candidates:
+            try:
+                res_av = await loop.run_in_executor(None, animevost_extractor.search, cand)
+                if res_av:
+                    anime_av = await loop.run_in_executor(None, res_av[0].get_anime)
+                    eps_av = await loop.run_in_executor(None, anime_av.get_episodes)
+                    if eps_av:
+                        ep_list = []
+                        for ep in eps_av:
+                            ep_num = getattr(ep, "ordinal", None) if getattr(ep, "ordinal", None) is not None else ep.num
+                            ep_list.append({
+                                "num": ep_num,
+                                "title": f"Episode {ep_num}"
+                            })
+                        return {
+                            "anime_title": anime_av.title,
+                            "total_episodes": len(ep_list),
+                            "episodes": ep_list
+                        }
+            except Exception:
+                pass
 
-        cache_key = clean_q.lower()
-        episodes_cache[cache_key] = episodes
+        # 2. Try Anilibria
+        for cand in candidates:
+            try:
+                res_al = await loop.run_in_executor(None, anilibria_extractor.search, cand)
+                if res_al:
+                    anime_al = await loop.run_in_executor(None, res_al[0].get_anime)
+                    eps_al = await loop.run_in_executor(None, anime_al.get_episodes)
+                    if eps_al:
+                        ep_list = []
+                        for ep in eps_al:
+                            ep_num = getattr(ep, "ordinal", None) if getattr(ep, "ordinal", None) is not None else ep.num
+                            ep_list.append({
+                                "num": ep_num,
+                                "title": f"Episode {ep_num}"
+                            })
+                        return {
+                            "anime_title": anime_al.title,
+                            "total_episodes": len(ep_list),
+                            "episodes": ep_list
+                        }
+            except Exception:
+                pass
 
-        ep_list = []
-        for ep in episodes:
-            ep_list.append({
-                "num": ep.num,
-                "title": ep.title or f"Episode {ep.num}"
-            })
+        # 3. Try YummyAnime
+        for cand in candidates:
+            try:
+                results = await loop.run_in_executor(None, yummy_extractor.search, cand)
+                if results:
+                    anime = await loop.run_in_executor(None, results[0].get_anime)
+                    episodes = await loop.run_in_executor(None, anime.get_episodes)
+                    if episodes:
+                        ep_list = []
+                        for ep in episodes:
+                            ep_list.append({
+                                "num": ep.num,
+                                "title": ep.title or f"Episode {ep.num}"
+                            })
+                        return {
+                            "anime_title": anime.title,
+                            "total_episodes": len(ep_list),
+                            "episodes": ep_list
+                        }
+            except Exception:
+                pass
 
-        return {
-            "anime_title": anime.title,
-            "total_episodes": len(ep_list),
-            "episodes": ep_list
-        }
+        return {"episodes": [], "message": f"Tidak ditemukan episode untuk '{clean_q}'"}
     except Exception as e:
         return {"error": str(e), "episodes": []}
 
 
 @app.get("/api/yummy/streams")
-async def get_yummy_streams(q: str = Query(...), ep: int = Query(1), nocache: bool = Query(False)):
-    """Extract direct Kodik HLS video streams (.m3u8) using anicli-api for specified episode"""
+async def get_yummy_streams(
+    q: str = Query(...), 
+    ep: int = Query(1), 
+    alt: Optional[str] = Query(None),
+    nocache: bool = Query(False)
+):
+    """Extract multi-provider video streams (AniLibria HLS, AnimeVost MP4, Kodik HLS)"""
     clean_q = q.strip()
-    simplified_q = re.sub(r'\s+(Season|\bS\b|\bPart\b|\bII\b|\b2nd\b|\b3rd\b|\b4th\b).*$', '', clean_q, flags=re.IGNORECASE).strip()
+    alt_q = alt.strip() if alt else ""
 
-    s_key = f"{clean_q.lower()}:{ep}"
+    s_key = f"{clean_q.lower()}:{alt_q.lower()}:{ep}"
     if not nocache and s_key in streams_cache:
         return streams_cache[s_key]
 
     output_sources = []
     loop = asyncio.get_event_loop()
 
-    # 1. Check known Kodik season templates first for instant, guaranteed playback
-    lookup_names = [clean_q.lower(), simplified_q.lower()]
+    # Generate query candidates
+    candidates = []
+    def add_cand(cand: str):
+        c = cand.strip()
+        if c and c not in candidates:
+            candidates.append(c)
+
+    add_cand(clean_q)
+    if alt_q:
+        add_cand(alt_q)
+
+    if ":" in clean_q:
+        add_cand(clean_q.split(":")[0])
+    if alt_q and ":" in alt_q:
+        add_cand(alt_q.split(":")[0])
+
+    spaced_q = re.sub(r':(?=\S)', ': ', clean_q)
+    if spaced_q != clean_q:
+        add_cand(spaced_q)
+
+    for base in [clean_q, alt_q]:
+        if base:
+            no_season = re.sub(r'\s+(Season|\bS\d+\b|\bPart\b|\bII\b|\b2nd\b|\b3rd\b|\b4th\b|\b5th\b|\b6th\b|\b7th\b).*$', '', base, flags=re.IGNORECASE).strip()
+            add_cand(no_season)
+
+    # 1. Check known Kodik season templates first
     kodik_configs = []
-    for name in lookup_names:
-        if name in KNOWN_KODIK_SEASONS:
-            kodik_configs = KNOWN_KODIK_SEASONS[name]
+    for cand in candidates:
+        low = cand.lower()
+        if low in KNOWN_KODIK_SEASONS:
+            kodik_configs = KNOWN_KODIK_SEASONS[low]
             break
 
     if kodik_configs:
@@ -405,159 +494,159 @@ async def get_yummy_streams(q: str = Query(...), ep: int = Query(1), nocache: bo
             if res and res.get("videos"):
                 output_sources.append(res)
 
-    # 2. Check Anilibria (fast official multi-quality HLS provider)
-    try:
-        def fetch_anilibria():
-            query_candidates = [clean_q]
-            if simplified_q and simplified_q.lower() != clean_q.lower():
-                query_candidates.append(simplified_q)
-            
-            for query_cand in query_candidates:
-                try:
-                    res_lib = anilibria_extractor.search(query_cand)
-                    if not res_lib:
-                        continue
-                    anime_lib = res_lib[0].get_anime()
-                    episodes_lib = anime_lib.get_episodes()
-                    target_ep = None
-                    for le in episodes_lib:
-                        try:
-                            le_int = int(getattr(le, "ordinal", None) if getattr(le, "ordinal", None) is not None else int(str(le.num).strip()))
-                            if le_int == int(ep):
-                                target_ep = le
-                                break
-                        except Exception:
-                            if str(getattr(le, "num", "")).strip() == str(ep).strip():
-                                target_ep = le
-                                break
-                    if not target_ep and 1 <= int(ep) <= len(episodes_lib):
-                        target_ep = episodes_lib[int(ep) - 1]
-                    
-                    if target_ep:
-                        sources = target_ep.get_sources()
-                        items = []
-                        for s in sources:
-                            for v in s.get_videos():
-                                raw_url = v.url
-                                items.append({
-                                    "quality": v.quality,
-                                    "type": v.type,
-                                    "url": f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}",
-                                    "direct_url": raw_url
-                                })
-                        if items:
-                            return [{
-                                "title": f"AniLibria Official (Multi-Quality 1080p/720p/480p)",
-                                "is_subtitles_original": False,
-                                "player_url": None,
-                                "videos": items
-                            }]
-                except Exception as inner_e:
-                    logger.warning(f"Anilibria search inner error for '{query_cand}': {inner_e}")
-            return []
+    # 2. Parallel Extraction: AniLibria (HLS) & AnimeVost (Direct MP4)
+    def fetch_anilibria():
+        for query_cand in candidates:
+            try:
+                res_lib = anilibria_extractor.search(query_cand)
+                if not res_lib:
+                    continue
+                anime_lib = res_lib[0].get_anime()
+                episodes_lib = anime_lib.get_episodes()
+                target_ep = None
+                for le in episodes_lib:
+                    try:
+                        le_int = int(getattr(le, "ordinal", None) if getattr(le, "ordinal", None) is not None else int(str(le.num).strip()))
+                        if le_int == int(ep):
+                            target_ep = le
+                            break
+                    except Exception:
+                        if str(getattr(le, "num", "")).strip() == str(ep).strip():
+                            target_ep = le
+                            break
+                if not target_ep and 1 <= int(ep) <= len(episodes_lib):
+                    target_ep = episodes_lib[int(ep) - 1]
+                
+                if target_ep:
+                    sources = target_ep.get_sources()
+                    items = []
+                    for s in sources:
+                        for v in s.get_videos():
+                            raw_url = v.url
+                            items.append({
+                                "quality": v.quality,
+                                "type": v.type,
+                                "url": f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}",
+                                "direct_url": raw_url
+                            })
+                    if items:
+                        items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
+                        return [{
+                            "title": "AniLibria Official (HLS 1080p/720p/480p)",
+                            "is_subtitles_original": False,
+                            "player_url": None,
+                            "videos": items
+                        }]
+            except Exception as inner_e:
+                logger.warning(f"Anilibria search inner error for '{query_cand}': {inner_e}")
+        return []
 
-        anilibria_sources = await loop.run_in_executor(None, fetch_anilibria)
-        if anilibria_sources:
-            output_sources.extend(anilibria_sources)
-    except Exception as e:
-        logger.warning(f"Anilibria fetch error: {e}")
+    def fetch_animevost():
+        for query_cand in candidates:
+            try:
+                res_av = animevost_extractor.search(query_cand)
+                if not res_av:
+                    continue
+                anime_av = res_av[0].get_anime()
+                episodes_av = anime_av.get_episodes()
+                target_ep = None
+                for ae in episodes_av:
+                    try:
+                        ae_int = int(getattr(ae, "ordinal", None) if getattr(ae, "ordinal", None) is not None else int(str(ae.num).strip()))
+                        if ae_int == int(ep):
+                            target_ep = ae
+                            break
+                    except Exception:
+                        if str(getattr(ae, "num", "")).strip() == str(ep).strip():
+                            target_ep = ae
+                            break
+                if not target_ep and 1 <= int(ep) <= len(episodes_av):
+                    target_ep = episodes_av[int(ep) - 1]
+
+                if target_ep:
+                    sources = target_ep.get_sources()
+                    items = []
+                    for s in sources:
+                        for v in s.get_videos():
+                            raw_url = v.url
+                            proxied_url = f"/api/video/proxy?url={urllib.parse.quote(raw_url)}"
+                            items.append({
+                                "quality": v.quality,
+                                "type": "mp4",
+                                "url": proxied_url,
+                                "direct_url": raw_url
+                            })
+                    if items:
+                        items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
+                        return [{
+                            "title": "AnimeVost Server (HD MP4 / Fast)",
+                            "is_subtitles_original": False,
+                            "player_url": None,
+                            "videos": items
+                        }]
+            except Exception as inner_e:
+                logger.warning(f"Animevost search inner error for '{query_cand}': {inner_e}")
+        return []
+
+    parallel_tasks = [
+        loop.run_in_executor(None, fetch_anilibria),
+        loop.run_in_executor(None, fetch_animevost)
+    ]
+    parallel_results = await asyncio.gather(*parallel_tasks)
+    for p_res in parallel_results:
+        if p_res:
+            output_sources.extend(p_res)
 
     # 3. If output_sources is still empty, fallback to YummyAnime
     if not output_sources:
         try:
-            cache_key = clean_q.lower()
-            episodes = episodes_cache.get(cache_key)
-            if not episodes and simplified_q:
-                episodes = episodes_cache.get(simplified_q.lower())
+            for query_cand in candidates:
+                try:
+                    results = await asyncio.wait_for(loop.run_in_executor(None, yummy_extractor.search, query_cand), timeout=5.0)
+                    if results:
+                        anime = await loop.run_in_executor(None, results[0].get_anime)
+                        episodes = await loop.run_in_executor(None, anime.get_episodes)
+                        if episodes:
+                            target_ep = None
+                            for e in episodes:
+                                try:
+                                    e_int = int(getattr(e, "ordinal", None) if getattr(e, "ordinal", None) is not None else int(str(e.num).strip()))
+                                    if e_int == int(ep):
+                                        target_ep = e
+                                        break
+                                except Exception:
+                                    if str(getattr(e, "num", "")).strip() == str(ep).strip():
+                                        target_ep = e
+                                        break
+                            if not target_ep and 1 <= int(ep) <= len(episodes):
+                                target_ep = episodes[int(ep) - 1]
 
-            if not episodes:
-                search_term = simplified_q if simplified_q else clean_q
-                results = await asyncio.wait_for(loop.run_in_executor(None, yummy_extractor.search, search_term), timeout=6.0)
-                if results:
-                    anime = await loop.run_in_executor(None, results[0].get_anime)
-                    episodes = await loop.run_in_executor(None, anime.get_episodes)
-                    episodes_cache[cache_key] = episodes
-
-            if episodes:
-                target_ep = None
-                for e in episodes:
-                    try:
-                        e_int = int(getattr(e, "ordinal", None) if getattr(e, "ordinal", None) is not None else int(str(e.num).strip()))
-                        if e_int == int(ep):
-                            target_ep = e
-                            break
-                    except Exception:
-                        if str(getattr(e, "num", "")).strip() == str(ep).strip():
-                            target_ep = e
-                            break
-
-                if not target_ep and episodes:
-                    if 1 <= int(ep) <= len(episodes):
-                        target_ep = episodes[int(ep) - 1]
-                    else:
-                        target_ep = episodes[0]
-
-                if target_ep:
-                    sources = await loop.run_in_executor(None, target_ep.get_sources)
-                    def source_priority(s):
-                        t = s.title.lower()
-                        if "субтитр" in t or "sub" in t: return 0
-                        if "anilibria" in t: return 1
-                        if "anidub" in t: return 2
-                        if "2x2" in t: return 3
-                        if "anirise" in t: return 4
-                        return 10
-
-                    sorted_sources = sorted(sources, key=source_priority)
-                    selected_sources = sorted_sources[:6]
-
-                    def fetch_source_videos(s):
-                        try:
-                            url = getattr(s, "url", "")
-                            if url and "kodik" in url:
-                                if "episode=" in url:
-                                    s.url = re.sub(r'([?&]episode=)\d+', rf'\g<1>{ep}', url)
-                                else:
-                                    sep = "&" if "?" in url else "?"
-                                    s.url = f"{url}{sep}episode={ep}"
-                            return s.get_videos()
-                        except Exception:
-                            return []
-
-                    tasks = [loop.run_in_executor(None, fetch_source_videos, s) for s in selected_sources]
-                    results_vids = await asyncio.gather(*tasks)
-
-                    for s, vids in zip(selected_sources, results_vids):
-                        source_title = s.title
-                        is_sub = "субтитр" in source_title.lower() or "sub" in source_title.lower()
-                        player_url = getattr(s, "url", None)
-                        if player_url and "kodik" in player_url:
-                            if "episode=" in player_url:
-                                player_url = re.sub(r'([?&]episode=)\d+', rf'\g<1>{ep}', player_url)
-                            else:
-                                sep = "&" if "?" in player_url else "?"
-                                player_url = f"{player_url}{sep}episode={ep}"
-
-                        video_items = []
-                        for v in vids:
-                            raw_url = v.url
-                            proxied_url = f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}"
-                            video_items.append({
-                                "quality": v.quality,
-                                "type": v.type,
-                                "url": proxied_url,
-                                "direct_url": raw_url
-                            })
-
-                        if video_items:
-                            output_sources.append({
-                                "title": source_title,
-                                "is_subtitles_original": is_sub,
-                                "player_url": player_url,
-                                "videos": video_items
-                            })
+                            if target_ep:
+                                sources = await loop.run_in_executor(None, target_ep.get_sources)
+                                for s in sources[:4]:
+                                    vids = await loop.run_in_executor(None, s.get_videos)
+                                    video_items = []
+                                    for v in vids:
+                                        raw_url = v.url
+                                        video_items.append({
+                                            "quality": v.quality,
+                                            "type": v.type,
+                                            "url": f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}",
+                                            "direct_url": raw_url
+                                        })
+                                    if video_items:
+                                        output_sources.append({
+                                            "title": f"Yummy / {s.title}",
+                                            "is_subtitles_original": "субтитр" in s.title.lower() or "sub" in s.title.lower(),
+                                            "player_url": getattr(s, "url", None),
+                                            "videos": video_items
+                                        })
+                    if output_sources:
+                        break
+                except Exception as inner_e:
+                    logger.warning(f"Yummy candidate '{query_cand}' error: {inner_e}")
         except Exception as e:
-            logger.warning(f"YummyAnime extraction fallback error: {e}")
+            logger.warning(f"Yummy fallback error: {e}")
 
     result_data = {
         "anime": clean_q,
@@ -763,6 +852,64 @@ async def proxy_hls_segment(request: Request, url: str = Query(...)):
         )
 
     raise HTTPException(status_code=504, detail="Segment upstream timeout")
+
+
+@app.api_route("/api/video/proxy", methods=["GET", "HEAD"])
+async def proxy_video(request: Request, url: str = Query(...)):
+    """High-speed streaming proxy for direct MP4 videos with HTTP Range support"""
+    clean_url = url.strip()
+    if not clean_url.startswith("http"):
+        raise HTTPException(status_code=400, detail="Invalid video URL")
+
+    req_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "http://video.animetop.info/"
+    }
+    if "range" in request.headers:
+        req_headers["range"] = request.headers["range"]
+
+    if request.method == "HEAD":
+        try:
+            head_resp = await global_client.head(clean_url, headers=req_headers)
+            h = {
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range, Content-Type",
+            }
+            for k in ["content-type", "content-length", "last-modified", "etag"]:
+                if k in head_resp.headers:
+                    h[k] = head_resp.headers[k]
+            return Response(status_code=head_resp.status_code, headers=h)
+        except Exception:
+            return Response(status_code=200, headers={"Accept-Ranges": "bytes", "Access-Control-Allow-Origin": "*"})
+
+    try:
+        req = global_client.build_request("GET", clean_url, headers=req_headers)
+        r = await global_client.send(req, stream=True)
+
+        resp_headers = {
+            "Accept-Ranges": "bytes",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type",
+        }
+        for k in ["content-type", "content-length", "content-range", "last-modified", "etag"]:
+            if k in r.headers:
+                resp_headers[k] = r.headers[k]
+
+        if "content-type" not in resp_headers:
+            resp_headers["content-type"] = "video/mp4"
+
+        return StreamingResponse(
+            r.aiter_raw(),
+            status_code=r.status_code,
+            headers=resp_headers,
+            background=r.aclose
+        )
+    except Exception as e:
+        logger.error(f"Video proxy error for {clean_url}: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 # ==========================================
