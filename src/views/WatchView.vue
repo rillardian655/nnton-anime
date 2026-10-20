@@ -29,10 +29,21 @@
                 @ended="onVideoEnded"
               ></video>
 
-              <!-- Loading Overlay -->
+              <!-- Cinematic Loading Overlay -->
               <div v-if="isLoadingStream" class="player-loading-overlay">
-                <span class="spinner-large"></span>
-                <p>{{ loadingMessage }}</p>
+                <div class="cinema-loader-core">
+                  <div class="loader-orbit orbit-1"></div>
+                  <div class="loader-orbit orbit-2"></div>
+                  <div class="loader-center-dot">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#e50914">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </div>
+                </div>
+                <div class="loader-status-wrap">
+                  <p class="loader-title">{{ loadingMessage || 'Menyiapkan Stream...' }}</p>
+                  <span class="loader-sub">Menghubungkan ke node server CDN VIP Sub Indo</span>
+                </div>
               </div>
 
               <!-- Resume Prompt Banner -->
@@ -765,15 +776,85 @@ onUnmounted(() => {
 .player-loading-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(8, 9, 12, 0.9);
+  background: radial-gradient(circle at center, rgba(14, 17, 26, 0.94) 0%, rgba(6, 7, 10, 0.98) 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 1.5rem;
   color: #cbd5e1;
-  font-size: 0.95rem;
   z-index: 10;
+  backdrop-filter: blur(6px);
+}
+
+.cinema-loader-core {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loader-orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+
+.loader-orbit.orbit-1 {
+  border-top-color: #e50914;
+  border-right-color: #e50914;
+  animation: orbitRotate 1.1s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  box-shadow: 0 0 16px rgba(229, 9, 20, 0.4);
+}
+
+.loader-orbit.orbit-2 {
+  inset: 8px;
+  border-bottom-color: #f43f5e;
+  border-left-color: rgba(244, 63, 94, 0.3);
+  animation: orbitRotateRev 1.6s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+.loader-center-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(229, 9, 20, 0.12);
+  border: 1px solid rgba(229, 9, 20, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px rgba(229, 9, 20, 0.3);
+}
+
+@keyframes orbitRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes orbitRotateRev {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.loader-status-wrap {
+  text-align: center;
+}
+
+.loader-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 4px 0;
+  letter-spacing: 0.02em;
+}
+
+.loader-sub {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
 }
 
 .resume-prompt-banner {

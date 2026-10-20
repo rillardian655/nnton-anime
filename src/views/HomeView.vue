@@ -159,15 +159,17 @@
         </button>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="isLoading" class="grid-loader">
-        <span class="spinner-large"></span>
-        <p>Memuat anime terbaik untukmu...</p>
-      </div>
+      <!-- Modern Skeleton Shimmer Loading State -->
+      <AnimeSkeletonGrid v-if="isLoading" :count="12" />
 
       <!-- Empty State -->
       <div v-else-if="animeList.length === 0" class="empty-state">
-        <div class="empty-icon">📺</div>
+        <div class="empty-icon-wrap">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+            <polyline points="17 2 12 7 7 2"></polyline>
+          </svg>
+        </div>
         <h3>Belum Ada Anime di Daftar Ini</h3>
         <p>{{ getEmptyMessage() }}</p>
       </div>
@@ -223,6 +225,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AnimeSkeletonGrid from '../components/AnimeSkeletonGrid.vue';
 import { 
   getTrendingAnime, 
   getPopularThisSeason, 
@@ -967,11 +970,24 @@ onUnmounted(() => {
   text-align: center;
   padding: 5rem 1rem;
   color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: 0.75rem;
+.empty-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .spinner-large {
