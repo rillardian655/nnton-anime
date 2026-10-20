@@ -124,10 +124,16 @@ onMounted(async () => {
   flex-direction: column;
   background-color: var(--bg-base);
   color: var(--text-main);
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .main-content-body {
   flex: 1;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .site-footer {

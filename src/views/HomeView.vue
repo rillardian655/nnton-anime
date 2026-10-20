@@ -415,6 +415,9 @@ onUnmounted(() => {
 <style scoped>
 .home-page {
   padding-bottom: 5rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* ================= Hero Billboard ================= */
@@ -618,6 +621,8 @@ onUnmounted(() => {
   max-width: 1440px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .continue-watching-section {
@@ -757,11 +762,20 @@ onUnmounted(() => {
 /* Filter Bar */
 .filter-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.5rem 0 1rem 0;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem 0 1rem 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .filter-bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
 }
 
 .genre-scroll-wrapper {
@@ -769,7 +783,18 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.45rem;
   overflow-x: auto;
-  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 1;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.genre-scroll-wrapper::-webkit-scrollbar {
+  display: none;
 }
 
 .chip-btn {
@@ -783,6 +808,7 @@ onUnmounted(() => {
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .chip-btn:hover {
@@ -801,6 +827,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .filter-selects {
+    width: auto;
+  }
 }
 
 .custom-select {
@@ -813,6 +848,8 @@ onUnmounted(() => {
   font-weight: 600;
   outline: none;
   cursor: pointer;
+  flex: 1;
+  min-width: 0;
 }
 
 .custom-select:focus {
@@ -1021,12 +1058,21 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  .content-container {
+    padding: 0 0.85rem;
+  }
   .hero-billboard {
     height: 50vh;
     min-height: 380px;
   }
+  .hero-content-wrap {
+    left: 1rem;
+    right: 1rem;
+    max-width: calc(100% - 2rem);
+    bottom: 2rem;
+  }
   .hero-title {
-    font-size: 1.8rem;
+    font-size: 1.65rem;
   }
   .hero-synopsis {
     display: none;
@@ -1036,10 +1082,27 @@ onUnmounted(() => {
   }
   .continue-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+  }
+  .continue-card {
+    min-width: 0;
   }
   .anime-cards-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.85rem;
+    gap: 0.75rem;
+  }
+  .anime-card {
+    min-width: 0;
+  }
+  .filter-selects {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .custom-select {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.78rem;
+    padding: 0.45rem 0.65rem;
   }
 }
 </style>

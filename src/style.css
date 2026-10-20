@@ -56,14 +56,26 @@ html {
   color: var(--text-main);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden !important;
+  max-width: 100vw;
+  width: 100%;
 }
 
 body {
   min-height: 100vh;
+  overflow-x: hidden !important;
+  background-color: var(--bg-base);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
-  background-color: var(--bg-base);
 }
 
 /* Custom Clean Scrollbar */
