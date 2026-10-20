@@ -1,0 +1,9 @@
+{
+  "appId": "com.anipulse.vip",
+  "appName": "AniPulse VIP",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}

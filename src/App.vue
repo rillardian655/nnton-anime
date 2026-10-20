@@ -24,6 +24,12 @@
       @close="selectedAnimeModal = null" 
     />
 
+    <!-- Mobile Bottom Navigation Bar -->
+    <MobileBottomNav 
+      :currentTab="activeTab" 
+      @selectTab="onTabSelected" 
+    />
+
     <!-- Footer -->
     <footer class="site-footer">
       <div class="footer-container">
@@ -79,6 +85,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import HeaderNav from './components/HeaderNav.vue';
+import MobileBottomNav from './components/MobileBottomNav.vue';
 import LoginModal from './components/LoginModal.vue';
 import InviteModal from './components/InviteModal.vue';
 import AnimeDetailModal from './components/AnimeDetailModal.vue';
@@ -242,6 +249,12 @@ onMounted(async () => {
   background: #10b981;
   border-radius: 50%;
   box-shadow: 0 0 6px #10b981;
+}
+
+@media (max-width: 900px) {
+  .app-root {
+    padding-bottom: calc(65px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (max-width: 768px) {

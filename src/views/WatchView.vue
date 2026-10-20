@@ -258,7 +258,8 @@ import {
   lookupTranslation, 
   translateSynopsis, 
   searchKusonime, 
-  getKusonimeDownloads 
+  getKusonimeDownloads,
+  apiUrl 
 } from '../api.js';
 import { 
   saveHistory, 
@@ -383,7 +384,7 @@ async function loadStream(ep) {
 
   try {
     // 1. Fetch stream sources from backend
-    const res = await fetch(`/api/yummy/streams?q=${encodeURIComponent(title)}&ep=${ep}`);
+    const res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&ep=${ep}`));
     const data = await res.json();
 
     // 2. Fetch subtitles
@@ -392,7 +393,7 @@ async function loadStream(ep) {
     if (!data.sources || data.sources.length === 0) {
       // Fallback try romaji
       if (altTitle && altTitle !== title) {
-        const altRes = await fetch(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}`);
+        const altRes = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}`));
         const altData = await altRes.json();
         if (altData.sources && altData.sources.length > 0) {
           setupSources(altData.sources);
@@ -515,7 +516,7 @@ function switchQuality(q) {
 
 async function fetchSubtitles(title, altTitle, ep) {
   try {
-    const res = await fetch(`/api/subtitles/search?title=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}`);
+    const res = await fetch(apiUrl(`/api/subtitles/search?title=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}`));
     const data = await res.json();
     if (data.subtitles && data.subtitles.length > 0) {
       subtitlesList.value = data.subtitles;

@@ -1,10 +1,33 @@
 // ==========================================
 // AniPulse - API Client & Data Layer
+// Supports Web & Android Native (Capacitor)
 // ==========================================
 
-const ANILIST_URL = '/api/anilist';
+export function getApiBaseUrl() {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('anipulse_backend_url');
+    if (custom) return custom.replace(/\/+$/, '');
+    if (window.Capacitor?.isNativePlatform?.()) {
+      return 'http://192.168.1.11:8000';
+    }
+  }
+  return '';
+}
+
+export function setBackendUrl(url) {
+  if (url) {
+    localStorage.setItem('anipulse_backend_url', url.replace(/\/+$/, ''));
+  } else {
+    localStorage.removeItem('anipulse_backend_url');
+  }
+}
+
+export function apiUrl(path) {
+  const base = getApiBaseUrl();
+  return `${base}${path}`;
+}
+
 const ANILIST_FALLBACK = 'https://graphql.anilist.co';
-const KITSU_URL = '/api/kitsu';
 const KITSU_FALLBACK = 'https://kitsu.io/api/edge';
 
 /**
@@ -14,7 +37,7 @@ export async function fetchAniList(query, variables = {}) {
   try {
     let response;
     try {
-      response = await fetch(ANILIST_URL, {
+      response = await fetch(apiUrl('/api/anilist'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -583,8 +606,8 @@ export async function auditAllAPIs() {
  */
 export function getSafeImageUrl(url) {
   if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
-  if (url.startsWith('/api/') || url.startsWith('data:')) return url;
-  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  if (url.startsWith('/api/') || url.startsWith('data:')) return apiUrl(url);
+  return apiUrl(`/api/image-proxy?url=${encodeURIComponent(url)}`);
 }
 
 /**
@@ -603,7 +626,7 @@ export function setAuthToken(token) {
 }
 
 export async function authLogin(username, password) {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
@@ -620,7 +643,7 @@ export async function authMe() {
   const token = getAuthToken();
   if (!token) return null;
   try {
-    const res = await fetch('/api/auth/me', {
+    const res = await fetch(apiUrl('/api/auth/me'), {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (!res.ok) {
@@ -638,7 +661,7 @@ export async function authLogout() {
   const token = getAuthToken();
   if (token) {
     try {
-      await fetch('/api/auth/logout', {
+      await fetch(apiUrl('/api/auth/logout'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -648,12 +671,12 @@ export async function authLogout() {
 }
 
 export async function verifyInvite(code) {
-  const res = await fetch(`/api/auth/verify-invite?code=${encodeURIComponent(code)}`);
+  const res = await fetch(apiUrl(`/api/auth/verify-invite?code=${encodeURIComponent(code)}`));
   return await res.json();
 }
 
 export async function claimInvite(code, username, password, displayName) {
-  const res = await fetch('/api/auth/claim-invite', {
+  const res = await fetch(apiUrl('/api/auth/claim-invite'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, username, password, displayName })
@@ -671,7 +694,7 @@ export async function claimInvite(code, username, password, displayName) {
  */
 export async function adminCreateInvite(targetName, durationType, customDays = null) {
   const token = getAuthToken();
-  const res = await fetch('/api/admin/create-invite', {
+  const res = await fetch(apiUrl('/api/admin/create-invite'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -686,7 +709,7 @@ export async function adminCreateInvite(targetName, durationType, customDays = n
 
 export async function adminGetInvites() {
   const token = getAuthToken();
-  const res = await fetch('/api/admin/invites', {
+  const res = await fetch(apiUrl('/api/admin/invites'), {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   const data = await res.json();
@@ -696,7 +719,7 @@ export async function adminGetInvites() {
 
 export async function adminGetUsers() {
   const token = getAuthToken();
-  const res = await fetch('/api/admin/users', {
+  const res = await fetch(apiUrl('/api/admin/users'), {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   const data = await res.json();
@@ -706,7 +729,7 @@ export async function adminGetUsers() {
 
 export async function adminExtendUser(username, days = 30) {
   const token = getAuthToken();
-  const res = await fetch('/api/admin/extend-user', {
+  const res = await fetch(apiUrl('/api/admin/extend-user'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -721,7 +744,7 @@ export async function adminExtendUser(username, days = 30) {
 
 export async function adminToggleUser(username) {
   const token = getAuthToken();
-  const res = await fetch('/api/admin/toggle-user', {
+  const res = await fetch(apiUrl('/api/admin/toggle-user'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -736,7 +759,7 @@ export async function adminToggleUser(username) {
 
 export async function adminDeleteUser(username) {
   const token = getAuthToken();
-  const res = await fetch(`/api/admin/user/${encodeURIComponent(username)}`, {
+  const res = await fetch(apiUrl(`/api/admin/user/${encodeURIComponent(username)}`), {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${token}` }
   });
@@ -747,7 +770,7 @@ export async function adminDeleteUser(username) {
 
 export async function adminDeleteInvite(code) {
   const token = getAuthToken();
-  const res = await fetch(`/api/admin/invite/${encodeURIComponent(code)}`, {
+  const res = await fetch(apiUrl(`/api/admin/invite/${encodeURIComponent(code)}`), {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${token}` }
   });
@@ -758,7 +781,7 @@ export async function adminDeleteInvite(code) {
 
 export async function adminGetStats() {
   const token = getAuthToken();
-  const res = await fetch('/api/admin/stats', {
+  const res = await fetch(apiUrl('/api/admin/stats'), {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   const data = await res.json();
@@ -771,7 +794,7 @@ export async function adminGetStats() {
  */
 export async function lookupTranslation(animeId) {
   try {
-    const res = await fetch(`/api/translate/lookup?anime_id=${encodeURIComponent(animeId)}`);
+    const res = await fetch(apiUrl(`/api/translate/lookup?anime_id=${encodeURIComponent(animeId)}`));
     if (res.ok) {
       return await res.json();
     }
@@ -785,7 +808,7 @@ export async function translateSynopsis(text, animeId = null) {
   try {
     const params = new URLSearchParams({ text, to_lang: 'id', from_lang: 'en' });
     if (animeId) params.append('anime_id', animeId);
-    const res = await fetch(`/api/translate?${params.toString()}`);
+    const res = await fetch(apiUrl(`/api/translate?${params.toString()}`));
     if (res.ok) {
       return await res.json();
     }
