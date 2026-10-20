@@ -1,0 +1,1104 @@
+<template>
+  <div class="admin-page">
+    <div class="admin-container">
+      <!-- Admin Header -->
+      <div class="admin-header">
+        <div class="admin-title-wrap">
+          <div class="admin-icon-badge">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e50914" stroke-width="2.2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+          </div>
+          <div>
+            <h1 class="admin-title">Panel Kontrol Administrator</h1>
+            <p class="admin-subtitle">Manajemen Link Undangan VIP (1x Pakai), Durasi Pengguna & Cache Terjemahan</p>
+          </div>
+        </div>
+
+        <router-link to="/" class="btn btn-secondary btn-sm">
+          ← Kembali ke Beranda
+        </router-link>
+      </div>
+
+      <!-- Access Denied if not admin -->
+      <div v-if="!isAdmin" class="access-denied-card">
+        <div class="denied-icon">🔒</div>
+        <h2>Akses Dibatasi</h2>
+        <p>Hanya akun Administrator yang berhak mengakses halaman ini.</p>
+        <button class="btn btn-primary" @click="showLoginModal = true">
+          Masuk sebagai Admin
+        </button>
+      </div>
+
+      <!-- Admin Content -->
+      <div v-else class="admin-content">
+        <!-- Stats Row -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <span class="stat-num">{{ stats.totalInvites || 0 }}</span>
+            <span class="stat-lbl">Total Undangan Dibuat</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num text-success">{{ stats.unclaimedInvites || 0 }}</span>
+            <span class="stat-lbl">Undangan Tersedia (Belum Dipakai)</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num text-muted">{{ stats.claimedInvites || 0 }}</span>
+            <span class="stat-lbl">Undangan Sudah Digunakan</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num text-primary">{{ stats.activeUsers || 0 }}</span>
+            <span class="stat-lbl">Pengguna VIP Aktif</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num text-danger">{{ stats.expiredUsers || 0 }}</span>
+            <span class="stat-lbl">Pengguna Expired</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num text-gold">{{ stats.cachedTranslations || 0 }}</span>
+            <span class="stat-lbl">Anime Diterjemahkan di DB</span>
+          </div>
+        </div>
+
+        <!-- Section: Buat Link Undangan Baru -->
+        <div class="admin-card create-invite-section">
+          <div class="card-header-bar">
+            <div class="card-header-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e50914" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+              <h3>Buat Link Undangan Baru (1x Pakai)</h3>
+            </div>
+            <span class="badge-hint">Hanya bisa diklaim 1x oleh penerima</span>
+          </div>
+
+          <form @submit.prevent="handleCreateInvite" class="create-invite-form">
+            <div class="invite-form-grid">
+              <!-- Nama Penerima -->
+              <div class="form-field">
+                <label for="invTargetName">Nama Penerima / Pemesan:</label>
+                <input 
+                  id="invTargetName" 
+                  v-model="targetName" 
+                  type="text" 
+                  placeholder="Misal: ceta, budi, kawan_kantor..." 
+                  required 
+                />
+                <span class="input-tip">Nama ini akan tercantum di pesan undangan dan mempermudah pelacakan data.</span>
+              </div>
+
+              <!-- Durasi Expired -->
+              <div class="form-field">
+                <label for="invDuration">Batas Masa Aktif (Expired):</label>
+                <select id="invDuration" v-model="durationType" class="admin-select">
+                  <option value="1d">1 Hari (24 Jam)</option>
+                  <option value="3d">3 Hari (72 Jam)</option>
+                  <option value="1w">1 Minggu (7 Hari)</option>
+                  <option value="2w">2 Minggu (14 Hari)</option>
+                  <option value="1m">1 Bulan (30 Hari) — Rekomendasi VIP</option>
+                  <option value="custom">Kustom (Isi jumlah hari)</option>
+                </select>
+              </div>
+
+              <!-- Custom Days if selected -->
+              <div class="form-field" v-if="durationType === 'custom'">
+                <label for="invCustomDays">Jumlah Hari Kustom:</label>
+                <input 
+                  id="invCustomDays" 
+                  v-model.number="customDays" 
+                  type="number" 
+                  min="1" 
+                  max="3650" 
+                  placeholder="Contoh: 60" 
+                />
+              </div>
+            </div>
+
+            <div class="create-btn-wrap">
+              <button type="submit" class="btn btn-primary btn-generate" :disabled="isCreating">
+                <span v-if="isCreating" class="spinner-small"></span>
+                <span>{{ isCreating ? 'Membuat Link...' : 'Generate Link Undangan VIP (1x Pakai)' }}</span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Result Generated Box -->
+          <div v-if="latestCreatedInvite" class="created-result-card">
+            <div class="created-header">
+              <div class="result-title">
+                <span class="success-icon">✓</span>
+                <h4>Link Undangan Berhasil Dibuat!</h4>
+              </div>
+              <span class="result-expiry-badge">{{ latestCreatedInvite.durationLabel }}</span>
+            </div>
+
+            <div class="result-url-box">
+              <input type="text" :value="getInviteFullUrl(latestCreatedInvite.code)" readonly ref="urlInputRef" />
+              <button class="btn btn-secondary btn-sm" @click="copyLink(latestCreatedInvite.code)">
+                {{ copiedLink ? '✓ Tersalin' : 'Salin Link' }}
+              </button>
+            </div>
+
+            <div class="wa-message-preview">
+              <div class="wa-header">
+                <span class="wa-badge">Format Pesan WhatsApp (Siap Kirim):</span>
+                <button class="btn btn-primary btn-sm btn-copy-wa" @click="copyWaMessage(latestCreatedInvite)">
+                  {{ copiedWa ? '✓ Pesan WA Tersalin!' : '📲 Salin Pesan WhatsApp Lengkap' }}
+                </button>
+              </div>
+              <pre class="wa-text-box">{{ generateWaText(latestCreatedInvite) }}</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs for Tables -->
+        <div class="admin-tabs">
+          <button 
+            class="admin-tab-btn" 
+            :class="{ active: currentTab === 'invites' }" 
+            @click="currentTab = 'invites'"
+          >
+            📋 Daftar Link Undangan ({{ invitesList.length }})
+          </button>
+          <button 
+            class="admin-tab-btn" 
+            :class="{ active: currentTab === 'users' }" 
+            @click="currentTab = 'users'"
+          >
+            👥 Daftar Pengguna VIP ({{ usersList.length }})
+          </button>
+        </div>
+
+        <!-- Tab 1: Invites Table -->
+        <div v-if="currentTab === 'invites'" class="admin-card table-card">
+          <div class="table-search-bar">
+            <input 
+              type="text" 
+              v-model="inviteSearch" 
+              placeholder="Cari penerima (ceta) atau kode undangan..." 
+            />
+            <button class="btn btn-secondary btn-sm" @click="fetchData">🔄 Refresh Data</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Kode Undangan</th>
+                  <th>Nama Penerima</th>
+                  <th>Durasi Akses</th>
+                  <th>Status (1x Pakai)</th>
+                  <th>Diklaim Oleh</th>
+                  <th>Waktu Dibuat</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="inv in filteredInvites" :key="inv.id">
+                  <td>
+                    <code class="code-tag">{{ inv.code }}</code>
+                  </td>
+                  <td class="font-bold text-white">{{ inv.target_name }}</td>
+                  <td>
+                    <span class="badge-duration-pill">{{ inv.duration_type }}</span>
+                  </td>
+                  <td>
+                    <span v-if="inv.is_used" class="status-claimed">✓ Sudah Digunakan</span>
+                    <span v-else class="status-available">● Belum Digunakan (Tersedia)</span>
+                  </td>
+                  <td>
+                    <span v-if="inv.claimed_by_user" class="claimed-user-tag">{{ inv.claimed_by_user }}</span>
+                    <span v-else class="text-dim">-</span>
+                  </td>
+                  <td class="text-sm text-dim">{{ formatDate(inv.created_at) }}</td>
+                  <td>
+                    <div class="action-buttons-row">
+                      <button 
+                        class="btn-act btn-act-wa" 
+                        title="Salin Pesan WA"
+                        @click="copyWaMessage(inv)"
+                      >
+                        📲 WA
+                      </button>
+                      <button 
+                        class="btn-act btn-act-copy" 
+                        title="Salin Link"
+                        @click="copyLink(inv.code)"
+                      >
+                        🔗 Link
+                      </button>
+                      <button 
+                        v-if="!inv.is_used"
+                        class="btn-act btn-act-del" 
+                        title="Hapus Undangan"
+                        @click="handleDeleteInvite(inv.code)"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="filteredInvites.length === 0">
+                  <td colspan="7" class="empty-cell">Tidak ada data link undangan yang cocok.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Users Table -->
+        <div v-if="currentTab === 'users'" class="admin-card table-card">
+          <div class="table-search-bar">
+            <input 
+              type="text" 
+              v-model="userSearch" 
+              placeholder="Cari username atau nama tampilan..." 
+            />
+            <button class="btn btn-secondary btn-sm" @click="fetchData">🔄 Refresh Data</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Pengguna</th>
+                  <th>Nama Tampilan</th>
+                  <th>Role</th>
+                  <th>Kode Undangan</th>
+                  <th>Masa Berlaku (Expired)</th>
+                  <th>Sisa Waktu</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="u in filteredUsers" :key="u.id">
+                  <td>
+                    <div class="user-cell">
+                      <div class="avatar-small">{{ (u.display_name || u.username).charAt(0).toUpperCase() }}</div>
+                      <span class="font-bold text-white">{{ u.username }}</span>
+                    </div>
+                  </td>
+                  <td>{{ u.display_name }}</td>
+                  <td>
+                    <span class="role-badge" :class="{ 'role-admin': u.role === 'admin' }">
+                      {{ u.role === 'admin' ? 'ADMIN' : 'VIP' }}
+                    </span>
+                  </td>
+                  <td>
+                    <code class="code-tag" v-if="u.invite_code">{{ u.invite_code }}</code>
+                    <span v-else class="text-dim">-</span>
+                  </td>
+                  <td class="text-sm">
+                    {{ u.role === 'admin' ? 'Permanen (Lifetime)' : formatDate(u.expires_at) }}
+                  </td>
+                  <td>
+                    <span 
+                      v-if="u.role !== 'admin'" 
+                      class="remaining-tag"
+                      :class="{ 'tag-expired': u.isExpired }"
+                    >
+                      {{ u.isExpired ? 'EXPIRED' : formatRemaining(u.remainingSeconds) }}
+                    </span>
+                    <span v-else class="text-dim">Selamanya</span>
+                  </td>
+                  <td>
+                    <button 
+                      v-if="u.role !== 'admin'"
+                      class="status-toggle-btn" 
+                      :class="{ 'active': u.is_active }"
+                      @click="handleToggleUser(u.username)"
+                    >
+                      {{ u.is_active ? 'Aktif' : 'Nonaktif' }}
+                    </button>
+                    <span v-else class="text-dim">Aktif</span>
+                  </td>
+                  <td>
+                    <div class="action-buttons-row" v-if="u.role !== 'admin'">
+                      <button 
+                        class="btn-act btn-act-extend" 
+                        title="Perpanjang 30 Hari"
+                        @click="handleExtendUser(u.username, 30)"
+                      >
+                        +30 Hari
+                      </button>
+                      <button 
+                        class="btn-act btn-act-extend" 
+                        title="Perpanjang 7 Hari"
+                        @click="handleExtendUser(u.username, 7)"
+                      >
+                        +7 Hari
+                      </button>
+                      <button 
+                        class="btn-act btn-act-del" 
+                        title="Hapus Akun Pengguna"
+                        @click="handleDeleteUser(u.username)"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="filteredUsers.length === 0">
+                  <td colspan="8" class="empty-cell">Tidak ada data pengguna.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import { isAdmin, showLoginModal } from '../stores/auth.js';
+import { 
+  adminCreateInvite, 
+  adminGetInvites, 
+  adminGetUsers, 
+  adminExtendUser, 
+  adminToggleUser, 
+  adminDeleteUser, 
+  adminDeleteInvite, 
+  adminGetStats 
+} from '../api.js';
+
+const targetName = ref('');
+const durationType = ref('1m');
+const customDays = ref(30);
+const isCreating = ref(false);
+const latestCreatedInvite = ref(null);
+
+const copiedLink = ref(false);
+const copiedWa = ref(false);
+
+const currentTab = ref('invites');
+const inviteSearch = ref('');
+const userSearch = ref('');
+
+const invitesList = ref([]);
+const usersList = ref([]);
+const stats = ref({});
+
+const filteredInvites = computed(() => {
+  const q = inviteSearch.value.trim().toLowerCase();
+  if (!q) return invitesList.value;
+  return invitesList.value.filter(i => 
+    i.target_name?.toLowerCase().includes(q) || 
+    i.code?.toLowerCase().includes(q) ||
+    i.claimed_by_user?.toLowerCase().includes(q)
+  );
+});
+
+const filteredUsers = computed(() => {
+  const q = userSearch.value.trim().toLowerCase();
+  if (!q) return usersList.value;
+  return usersList.value.filter(u => 
+    u.username?.toLowerCase().includes(q) || 
+    u.display_name?.toLowerCase().includes(q)
+  );
+});
+
+function getInviteFullUrl(code) {
+  const origin = window.location.origin;
+  return `${origin}/?invite=${code}`;
+}
+
+function generateWaText(invite) {
+  const target = invite.target_name || 'Teman';
+  const url = getInviteFullUrl(invite.code);
+  const dur = invite.durationLabel || invite.duration_type || '30 Hari';
+
+  return `Halo ${target}! 🎉
+
+Berikut link akses khusus AniPulse VIP kamu:
+🔗 ${url}
+
+⏳ Masa aktif: ${dur} (dihitung sejak aktivasi)
+⚠️ Catatan: Link ini berlaku 1x pakai untuk aktivasi akun baru. Simpan nama pengguna dan kata sandi yang kamu buat untuk login kembali nanti ya!
+
+Selamat menonton anime favorit tanpa iklan! 🍿✨`;
+}
+
+async function handleCreateInvite() {
+  if (!targetName.value.trim()) return;
+  isCreating.value = true;
+  copiedLink.value = false;
+  copiedWa.value = false;
+  try {
+    const res = await adminCreateInvite(targetName.value.trim(), durationType.value, customDays.value);
+    if (res.success && res.invite) {
+      latestCreatedInvite.value = res.invite;
+      targetName.value = '';
+      await fetchData();
+    }
+  } catch (err) {
+    alert('Gagal membuat undangan: ' + err.message);
+  } finally {
+    isCreating.value = false;
+  }
+}
+
+async function copyLink(code) {
+  const url = getInviteFullUrl(code);
+  await navigator.clipboard.writeText(url);
+  copiedLink.value = true;
+  setTimeout(() => copiedLink.value = false, 2500);
+}
+
+async function copyWaMessage(invite) {
+  const text = generateWaText(invite);
+  await navigator.clipboard.writeText(text);
+  copiedWa.value = true;
+  setTimeout(() => copiedWa.value = false, 2500);
+}
+
+async function handleExtendUser(username, days) {
+  if (!confirm(`Perpanjang masa aktif ${username} selama +${days} hari?`)) return;
+  try {
+    await adminExtendUser(username, days);
+    await fetchData();
+  } catch (err) {
+    alert('Gagal perpanjang: ' + err.message);
+  }
+}
+
+async function handleToggleUser(username) {
+  try {
+    await adminToggleUser(username);
+    await fetchData();
+  } catch (err) {
+    alert('Gagal ubah status: ' + err.message);
+  }
+}
+
+async function handleDeleteUser(username) {
+  if (!confirm(`Hapus akun ${username}? Tindakan ini tidak dapat dibatalkan.`)) return;
+  try {
+    await adminDeleteUser(username);
+    await fetchData();
+  } catch (err) {
+    alert('Gagal hapus: ' + err.message);
+  }
+}
+
+async function handleDeleteInvite(code) {
+  if (!confirm(`Hapus kode undangan ${code}?`)) return;
+  try {
+    await adminDeleteInvite(code);
+    await fetchData();
+  } catch (err) {
+    alert('Gagal hapus: ' + err.message);
+  }
+}
+
+function formatRemaining(seconds) {
+  if (!seconds || seconds <= 0) return 'Expired';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  if (days > 0) return `${days} Hari ${hours} Jam`;
+  return `${hours} Jam`;
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '-';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return isoStr;
+  }
+}
+
+async function fetchData() {
+  try {
+    const [invites, users, st] = await Promise.all([
+      adminGetInvites(),
+      adminGetUsers(),
+      adminGetStats()
+    ]);
+    invitesList.value = invites;
+    usersList.value = users;
+    stats.value = st;
+  } catch (err) {
+    console.error('Fetch admin data error:', err);
+  }
+}
+
+onMounted(() => {
+  if (isAdmin.value) {
+    fetchData();
+  }
+});
+</script>
+
+<style scoped>
+.admin-page {
+  padding: 2rem 0 5rem 0;
+  min-height: 90vh;
+}
+
+.admin-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.admin-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(229, 9, 20, 0.15);
+  border: 1px solid rgba(229, 9, 20, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.admin-subtitle {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-top: 0.2rem;
+}
+
+.access-denied-card {
+  background: #12141c;
+  border: 1px solid #2a3044;
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  max-width: 450px;
+  margin: 3rem auto;
+}
+
+.denied-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.8rem;
+}
+
+.stat-card {
+  background: #12141c;
+  border: 1px solid #1e2230;
+  border-radius: 12px;
+  padding: 1.1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.stat-num {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.stat-lbl {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.text-success { color: #10b981; }
+.text-primary { color: #3b82f6; }
+.text-danger { color: #ef4444; }
+.text-gold { color: #eab308; }
+.text-muted { color: #cbd5e1; }
+.text-dim { color: #64748b; }
+
+.admin-card {
+  background: #12141c;
+  border: 1px solid #1e2230;
+  border-radius: 16px;
+  padding: 1.6rem 1.8rem;
+  margin-bottom: 1.8rem;
+}
+
+.card-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.2rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.card-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.badge-hint {
+  background: rgba(229, 9, 20, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(229, 9, 20, 0.3);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.invite-form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1fr;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-field label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.form-field input, .admin-select {
+  background: #08090c;
+  border: 1px solid #1e2230;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  color: #fff;
+  font-size: 0.88rem;
+  outline: none;
+  font-family: inherit;
+}
+
+.form-field input:focus, .admin-select:focus {
+  border-color: #e50914;
+}
+
+.input-tip {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.create-btn-wrap {
+  margin-top: 1.2rem;
+}
+
+.btn-generate {
+  padding: 0.75rem 1.6rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 10px;
+}
+
+/* Created Result Card */
+.created-result-card {
+  margin-top: 1.6rem;
+  background: rgba(8, 9, 12, 0.95);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 12px;
+  padding: 1.4rem;
+  animation: fadeIn 0.25s ease;
+}
+
+.created-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.result-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.success-icon {
+  width: 22px;
+  height: 22px;
+  background: #10b981;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.result-title h4 {
+  font-size: 1.05rem;
+  color: #fff;
+}
+
+.result-expiry-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.result-url-box {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+
+.result-url-box input {
+  flex: 1;
+  background: #12141c;
+  border: 1px solid #2a3044;
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  color: #60a5fa;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.wa-message-preview {
+  background: #12141c;
+  border: 1px solid #1e2230;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.wa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.wa-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.btn-copy-wa {
+  background: #25d366;
+  border-color: #25d366;
+  color: #fff;
+  font-weight: 700;
+}
+
+.btn-copy-wa:hover {
+  background: #20ba5a;
+}
+
+.wa-text-box {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+  background: #08090c;
+  padding: 0.8rem 1rem;
+  border-radius: 6px;
+}
+
+/* Tabs */
+.admin-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.admin-tab-btn {
+  background: #12141c;
+  border: 1px solid #1e2230;
+  color: #94a3b8;
+  padding: 0.65rem 1.2rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-tab-btn:hover {
+  color: #fff;
+  border-color: #2a3044;
+}
+
+.admin-tab-btn.active {
+  background: #e50914;
+  border-color: #e50914;
+  color: #fff;
+}
+
+/* Tables */
+.table-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.table-search-bar input {
+  max-width: 380px;
+  width: 100%;
+  background: #08090c;
+  border: 1px solid #1e2230;
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  color: #fff;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.table-search-bar input:focus {
+  border-color: #e50914;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-table th {
+  padding: 0.75rem 0.85rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #1e2230;
+}
+
+.admin-table td {
+  padding: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.84rem;
+  color: #cbd5e1;
+}
+
+.admin-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.code-tag {
+  background: #08090c;
+  border: 1px solid #2a3044;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #f87171;
+  font-size: 0.8rem;
+}
+
+.badge-duration-pill {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-available {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.status-claimed {
+  color: #64748b;
+  text-decoration: line-through;
+}
+
+.claimed-user-tag {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.avatar-small {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e50914;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.role-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.role-badge.role-admin {
+  background: rgba(229, 9, 20, 0.2);
+  color: #e50914;
+}
+
+.remaining-tag {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.remaining-tag.tag-expired {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-toggle-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #1e2230;
+  color: #94a3b8;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.status-toggle-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.action-buttons-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-act {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-act:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.btn-act-wa {
+  background: rgba(37, 211, 102, 0.15);
+  color: #25d366;
+  border-color: rgba(37, 211, 102, 0.3);
+}
+
+.btn-act-extend {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.btn-act-del:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
+
+.empty-cell {
+  text-align: center;
+  color: #64748b;
+  padding: 2rem 0;
+}
+
+.spinner-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1024px) {
+  .stats-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .invite-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
