@@ -46,13 +46,9 @@ jobs:
       - name: 🔨 Compile Android Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee ../build.log || {
-            echo "::error::Gradle assembleDebug failed!"
-            echo "=== GRADLE FAILURE LOG START ==="
-            grep -E 'FAILURE:|BUILD FAILED|Caused by:|what went wrong' ../build.log -A 10 || tail -n 60 ../build.log
-            echo "=== GRADLE FAILURE LOG END ==="
-            exit 1
-          }
+          ./gradlew :app:assembleDebug --stacktrace --no-daemon
+          echo "=== ANDROID BUILD DIRECTORY CONTENTS ==="
+          find app/build -type f | head -n 30 || true
 
       - name: 🏷️ Prepare APK for Download
         run: |
