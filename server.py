@@ -2065,9 +2065,9 @@ def generate_default_weekly_schedule():
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
-                "id": 170942, "title": {"romaji": "Ao no Hako", "english": "Blue Box"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg"},
-                "genres": ["Romance", "Sports", "Slice of Life"], "averageScore": 82, "currentEpisode": 3, "timeText": "22:30",
+                "id": 178551, "title": {"romaji": "Natsume Yuujinchou Shichi", "english": "Natsume's Book of Friends Season 7"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/48675/medium.jpg"},
+                "genres": ["Drama", "Fantasy", "Slice of Life", "Supernatural"], "averageScore": 86, "currentEpisode": 5, "timeText": "23:00",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {

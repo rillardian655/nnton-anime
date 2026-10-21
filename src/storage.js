@@ -107,11 +107,21 @@ export function saveHistory(anime, episodeNumber = 1, currentTime = 0, duration 
     updatedAt: Date.now()
   };
 
+  let cleanCover = '';
+  if (typeof anime.coverImage === 'object' && anime.coverImage !== null) {
+    cleanCover = anime.coverImage.large || anime.coverImage.extraLarge || anime.coverImage.medium || '';
+  } else if (typeof anime.coverImage === 'string') {
+    cleanCover = anime.coverImage;
+  }
+  if (!cleanCover) {
+    cleanCover = 'https://media.kitsu.app/anime/poster_images/45974/medium.jpg';
+  }
+
   const entry = {
     id: Number(anime.id),
     title: anime.title?.english || anime.title?.romaji || anime.title || 'Anime',
-    coverImage: anime.coverImage?.large || anime.coverImage?.extraLarge || anime.coverImage,
-    bannerImage: anime.bannerImage,
+    coverImage: cleanCover,
+    bannerImage: anime.bannerImage || '',
     episode: epNum,
     totalEpisodes: Number(anime.episodes || anime.totalEpisodes) || 0,
     currentTime: curTime,

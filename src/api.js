@@ -65,85 +65,36 @@ export async function safeFetchJson(res, context = 'Permintaan') {
   }
 }
 
-export const KNOWN_AIRING_EPISODES = {
-  'aonohako': 3,
-  'bluebox': 3,
-  'dandadan': 3,
-  'dragonballdaima': 2,
-  'daima': 2,
-  'rezero': 4,
-  'rezerokarahajimeruisekaiseikatsu3rdseason': 4,
-  'rezeroseason3': 4,
-  'bleachsennenkessenhensokokutan': 3,
-  'bleachthousandyearbloodwar': 3,
-  'bluelock': 3,
-  'bluelockvsu20japan': 3,
-  'bluelockseason2': 3,
-  'ranma12': 3,
-  'ranma122024': 3,
-  'negaposiangler': 3,
-  'negativepositiveangler': 3,
-  'rurounikenshin': 3,
-  'rurounikenshinkyotodouran': 3,
-  'hoshifuruoukokunonina': 3,
-  'ninathestarrybride': 3,
-  'swordartonlinealternativegungaleonlineii': 3,
-  'gungaleonlineii': 3,
-  'danmachiv': 3,
-  'danmachivhoujounomegamihen': 3,
-  'sayounararyuuseikonnichiwajinsei': 3,
-  'goodbyedragonlife': 3,
-  'shangrilafrontier': 3,
-  'shangrilafrontier2ndseason': 3,
-  'chichikyuunoundounitsuite': 4,
-  'orbonthemovementsoftheearth': 4,
-  'tenprogoku': 3,
-  'tensekizokukanteiskilldenariagaru2': 3,
-  'kaminotou': 16,
-  'kaminotououjinokikan': 16,
-  'towerofgodseason2': 16,
-  'natsumeyuujinchoushichi': 3,
-  'natsumesbookoffriendsseason7': 3
-};
-
 export function getEffectiveEpisodeCount(anime) {
   if (!anime) return 1;
   if (anime.currentEpisode && anime.currentEpisode > 0) return Number(anime.currentEpisode);
 
-  const normRom = (anime.title?.romaji || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const normEng = (anime.title?.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-  for (const [key, epCount] of Object.entries(KNOWN_AIRING_EPISODES)) {
-    if (normRom.includes(key) || normEng.includes(key) || key.includes(normRom) || key.includes(normEng)) {
-      return epCount;
-    }
+  // If status is finished, return actual episode count directly
+  const st = (anime.status || '').toUpperCase();
+  if (st === 'FINISHED' || anime.category === 'finished') {
+    return Number(anime.episodes || anime.totalEpisodes) || 12;
   }
 
+  // If airing anime has nextAiringEpisode from official schedule
   if (anime.nextAiringEpisode?.episode) {
     return Math.max(1, anime.nextAiringEpisode.episode - 1);
   }
 
-  if (anime.status === 'RELEASING' || anime.category === 'airing') {
-    if (!anime.episodes || anime.episodes >= 12) {
-      return 3;
-    }
-    return anime.episodes;
+  // If airing / releasing anime
+  if (st === 'RELEASING' || anime.category === 'airing' || st === 'CURRENT') {
+    if (anime.currentEpisode) return Number(anime.currentEpisode);
+    if (anime.episodes && anime.episodes <= 12) return Number(anime.episodes);
+    return 1;
   }
 
-  return anime.episodes || 12;
+  return Number(anime.episodes || anime.totalEpisodes) || 12;
 }
 
 export function isAiringStatus(anime) {
   if (!anime) return false;
-  if (anime.status === 'RELEASING' || anime.category === 'airing') return true;
-  const normRom = (anime.title?.romaji || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const normEng = (anime.title?.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  for (const key of Object.keys(KNOWN_AIRING_EPISODES)) {
-    if ((normRom && (normRom.includes(key) || key.includes(normRom))) || 
-        (normEng && (normEng.includes(key) || key.includes(normEng)))) {
-      return true;
-    }
-  }
+  const st = (anime.status || '').toUpperCase();
+  if (st === 'FINISHED' || anime.category === 'finished') return false;
+  if (st === 'RELEASING' || st === 'CURRENT' || anime.category === 'airing') return true;
   return false;
 }
 
@@ -352,7 +303,7 @@ export const OFFLINE_ANIME_DATASET = [
       color: '#3b82f6'
     },
     bannerImage: 'https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg',
-    format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 82, popularity: 75000,
+    format: 'TV', episodes: 25, duration: 24, status: 'FINISHED', seasonYear: 2024, averageScore: 82, popularity: 75000,
     genres: ['Romance', 'Sports', 'Slice of Life'],
     description: 'Taiki Inomata adalah anggota klub bulu tangkis di Eimei High. Setiap pagi ia berlatih bersama Chinatsu Kano, bintang klub basket wanita yang ia kagumi secara diam-diam.'
   },
@@ -487,18 +438,9 @@ function transformKitsuItem(item) {
   const titleEnglish = attr.titles?.en || attr.titles?.en_jp || attr.canonicalTitle || 'Anime';
   const titleNative = attr.titles?.ja_jp || attr.canonicalTitle || '';
 
-  const titleLow = (titleEnglish + ' ' + titleRomaji).toLowerCase();
-  const isAiringSeasonal = titleLow.includes('blue box') || titleLow.includes('ao no hako') ||
-    titleLow.includes('dandadan') || titleLow.includes('re:zero') || titleLow.includes('dragon ball daima') ||
-    titleLow.includes('ranma') || titleLow.includes('blue lock') || titleLow.includes('bleach') ||
-    titleLow.includes('negaposi');
-
-  let currentAired = attr.episodeCount || 12;
-  if (isAiringSeasonal) {
-    currentAired = 3;
-    if (titleLow.includes('re:zero')) currentAired = 4;
-    if (titleLow.includes('dragon ball')) currentAired = 2;
-  }
+  // Map real status from Kitsu API: 'current' -> RELEASING, 'finished' -> FINISHED, 'upcoming' -> NOT_YET_RELEASED
+  const realStatus = attr.status === 'current' ? 'RELEASING' : (attr.status === 'upcoming' ? 'NOT_YET_RELEASED' : 'FINISHED');
+  const realEpisodes = Number(attr.episodeCount) || (realStatus === 'RELEASING' ? null : 12);
 
   return {
     id: numId,
@@ -515,10 +457,10 @@ function transformKitsuItem(item) {
     },
     bannerImage: attr.coverImage?.large || attr.coverImage?.original || attr.posterImage?.large,
     format: (attr.subtype || 'TV').toUpperCase(),
-    episodes: isAiringSeasonal ? currentAired : (attr.episodeCount || 12),
-    currentEpisode: isAiringSeasonal ? currentAired : 1,
+    episodes: realEpisodes,
+    currentEpisode: realStatus === 'RELEASING' ? (Number(attr.episodeCount) || 1) : realEpisodes,
     duration: attr.episodeLength || 24,
-    status: isAiringSeasonal ? 'RELEASING' : (attr.status === 'current' ? 'RELEASING' : 'FINISHED'),
+    status: realStatus,
     seasonYear: attr.startDate ? new Date(attr.startDate).getFullYear() : 2024,
     averageScore: Math.round(parseFloat(attr.averageRating || '82')),
     popularity: attr.userCount || 40000,
@@ -535,7 +477,13 @@ function transformKitsuItem(item) {
 
 export async function fetchKitsuList(endpoint) {
   try {
-    const res = await fetch(endpoint);
+    // Route via backend proxy to bypass browser/mobile CORS restrictions
+    let finalUrl = endpoint;
+    if (endpoint.includes('kitsu.io/api/edge/')) {
+      const path = endpoint.split('kitsu.io/api/edge/')[1];
+      finalUrl = apiUrl(`/api/kitsu/${path}`);
+    }
+    const res = await fetch(finalUrl);
     if (!res.ok) throw new Error(`Kitsu returned HTTP ${res.status}`);
     const json = await res.json();
     if (json.data && Array.isArray(json.data)) {
@@ -543,6 +491,16 @@ export async function fetchKitsuList(endpoint) {
     }
     return [];
   } catch (err) {
+    // Direct fetch fallback
+    try {
+      const res = await fetch(endpoint);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) {
+          return json.data.map(transformKitsuItem).filter(Boolean);
+        }
+      }
+    } catch (_) {}
     console.warn('Kitsu fetch failed:', err.message);
     return [];
   }
@@ -698,7 +656,7 @@ export function getClientFallbackSchedule() {
     ],
     "Selasa": [
       { id: 171018, title: { romaji: "Dandadan", english: "DAN DA DAN" }, coverImage: { large: "https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg" }, genres: ["Action", "Comedy", "Supernatural", "Sci-Fi"], averageScore: 87, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 170942, title: { romaji: "Ao no Hako", english: "Blue Box" }, coverImage: { large: "https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg" }, genres: ["Romance", "Sports", "Slice of Life"], averageScore: 82, currentEpisode: 3, timeText: "22:30", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 178551, title: { romaji: "Natsume Yuujinchou Shichi", english: "Natsume's Book of Friends Season 7" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/48675/medium.jpg" }, genres: ["Drama", "Fantasy", "Slice of Life", "Supernatural"], averageScore: 86, currentEpisode: 5, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
       { id: 180104, title: { romaji: "NegaPosi Angler", english: "Negative Positive Angler" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45974/medium.jpg" }, genres: ["Drama", "Slice of Life"], averageScore: 71, currentEpisode: 3, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Rabu": [
@@ -1316,12 +1274,27 @@ export async function auditAllAPIs() {
  */
 export function getSafeImageUrl(url) {
   if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
-  if (url.includes('s4.anilist.co') && (url.includes('bx170942-') || url.includes('bx171018-') || url.includes('bx180104-') || url.includes('bx159322-') || url.includes('bx163134-') || url.includes('bx170947-') || url.includes('bx169829-') || url.includes('bx178551-'))) {
-    return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  if (typeof url === 'object' && url !== null) {
+    url = url.large || url.extraLarge || url.medium || url.original || '';
+    if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
   }
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
-  if (url.startsWith('/api/')) return apiUrl(url);
-  return apiUrl(`/api/image-proxy?url=${encodeURIComponent(url)}`);
+  if (typeof url !== 'string' || !url.trim()) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+
+  const cleanUrl = url.trim();
+
+  // If URL is from s4.anilist.co, proxy it via backend image-proxy or fallback if known broken hash
+  if (cleanUrl.includes('s4.anilist.co')) {
+    if (cleanUrl.includes('bx170942-') || cleanUrl.includes('bx171018-') || cleanUrl.includes('bx180104-') || cleanUrl.includes('bx159322-') || cleanUrl.includes('bx163134-') || cleanUrl.includes('bx170947-') || cleanUrl.includes('bx169829-') || cleanUrl.includes('bx178551-')) {
+      return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+    }
+    return apiUrl(`/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`);
+  }
+
+  if (cleanUrl.startsWith('/api/')) return apiUrl(cleanUrl);
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://') || cleanUrl.startsWith('data:')) {
+    return cleanUrl;
+  }
+  return apiUrl(`/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`);
 }
 
 /**

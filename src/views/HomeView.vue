@@ -12,6 +12,7 @@
           :src="getSafeImageUrl(anime.bannerImage || anime.coverImage?.extraLarge)" 
           :alt="anime.title?.romaji" 
           class="hero-bg-img" 
+          @error="onImgError($event, 'banner')"
         />
         <div class="hero-gradient-overlay"></div>
 
@@ -52,7 +53,7 @@
           :class="{ 'active': idx === heroIndex }"
           @click="heroIndex = idx"
         >
-          <img :src="getSafeImageUrl(anime.coverImage?.large)" :alt="anime.title?.romaji" />
+          <img :src="getSafeImageUrl(anime.coverImage?.large)" :alt="anime.title?.romaji" @error="onImgError($event, 'thumb')" />
           <span class="pill-number">{{ idx + 1 }}</span>
         </button>
       </div>
@@ -80,7 +81,7 @@
             @click="navigateToWatch(item.id, item.episode || item.lastEpisode || 1)"
           >
             <div class="continue-thumb-wrap">
-              <img :src="getSafeImageUrl(item.coverImage)" :alt="item.title" class="continue-thumb" />
+              <img :src="getSafeImageUrl(item.coverImage)" :alt="item.title" class="continue-thumb" @error="onImgError($event, 'thumb')" />
               <div class="play-overlay-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               </div>
@@ -213,6 +214,7 @@
               :alt="anime.title?.romaji || anime.title" 
               class="card-poster" 
               loading="lazy"
+              @error="onImgError($event, 'poster')"
             />
             <div class="poster-badge-score" v-if="anime.averageScore && currentTab !== 'history'">
               ★ {{ (anime.averageScore / 10).toFixed(1) }}
@@ -498,6 +500,16 @@ watch(() => [route.query.search, route.query.q], ([newSearch, newQ]) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 });
+
+function onImgError(e, type = 'poster') {
+  if (e.target.dataset.triedFallback) return;
+  e.target.dataset.triedFallback = 'true';
+  if (type === 'banner') {
+    e.target.src = 'https://media.kitsu.app/anime/cover_images/45974/large.jpg';
+  } else {
+    e.target.src = 'https://media.kitsu.app/anime/poster_images/45974/medium.jpg';
+  }
+}
 
 onMounted(() => {
   historyList.value = getHistory();
