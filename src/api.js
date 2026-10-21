@@ -218,6 +218,45 @@ export async function getAiringSchedule(page = 1, perPage = 20) {
 }
 
 /**
+ * Fetch Weekly Anime Schedule (Senin - Minggu with 3 sections: Airing 0-4d, Upcoming 5-7d, Finished)
+ */
+export async function getWeeklySchedule() {
+  try {
+    const res = await fetch(apiUrl('/api/anime/schedule'));
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('getWeeklySchedule error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Fetch LiveChart Seasonal Anime (Musim Ini, Musim Depan, Musim Mendatang, TBA)
+ * Past seasons are strictly excluded.
+ */
+export async function getLiveChart({ season, year, sort = 'POPULARITY_DESC', format, page = 1, perPage = 50 } = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (season) params.set('season', season);
+    if (year) params.set('year', year);
+    if (sort) params.set('sort', sort);
+    if (format && format !== 'ALL') params.set('format', format);
+    if (page) params.set('page', page);
+    if (perPage) params.set('perPage', perPage);
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(apiUrl(`/api/anime/livechart${qs}`));
+    if (!res.ok) throw new Error(`LiveChart API returned ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('getLiveChart error:', err);
+    throw err;
+  }
+}
+
+/**
  * Advanced Search & Filter
  */
 export async function searchAnime(keyword = '', filters = {}, page = 1, perPage = 18) {
@@ -820,26 +859,55 @@ export async function lookupTranslation(animeId) {
   try {
     const res = await fetch(apiUrl(`/api/translate/lookup?anime_id=${encodeURIComponent(animeId)}`));
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      return {
+        found: !!data.found,
+        translation: data.translation || '',
+        text: data.translation || '',
+        provider: data.provider || 'server_db'
+      };
     }
   } catch (e) {
     console.warn('Translation lookup error:', e);
   }
-  return { found: false };
+  return { found: false, translation: '', text: '' };
 }
 
-export async function translateSynopsis(text, animeId = null) {
+export async function translateSynopsis(firstArg, secondArg = null) {
+  // Support both (text, animeId) and (animeId, text)
+  let text = '';
+  let animeId = null;
+
+  if (typeof firstArg === 'number' || (typeof firstArg === 'string' && /^\d+$/.test(String(firstArg).trim()))) {
+    animeId = String(firstArg).trim();
+    text = secondArg || '';
+  } else {
+    text = firstArg || '';
+    animeId = secondArg ? String(secondArg).trim() : null;
+  }
+
+  if (!text || !text.trim()) {
+    return { success: false, translation: '', text: '' };
+  }
+
   try {
-    const params = new URLSearchParams({ text, to_lang: 'id', from_lang: 'en' });
+    const params = new URLSearchParams({ text: text.trim(), to_lang: 'id', from_lang: 'en' });
     if (animeId) params.append('anime_id', animeId);
     const res = await fetch(apiUrl(`/api/translate?${params.toString()}`));
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      const translated = data.translation || text;
+      return {
+        success: !!data.success,
+        translation: translated,
+        text: translated,
+        source: data.provider || (data.cached ? 'server_db' : 'google')
+      };
     }
   } catch (e) {
     console.warn('Translation fetch error:', e);
   }
-  return { success: false, translation: text };
+  return { success: false, translation: text, text };
 }
 
 

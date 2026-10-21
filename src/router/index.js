@@ -4,12 +4,32 @@ import WatchView from '../views/WatchView.vue';
 import AdminView from '../views/AdminView.vue';
 import InviteView from '../views/InviteView.vue';
 import AnimeDetailView from '../views/AnimeDetailView.vue';
+import ScheduleView from '../views/ScheduleView.vue';
+import LiveChartView from '../views/LiveChartView.vue';
 
 const routes = [
   {
     path: '/',
     name: 'home',
     component: HomeView
+  },
+  {
+    path: '/schedule',
+    name: 'schedule',
+    component: ScheduleView
+  },
+  {
+    path: '/jadwal',
+    redirect: '/schedule'
+  },
+  {
+    path: '/livechart',
+    name: 'livechart',
+    component: LiveChartView
+  },
+  {
+    path: '/musim',
+    redirect: '/livechart'
   },
   {
     path: '/anime',

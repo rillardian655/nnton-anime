@@ -6,8 +6,8 @@
       <!-- Logo & Header -->
       <div class="login-header">
         <img src="/logo.png" alt="AniPulse Logo" class="login-logo-img" />
-        <h2 class="login-title">Masuk ke AniPulse</h2>
-        <p class="login-subtitle">Platform Streaming Anime VIP Tanpa Iklan</p>
+        <h2 class="login-title">{{ authMode === 'admin' ? 'Masuk Administrator' : 'Masuk Akun VIP' }}</h2>
+        <p class="login-subtitle">Akses Khusus Pengguna Terdaftar & Undangan Resmi</p>
       </div>
 
       <!-- Error Alert -->
@@ -16,8 +16,15 @@
         <span>{{ errorMessage }}</span>
       </div>
 
-      <!-- Login Form -->
-      <form @submit.prevent="handleLogin" class="login-form">
+      <!-- Success Alert -->
+      <div v-if="successMessage" class="success-alert">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>{{ successMessage }}</span>
+      </div>
+
+      <!-- 1. VIP Member Login Form -->
+      <form v-if="authMode === 'login'" @submit.prevent="handleUserLogin" class="login-form">
+        <!-- Username Field -->
         <div class="form-group">
           <label for="loginUsername">Nama Pengguna (Username)</label>
           <div class="input-wrap">
@@ -34,15 +41,16 @@
           </div>
         </div>
 
+        <!-- Password Field -->
         <div class="form-group">
-          <label for="loginPassword">Kata Sandi (Password)</label>
+          <label for="loginPassword">Kata Sandi</label>
           <div class="input-wrap">
             <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
             <input 
               id="loginPassword" 
               v-model="password" 
               :type="showPassword ? 'text' : 'password'" 
-              placeholder="Masukkan password..." 
+              placeholder="Masukkan kata sandi..." 
               required 
               autocomplete="current-password"
             />
@@ -54,19 +62,91 @@
 
         <button type="submit" class="btn btn-primary submit-btn" :disabled="isLoading">
           <span v-if="isLoading" class="spinner-small"></span>
-          <span>{{ isLoading ? 'Memproses...' : 'Masuk Sekarang' }}</span>
+          <span>{{ isLoading ? 'Memverifikasi...' : 'Masuk ke Aplikasi' }}</span>
+        </button>
+
+        <!-- VIP Invite Access Box (Replaces Public Register & Google Sign-In) -->
+        <div class="invite-banner-card">
+          <div class="invite-banner-top">
+            <svg class="invite-ticket-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2">
+              <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
+              <line x1="12" y1="9" x2="12" y2="15"></line>
+            </svg>
+            <div class="invite-banner-text">
+              <h4>Akses Khusus Undangan (Invite Only)</h4>
+              <p>Belum punya akun? Akun hanya dibuatkan langsung oleh Admin atau melalui Kode Undangan resmi.</p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            class="btn-claim-invite"
+            @click="handleOpenInviteModal"
+          >
+            Punya Kode Undangan? Klaim di Sini →
+          </button>
+        </div>
+      </form>
+
+      <!-- 2. Admin Login Form -->
+      <form v-else-if="authMode === 'admin'" @submit.prevent="handleAdminLogin" class="login-form">
+        <div class="form-group">
+          <label for="adminUsername">Nama Pengguna Admin</label>
+          <div class="input-wrap">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <input 
+              id="adminUsername" 
+              v-model="adminUsername" 
+              type="text" 
+              placeholder="Masukkan username admin..." 
+              required 
+              autocomplete="username"
+              autofocus
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="adminPassword">Kata Sandi Admin</label>
+          <div class="input-wrap">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <input 
+              id="adminPassword" 
+              v-model="adminPassword" 
+              :type="showPassword ? 'text' : 'password'" 
+              placeholder="Masukkan kata sandi..." 
+              required 
+              autocomplete="current-password"
+            />
+            <button type="button" class="toggle-pw-btn" @click="showPassword = !showPassword">
+              {{ showPassword ? 'Sembunyi' : 'Lihat' }}
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary submit-btn" :disabled="isLoading">
+          <span v-if="isLoading" class="spinner-small"></span>
+          <span>{{ isLoading ? 'Memverifikasi...' : 'Masuk Panel Administrator' }}</span>
         </button>
       </form>
 
-      <!-- Explanatory Notice (No Register Allowed) -->
-      <div class="invite-notice-box">
-        <div class="invite-notice-title">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-          <span>Akses Privat Via Undangan</span>
-        </div>
-        <p class="invite-notice-text">
-          Aplikasi ini tidak memiliki pendaftaran terbuka. Akun baru hanya dapat diaktifkan melalui <strong>Link Undangan 1x Pakai</strong> yang dibuat khusus oleh Admin di WhatsApp.
-        </p>
+      <!-- Bottom Switcher Links -->
+      <div class="bottom-mode-switch">
+        <button 
+          v-if="authMode !== 'admin'" 
+          type="button" 
+          class="switch-link-btn" 
+          @click="authMode = 'admin'; errorMessage = '';"
+        >
+          🔐 Masuk sebagai Administrator
+        </button>
+        <button 
+          v-else 
+          type="button" 
+          class="switch-link-btn" 
+          @click="authMode = 'login'; errorMessage = '';"
+        >
+          ← Kembali ke Login Pengguna
+        </button>
       </div>
     </div>
   </div>
@@ -74,27 +154,80 @@
 
 <script setup>
 import { ref } from 'vue';
-import { showLoginModal, loginUser } from '../stores/auth.js';
+import { useRouter, useRoute } from 'vue-router';
+import { 
+  showLoginModal, 
+  showInviteModal,
+  activeInviteCode,
+  inviteData,
+  inviteError,
+  loginUser 
+} from '../stores/auth.js';
 
+const router = useRouter();
+const route = useRoute();
+
+const authMode = ref('login'); // 'login' | 'admin'
 const username = ref('');
 const password = ref('');
+const adminUsername = ref('');
+const adminPassword = ref('');
 const showPassword = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
+const successMessage = ref('');
 
-async function handleLogin() {
+// User Login (Direct / Invite Created / Admin)
+async function handleUserLogin() {
   if (!username.value.trim() || !password.value.trim()) return;
   isLoading.value = true;
   errorMessage.value = '';
+  successMessage.value = '';
+
   try {
-    await loginUser(username.value.trim(), password.value.trim());
-    username.value = '';
-    password.value = '';
+    const res = await loginUser(username.value.trim(), password.value.trim());
+    if (res?.user) {
+      username.value = '';
+      password.value = '';
+      if (res.user.role === 'admin' && route.path !== '/watch' && !route.path.startsWith('/anime')) {
+        router.push('/admin');
+      }
+    }
   } catch (err) {
-    errorMessage.value = err.message || 'Gagal masuk. Periksa kembali nama pengguna dan sandi.';
+    errorMessage.value = err.message || 'Nama pengguna atau kata sandi tidak cocok.';
   } finally {
     isLoading.value = false;
   }
+}
+
+// Admin Login
+async function handleAdminLogin() {
+  if (!adminUsername.value.trim() || !adminPassword.value.trim()) return;
+  isLoading.value = true;
+  errorMessage.value = '';
+
+  try {
+    const res = await loginUser(adminUsername.value.trim(), adminPassword.value.trim());
+    if (res?.user?.role === 'admin') {
+      adminUsername.value = '';
+      adminPassword.value = '';
+      if (route.path !== '/watch') {
+        router.push('/admin');
+      }
+    }
+  } catch (err) {
+    errorMessage.value = err.message || 'Gagal masuk. Periksa kembali username dan kata sandi admin.';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function handleOpenInviteModal() {
+  showLoginModal.value = false;
+  activeInviteCode.value = '';
+  inviteData.value = null;
+  inviteError.value = '';
+  showInviteModal.value = true;
 }
 </script>
 
@@ -102,9 +235,9 @@ async function handleLogin() {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -115,10 +248,10 @@ async function handleLogin() {
 
 .login-card {
   position: relative;
-  background: #12141c;
-  border: 1px solid #2a3044;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(229, 9, 20, 0.15);
-  border-radius: 16px;
+  background: #11141e;
+  border: 1px solid #23293d;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(229, 9, 20, 0.15);
+  border-radius: 20px;
   width: 100%;
   max-width: 420px;
   padding: 2.2rem 2rem;
@@ -151,44 +284,55 @@ async function handleLogin() {
 
 .login-header {
   text-align: center;
-  margin-bottom: 1.8rem;
+  margin-bottom: 1.5rem;
 }
 
 .login-logo-img {
-  width: 58px;
-  height: 58px;
-  object-fit: contain;
-  margin: 0 auto 0.75rem auto;
-  border-radius: 12px;
-  filter: drop-shadow(0 4px 16px rgba(229, 9, 20, 0.5));
+  width: 48px;
+  height: 48px;
+  margin-bottom: 0.75rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(229, 9, 20, 0.25);
 }
 
 .login-title {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
-  letter-spacing: -0.01em;
   color: #fff;
+  letter-spacing: -0.3px;
+  margin-bottom: 0.3rem;
 }
 
 .login-subtitle {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: #94a3b8;
-  margin-top: 0.25rem;
 }
 
 .error-alert {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  align-items: flex-start;
+  gap: 0.65rem;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: #fca5a5;
-  font-size: 0.82rem;
   padding: 0.75rem 1rem;
-  border-radius: 8px;
-  margin-bottom: 1.2rem;
-  line-height: 1.4;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin-bottom: 1.25rem;
+}
+
+.success-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  margin-bottom: 1.25rem;
 }
 
 .login-form {
@@ -200,7 +344,7 @@ async function handleLogin() {
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .form-group label {
@@ -213,86 +357,152 @@ async function handleLogin() {
   position: relative;
   display: flex;
   align-items: center;
-  background: #08090c;
-  border: 1px solid #1e2230;
-  border-radius: 10px;
-  padding: 0 0.85rem;
+}
+
+.input-icon {
+  position: absolute;
+  left: 1rem;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.input-wrap input {
+  width: 100%;
+  background: #0a0c13;
+  border: 1px solid #1e2538;
+  border-radius: 12px;
+  padding: 0.75rem 1rem 0.75rem 2.6rem;
+  color: #fff;
+  font-size: 0.88rem;
   transition: all 0.2s ease;
 }
 
-.input-wrap:focus-within {
+.input-wrap input:focus {
+  outline: none;
   border-color: #e50914;
   box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.15);
 }
 
-.input-icon {
-  color: #64748b;
-  flex-shrink: 0;
-  margin-right: 0.5rem;
-}
-
-.input-wrap input {
-  flex: 1;
+.toggle-pw-btn {
+  position: absolute;
+  right: 0.8rem;
   background: transparent;
   border: none;
-  outline: none;
-  color: #fff;
-  font-size: 0.9rem;
-  padding: 0.7rem 0;
-  font-family: inherit;
-}
-
-.input-wrap input::placeholder {
-  color: #475569;
-}
-
-.toggle-pw-btn {
-  background: none;
-  border: none;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 0.75rem;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0.2rem 0.4rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
 }
 
 .toggle-pw-btn:hover {
-  color: #fff;
+  color: #cbd5e1;
 }
 
 .submit-btn {
-  margin-top: 0.5rem;
-  padding: 0.75rem;
-  font-size: 0.95rem;
-  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 10px;
-}
-
-.invite-notice-box {
-  margin-top: 1.5rem;
-  padding: 0.85rem 1rem;
-  background: rgba(234, 179, 8, 0.06);
-  border: 1px solid rgba(234, 179, 8, 0.2);
-  border-radius: 10px;
-}
-
-.invite-notice-title {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
+  width: 100%;
+  padding: 0.85rem;
+  font-size: 0.92rem;
   font-weight: 700;
-  color: #eab308;
-  margin-bottom: 0.25rem;
+  border-radius: 12px;
+  background: #e50914;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+  transition: all 0.2s ease;
+  margin-top: 0.25rem;
 }
 
-.invite-notice-text {
+.submit-btn:hover:not(:disabled) {
+  background: #ff1f2d;
+  transform: translateY(-1px);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* VIP Invite Banner (Private App Security Notice) */
+.invite-banner-card {
+  background: rgba(234, 179, 8, 0.05);
+  border: 1px solid rgba(234, 179, 8, 0.2);
+  border-radius: 14px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.invite-banner-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.invite-ticket-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.invite-banner-text h4 {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 0.2rem;
+}
+
+.invite-banner-text p {
   font-size: 0.76rem;
   color: #94a3b8;
-  line-height: 1.4;
+  line-height: 1.45;
+}
+
+.btn-claim-invite {
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  color: #fde047;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.btn-claim-invite:hover {
+  background: #eab308;
+  color: #000;
+  border-color: #eab308;
+}
+
+.bottom-mode-switch {
+  text-align: center;
+  margin-top: 1.4rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.switch-link-btn {
+  background: transparent;
+  border: none;
+  color: #828ba0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.switch-link-btn:hover {
+  color: #fff;
 }
 
 .spinner-small {
@@ -302,7 +512,12 @@ async function handleLogin() {
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: #fff;
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes fadeIn {
@@ -313,9 +528,5 @@ async function handleLogin() {
 @keyframes scaleUp {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 </style>

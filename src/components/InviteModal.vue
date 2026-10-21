@@ -3,10 +3,43 @@
     <div class="invite-card">
       <button class="modal-close-btn" @click="handleDismiss" aria-label="Tutup">✕</button>
 
-      <!-- 1. Loading State -->
-      <div v-if="!inviteData && !inviteError" class="loading-state">
+      <!-- 1. Manual Code Entry Form (if opened without code and no error) -->
+      <div v-if="!activeInviteCode && !inviteData && !inviteError" class="manual-entry-state">
+        <div class="vip-header">
+          <div class="vip-crown-badge">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5v-2z"></path></svg>
+            <span>KLAIM AKSES VIP</span>
+          </div>
+          <h2 class="claim-title">Aktivasi Akun Undangan</h2>
+          <p class="claim-subtitle">Masukkan kode undangan yang diberikan oleh Administrator</p>
+        </div>
+
+        <form @submit.prevent="handleManualCodeSubmit" class="claim-form">
+          <div class="form-group">
+            <label for="manualInviteCode">Kode Undangan (1x Pakai)</label>
+            <input 
+              id="manualInviteCode"
+              v-model="manualCode" 
+              type="text" 
+              placeholder="Contoh: VIP-XXXXXX" 
+              required
+              style="text-transform: uppercase; font-weight: 800; letter-spacing: 2px; text-align: center; font-size: 1.1rem; padding: 0.9rem;"
+              autofocus
+            />
+            <span class="field-hint">Paste atau ketik kode yang kamu terima via WhatsApp/Chat.</span>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" :disabled="isVerifying">
+            <span v-if="isVerifying" class="spinner-small"></span>
+            <span>{{ isVerifying ? 'Memeriksa Kode...' : 'Periksa & Aktivasi' }}</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- 2. Loading State (when verifying code) -->
+      <div v-else-if="activeInviteCode && !inviteData && !inviteError" class="loading-state">
         <span class="spinner-large"></span>
-        <p class="loading-text">Memeriksa link undangan VIP kamu...</p>
+        <p class="loading-text">Memeriksa kode undangan VIP: {{ activeInviteCode }}...</p>
       </div>
 
       <!-- 2. Error / Already Used State -->
@@ -123,15 +156,36 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { showInviteModal, showLoginModal, inviteData, inviteError, submitClaimInvite } from '../stores/auth.js';
+import { 
+  showInviteModal, 
+  showLoginModal, 
+  activeInviteCode,
+  inviteData, 
+  inviteError, 
+  checkInviteUrl,
+  submitClaimInvite 
+} from '../stores/auth.js';
 
 const router = useRouter();
+const manualCode = ref('');
+const isVerifying = ref(false);
 const formUsername = ref('');
 const formDisplayName = ref('');
 const formPassword = ref('');
 const formPasswordConfirm = ref('');
 const isSubmitting = ref(false);
 const claimError = ref('');
+
+async function handleManualCodeSubmit() {
+  if (!manualCode.value.trim()) return;
+  isVerifying.value = true;
+  claimError.value = '';
+  try {
+    await checkInviteUrl(manualCode.value.trim().toUpperCase());
+  } finally {
+    isVerifying.value = false;
+  }
+}
 
 // Watch inviteData to auto-fill username based on targetName
 watch(inviteData, (newVal) => {

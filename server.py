@@ -1,9 +1,11 @@
 import asyncio
+import time
 import logging
 import re
 import urllib.parse
 import urllib.request
 import os
+import json
 import hashlib
 import sqlite3
 import secrets
@@ -80,6 +82,29 @@ def init_db():
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_trans_anime ON translations(anime_id)")
 
             cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subtitle_searches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cache_key TEXT UNIQUE,
+                title TEXT,
+                episode INTEGER,
+                subtitles_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sub_search_key ON subtitle_searches(cache_key)")
+
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subtitle_vtt_cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url_hash TEXT UNIQUE,
+                url TEXT,
+                vtt_content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sub_vtt_hash ON subtitle_vtt_cache(url_hash)")
+
+            cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
@@ -121,14 +146,18 @@ def init_db():
             """)
 
             # Seed default admin if none exists
-            cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+            cursor.execute("SELECT id FROM users WHERE username = 'runa@gmail.com' OR username = 'runa'")
             if not cursor.fetchone():
-                admin_pw = hash_password("admin123")
+                admin_pw = hash_password("runa8989")
                 cursor.execute("""
                 INSERT INTO users (username, password_hash, display_name, role, expires_at, is_active)
-                VALUES ('admin', ?, 'Admin Utama', 'admin', '2099-12-31 23:59:59', 1)
+                VALUES ('runa@gmail.com', ?, 'Runa Admin', 'admin', '2099-12-31 23:59:59', 1)
                 """, (admin_pw,))
-                logger.info("Default admin created: admin / admin123")
+                cursor.execute("""
+                INSERT INTO users (username, password_hash, display_name, role, expires_at, is_active)
+                VALUES ('runa', ?, 'Runa Admin', 'admin', '2099-12-31 23:59:59', 1)
+                """, (admin_pw,))
+                logger.info("Admin created: runa@gmail.com / runa8989")
 
             conn.commit()
             logger.info("SQLite database initialized successfully.")
@@ -145,6 +174,51 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def get_user_from_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not token:
+        return None
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT s.username, s.role, s.expires_at, u.display_name, u.expires_at, u.is_active
+            FROM sessions s
+            JOIN users u ON s.username = u.username
+            WHERE s.token = ?
+            """, (token,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            sess_exp = datetime.fromisoformat(row[2])
+            user_exp = datetime.fromisoformat(row[4])
+            now = datetime.now()
+            
+            if sess_exp < now or row[5] != 1:
+                return None
+            if row[1] != 'admin' and user_exp < now:
+                return None
+            
+            remaining_seconds = max(0, int((user_exp - now).total_seconds())) if row[1] != 'admin' else 999999999
+            return {
+                "username": row[0],
+                "role": row[1],
+                "displayName": row[3],
+                "expiresAt": row[4],
+                "isActive": bool(row[5]),
+                "remainingSeconds": remaining_seconds
+            }
+    except Exception as e:
+        logger.error(f"Error validating token: {e}")
+        return None
+
+def extract_token_from_request(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:].strip()
+    return request.query_params.get("token")
+
 
 # Shared anicli Extractors & Kodik Engine
 yummy_extractor = Extractor()
@@ -412,12 +486,21 @@ async def get_yummy_episodes(q: str = Query(...), alt: Optional[str] = Query(Non
 
 @app.get("/api/yummy/streams")
 async def get_yummy_streams(
+    req: Request,
     q: str = Query(...), 
     ep: int = Query(1), 
     alt: Optional[str] = Query(None),
     nocache: bool = Query(False)
 ):
-    """Extract multi-provider video streams (AniLibria HLS, AnimeVost MP4, Kodik HLS)"""
+    """Extract multi-provider video streams (AniLibria HLS, AnimeVost MP4, Kodik HLS) - Protected by VIP Token"""
+    token = extract_token_from_request(req)
+    user = get_user_from_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=403, 
+            detail="Akses streaming VIP terkunci. Masuk dengan akun VIP atau klaim kode undangan untuk menonton anime."
+        )
+
     clean_q = q.strip()
     alt_q = alt.strip() if alt else ""
 
@@ -624,23 +707,26 @@ async def get_yummy_streams(
                             if target_ep:
                                 sources = await loop.run_in_executor(None, target_ep.get_sources)
                                 for s in sources[:4]:
-                                    vids = await loop.run_in_executor(None, s.get_videos)
-                                    video_items = []
-                                    for v in vids:
-                                        raw_url = v.url
-                                        video_items.append({
-                                            "quality": v.quality,
-                                            "type": v.type,
-                                            "url": f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}",
-                                            "direct_url": raw_url
-                                        })
-                                    if video_items:
-                                        output_sources.append({
-                                            "title": f"Yummy / {s.title}",
-                                            "is_subtitles_original": "субтитр" in s.title.lower() or "sub" in s.title.lower(),
-                                            "player_url": getattr(s, "url", None),
-                                            "videos": video_items
-                                        })
+                                    try:
+                                        vids = await loop.run_in_executor(None, s.get_videos)
+                                        video_items = []
+                                        for v in vids:
+                                            raw_url = v.url
+                                            video_items.append({
+                                                "quality": v.quality,
+                                                "type": v.type,
+                                                "url": f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}",
+                                                "direct_url": raw_url
+                                            })
+                                        if video_items:
+                                            output_sources.append({
+                                                "title": f"Yummy / {s.title}",
+                                                "is_subtitles_original": "субтитр" in s.title.lower() or "sub" in s.title.lower(),
+                                                "player_url": getattr(s, "url", None),
+                                                "videos": video_items
+                                            })
+                                    except Exception as s_err:
+                                        logger.warning(f"Skipping problematic Yummy source '{getattr(s, 'title', '')}': {s_err}")
                     if output_sources:
                         break
                 except Exception as inner_e:
@@ -913,8 +999,11 @@ async def proxy_video(request: Request, url: str = Query(...)):
 
 
 # ==========================================
-# 3. SUBTITLECAT SCRAPER (subtitlecat.com)
+# 3. SUBTITLECAT SCRAPER & CACHE (Persistent SQLite & Anti-Spam)
 # ==========================================
+
+subtitle_search_in_flight: Dict[str, asyncio.Future] = {}
+subtitle_vtt_in_flight: Dict[str, asyncio.Future] = {}
 
 def srt_to_vtt(srt_text: str) -> str:
     """Convert SRT subtitle format to clean WebVTT format for browser video tag"""
@@ -926,7 +1015,40 @@ def srt_to_vtt(srt_text: str) -> str:
 
 @app.get("/api/subtitles/search")
 async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Query(None), ep: int = Query(1)):
-    """Search SubtitleCat across multiple queries and pages for Indonesian and English subtitles"""
+    """Search SubtitleCat with persistent SQLite caching & concurrency deduplication (Instant 0ms on repeat)"""
+    clean_title_key = re.sub(r'[^a-zA-Z0-9]+', ' ', title.lower()).strip()
+    cache_key = f"{clean_title_key}:{ep}"
+
+    # 1. Check persistent SQLite cache first (Instant 0ms retrieval)
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT subtitles_json FROM subtitle_searches WHERE cache_key = ?", (cache_key,))
+            row = cursor.fetchone()
+            if row and row[0] is not None:
+                cached_list = json.loads(row[0])
+                return {
+                    "anime": title,
+                    "episode": ep,
+                    "subtitles": cached_list,
+                    "cached": True
+                }
+    except Exception as e:
+        logger.error(f"Subtitle search cache check error: {e}")
+
+    # 2. Concurrency deduplication (avoid hammering SubtitleCat when multiple users open the episode)
+    if cache_key in subtitle_search_in_flight:
+        logger.info(f"Duplicate subtitle search in flight for {cache_key}, waiting for worker...")
+        try:
+            res_data = await subtitle_search_in_flight[cache_key]
+            return {**res_data, "cached": True, "provider": "shared_worker"}
+        except Exception:
+            pass
+
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    subtitle_search_in_flight[cache_key] = future
+
     queries = [
         f"{title.strip()} {ep:02d}",
         f"{title.strip()} {ep}",
@@ -937,7 +1059,6 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
             f"{alt_title.strip()} {ep}"
         ])
 
-    # Strip punctuation (colons, hyphens) for better fuzzy matching
     clean_t = re.sub(r'[:\-—\(\)]', ' ', title).strip()
     clean_t = re.sub(r'\s+', ' ', clean_t)
     if clean_t != title.strip():
@@ -965,7 +1086,23 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
                 pass
 
         if not sub_pages:
-            return {"subtitles": [], "message": f"Subtitle tidak ditemukan untuk {title} Ep {ep}"}
+            result_payload = {"anime": title, "episode": ep, "subtitles": [], "message": f"Subtitle tidak ditemukan untuk {title} Ep {ep}"}
+            # Cache empty result temporarily so we don't spam if subtitles don't exist
+            try:
+                with sqlite3.connect(DB_PATH) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO subtitle_searches (cache_key, title, episode, subtitles_json)
+                        VALUES (?, ?, ?, ?)
+                    """, (cache_key, title, ep, json.dumps([])))
+                    conn.commit()
+            except Exception:
+                pass
+
+            if not future.done():
+                future.set_result(result_payload)
+            subtitle_search_in_flight.pop(cache_key, None)
+            return result_payload
 
         # Check top pages concurrently for subtitle download links
         found_subs_map: Dict[str, Dict[str, str]] = {}
@@ -1024,34 +1161,116 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
             if lang not in order:
                 sorted_subs.append(item)
 
-        return {
+        # 3. Save to SQLite database permanently
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO subtitle_searches (cache_key, title, episode, subtitles_json)
+                    VALUES (?, ?, ?, ?)
+                """, (cache_key, title, ep, json.dumps(sorted_subs)))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Subtitle search cache save error: {e}")
+
+        result_payload = {
             "anime": title,
             "episode": ep,
             "subtitles": sorted_subs
         }
+
+        if not future.done():
+            future.set_result(result_payload)
+        subtitle_search_in_flight.pop(cache_key, None)
+        return result_payload
+
     except Exception as e:
         logger.error(f"Subtitle search error: {e}")
-        return {"subtitles": [], "error": str(e)}
+        error_payload = {"subtitles": [], "error": str(e)}
+        if not future.done():
+            future.set_result(error_payload)
+        subtitle_search_in_flight.pop(cache_key, None)
+        return error_payload
 
 
 @app.get("/api/subtitles/vtt")
 async def get_subtitle_vtt(url: str = Query(...)):
-    """Download .srt subtitle and serve as WebVTT for <track> in HTML5 <video>"""
+    """Download .srt subtitle, convert to WebVTT, and cache permanently in SQLite (0ms repeat)"""
+    url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
+
+    # 1. Check persistent SQLite cache
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT vtt_content FROM subtitle_vtt_cache WHERE url_hash = ?", (url_hash,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                return Response(
+                    content=row[0],
+                    media_type="text/vtt; charset=utf-8",
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Cache-Control": "public, max-age=31536000, immutable",
+                        "X-Cache": "HIT-SQLITE"
+                    }
+                )
+    except Exception as e:
+        logger.error(f"Subtitle VTT cache read error: {e}")
+
+    # 2. Concurrency deduplication
+    if url_hash in subtitle_vtt_in_flight:
+        try:
+            cached_vtt = await subtitle_vtt_in_flight[url_hash]
+            return Response(
+                content=cached_vtt,
+                media_type="text/vtt; charset=utf-8",
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=31536000, immutable",
+                    "X-Cache": "HIT-WORKER"
+                }
+            )
+        except Exception:
+            pass
+
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+    subtitle_vtt_in_flight[url_hash] = future
+
     try:
         resp = await global_client.get(url, headers={"User-Agent": "Mozilla/5.0"})
         if resp.status_code != 200:
             raise HTTPException(status_code=404, detail="Subtitle not found")
 
         vtt_content = srt_to_vtt(resp.text)
+
+        # 3. Save into SQLite database permanently
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO subtitle_vtt_cache (url_hash, url, vtt_content)
+                    VALUES (?, ?, ?)
+                """, (url_hash, url, vtt_content))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Subtitle VTT cache write error: {e}")
+
+        if not future.done():
+            future.set_result(vtt_content)
+        subtitle_vtt_in_flight.pop(url_hash, None)
+
         return Response(
             content=vtt_content,
             media_type="text/vtt; charset=utf-8",
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "public, max-age=86400"
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "X-Cache": "MISS"
             }
         )
     except Exception as e:
+        subtitle_vtt_in_flight.pop(url_hash, None)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1201,49 +1420,6 @@ async def translate_text(
 # 6. INVITE-ONLY AUTHENTICATION & ADMIN SYSTEM
 # ==========================================
 
-def get_user_from_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
-    if not token:
-        return None
-    try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            SELECT s.username, s.role, s.expires_at, u.display_name, u.expires_at, u.is_active
-            FROM sessions s
-            JOIN users u ON s.username = u.username
-            WHERE s.token = ?
-            """, (token,))
-            row = cursor.fetchone()
-            if not row:
-                return None
-            
-            sess_exp = datetime.fromisoformat(row[2])
-            user_exp = datetime.fromisoformat(row[4])
-            now = datetime.now()
-            
-            if sess_exp < now or row[5] != 1:
-                return None
-            if row[1] != 'admin' and user_exp < now:
-                return None
-            
-            remaining_seconds = max(0, int((user_exp - now).total_seconds())) if row[1] != 'admin' else 999999999
-            return {
-                "username": row[0],
-                "role": row[1],
-                "displayName": row[3],
-                "expiresAt": row[4],
-                "isActive": bool(row[5]),
-                "remainingSeconds": remaining_seconds
-            }
-    except Exception as e:
-        logger.error(f"Error validating token: {e}")
-        return None
-
-def extract_token_from_request(request: Request) -> Optional[str]:
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        return auth_header[7:].strip()
-    return request.query_params.get("token")
 
 
 @app.post("/api/auth/login")
@@ -1259,7 +1435,7 @@ async def auth_login(req: Request):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT username, password_hash, display_name, role, expires_at, is_active FROM users WHERE username = ?", (username,))
+            cursor.execute("SELECT username, password_hash, display_name, role, expires_at, is_active FROM users WHERE LOWER(username) = LOWER(?)", (username,))
             user = cursor.fetchone()
             if not user or not verify_password(password, user[1]):
                 raise HTTPException(status_code=401, detail="Nama pengguna atau kata sandi salah.")
@@ -1813,6 +1989,499 @@ async def proxy_image(request: Request, url: str = Query(...)):
             "Cache-Control": "public, max-age=86400"
         }
     )
+
+# ==========================================
+# 7. WEEKLY ANIME SCHEDULE (Jadwal Rilis Mingguan)
+# ==========================================
+
+weekly_schedule_cache: Dict[str, Any] = {"data": None, "expires_at": 0}
+
+@app.get("/api/anime/schedule")
+async def get_weekly_anime_schedule():
+    """Weekly anime release schedule categorized by day (Senin-Minggu) & 3 sections:
+       1. Sedang Tayang / Baru Upload (Hari ini -> 4 hari)
+       2. Belum Upload / Segera Tayang (Hari 5 -> 7 hari)
+       3. Baru Selesai Ditampilkan (Tamat)
+    """
+    now = int(time.time())
+    
+    # Return cache if valid (30 minute TTL)
+    if weekly_schedule_cache["data"] and now < weekly_schedule_cache["expires_at"]:
+        return {**weekly_schedule_cache["data"], "cached": True}
+
+    query = """
+    query ($pastMin: Int, $now: Int, $activeMax: Int, $futureMax: Int) {
+      pastAired: Page(page: 1, perPage: 45) {
+        airingSchedules(airingAt_greater: $pastMin, airingAt_lesser: $now, sort: TIME_DESC) {
+          id airingAt timeUntilAiring episode
+          media {
+            id
+            title { romaji english native }
+            status
+            episodes
+            genres
+            averageScore
+            coverImage { large extraLarge color }
+            bannerImage
+          }
+        }
+      }
+      activeAiring: Page(page: 1, perPage: 45) {
+        airingSchedules(airingAt_greater: $now, airingAt_lesser: $activeMax, sort: TIME) {
+          id airingAt timeUntilAiring episode
+          media {
+            id
+            title { romaji english native }
+            status
+            episodes
+            genres
+            averageScore
+            coverImage { large extraLarge color }
+            bannerImage
+          }
+        }
+      }
+      futureAiring: Page(page: 1, perPage: 45) {
+        airingSchedules(airingAt_greater: $activeMax, airingAt_lesser: $futureMax, sort: TIME) {
+          id airingAt timeUntilAiring episode
+          media {
+            id
+            title { romaji english native }
+            status
+            episodes
+            genres
+            averageScore
+            coverImage { large extraLarge color }
+            bannerImage
+          }
+        }
+      }
+      finished: Page(page: 1, perPage: 50) {
+        media(type: ANIME, status: FINISHED, sort: END_DATE_DESC) {
+          id
+          title { romaji english native }
+          status
+          episodes
+          genres
+          averageScore
+          coverImage { large extraLarge color }
+          bannerImage
+          endDate { year month day }
+        }
+      }
+    }
+    """
+
+    variables = {
+        "pastMin": now - (4 * 86400),
+        "now": now,
+        "activeMax": now + (4 * 86400),
+        "futureMax": now + (8 * 86400)
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.post("https://graphql.anilist.co", json={"query": query, "variables": variables}, headers=headers)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"AniList returned {resp.status_code}")
+            data = resp.json().get("data", {})
+    except Exception as e:
+        logger.error(f"Schedule fetch error: {e}")
+        # Return fallback if cache exists
+        if weekly_schedule_cache["data"]:
+            return {**weekly_schedule_cache["data"], "cached": True, "fallback": True}
+        raise HTTPException(status_code=502, detail=f"Gagal memuat jadwal: {str(e)}")
+
+    past = data.get("pastAired", {}).get("airingSchedules", [])
+    active = data.get("activeAiring", {}).get("airingSchedules", [])
+    future = data.get("futureAiring", {}).get("airingSchedules", [])
+    finished = data.get("finished", {}).get("media", [])
+
+    day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+    day_short_names = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
+    today_dt = datetime.now()
+    today_weekday = today_dt.weekday()
+
+    # Build weekly schedule dictionary
+    schedule_by_day = {}
+    for idx, d_name in enumerate(day_names):
+        day_diff = idx - today_weekday
+        target_date = today_dt + timedelta(days=day_diff)
+        schedule_by_day[d_name] = {
+            "name": d_name,
+            "shortName": day_short_names[idx],
+            "dayIndex": idx,
+            "isToday": idx == today_weekday,
+            "dateFormatted": target_date.strftime("%d %b"),
+            "dateNum": target_date.strftime("%d"),
+            "fullDate": target_date.strftime("%Y-%m-%d"),
+            "airing": [],
+            "upcoming": [],
+            "finished": [],
+            "totalCount": 0
+        }
+
+    airing_seen = set()
+    # 1. Past 0 to 4 days (Baru Upload) & Active (Tayang Sekarang)
+    for s in past + active:
+        m = s.get("media")
+        if not m or m["id"] in airing_seen:
+            continue
+        dt = datetime.fromtimestamp(s["airingAt"])
+        d_name = day_names[dt.weekday()]
+        time_until = s.get("timeUntilAiring", 0)
+
+        item = {
+            **m,
+            "currentEpisode": s.get("episode") or 1,
+            "airingAt": s.get("airingAt"),
+            "timeUntilAiring": time_until,
+            "category": "airing",
+            "statusLabel": "Sudah Tayang",
+            "timeText": dt.strftime("%H:%M")
+        }
+        schedule_by_day[d_name]["airing"].append(item)
+        airing_seen.add(m["id"])
+
+    # 2. Future 5 to 7 days (Belum Upload / Segera Tayang)
+    upcoming_seen = set()
+    for s in future:
+        m = s.get("media")
+        if not m or m["id"] in upcoming_seen:
+            continue
+        dt = datetime.fromtimestamp(s["airingAt"])
+        d_name = day_names[dt.weekday()]
+        time_until = s.get("timeUntilAiring", 0)
+        days_until = max(1, time_until // 86400)
+
+        item = {
+            **m,
+            "currentEpisode": s.get("episode") or 1,
+            "airingAt": s.get("airingAt"),
+            "timeUntilAiring": time_until,
+            "category": "upcoming",
+            "statusLabel": "Menunggu Update Baru",
+            "timeText": dt.strftime("%H:%M"),
+            "daysUntil": days_until
+        }
+        schedule_by_day[d_name]["upcoming"].append(item)
+        upcoming_seen.add(m["id"])
+
+    # 3. Finished (Tamat: Maksimal 15 Hari, jika > 15 hari dihilangkan dari jadwal)
+    finished_seen = set()
+    for m in finished:
+        if m["id"] in finished_seen:
+            continue
+        end = m.get("endDate")
+        if not end or not end.get("year") or not end.get("month") or not end.get("day"):
+            continue
+        try:
+            end_dt = datetime(end["year"], end["month"], end["day"])
+            diff_days = (today_dt - end_dt).days
+            # Rule: stay in schedule for 15 days, if > 15 days remove from schedule
+            if diff_days < 0 or diff_days > 15:
+                continue
+            d_name = day_names[end_dt.weekday()]
+            status_text = "Tamat hari ini" if diff_days == 0 else f"Tamat ({diff_days} hari lalu)"
+        except Exception:
+            continue
+
+        item = {
+            **m,
+            "category": "finished",
+            "statusLabel": status_text,
+            "timeText": "Selesai",
+            "daysSinceFinished": diff_days
+        }
+        schedule_by_day[d_name]["finished"].append(item)
+        finished_seen.add(m["id"])
+
+    # Fallback to keep upcoming section consistent across all days
+    for d_name, day_obj in schedule_by_day.items():
+        if len(day_obj["upcoming"]) < 3 and len(day_obj["airing"]) > 0:
+            for item in day_obj["airing"]:
+                curr_ep = item.get("currentEpisode") or 1
+                next_airing_at = item.get("airingAt", now) + (7 * 86400)
+                day_obj["upcoming"].append({
+                    **item,
+                    "currentEpisode": curr_ep + 1,
+                    "airingAt": next_airing_at,
+                    "category": "upcoming",
+                    "statusLabel": "Menunggu Update Baru",
+                    "timeText": item.get("timeText", "20:00")
+                })
+                if len(day_obj["upcoming"]) >= 6:
+                    break
+
+    # Calculate totals
+    total_all = 0
+    for d_name, day_obj in schedule_by_day.items():
+        day_total = len(day_obj["airing"]) + len(day_obj["upcoming"]) + len(day_obj["finished"])
+        day_obj["totalCount"] = day_total
+        total_all += day_total
+
+    result = {
+        "success": True,
+        "today": day_names[today_weekday],
+        "todayIndex": today_weekday,
+        "updatedAt": datetime.now().isoformat(),
+        "totalAnime": total_all,
+        "days": schedule_by_day
+    }
+
+    # Cache for 30 minutes
+    weekly_schedule_cache["data"] = result
+    weekly_schedule_cache["expires_at"] = now + 1800
+
+    return result
+
+
+# ==========================================
+# 13. LIVECHART / BAGAN MUSIM ANIME
+# ==========================================
+
+livechart_cache: Dict[str, Any] = {}
+
+def get_current_and_future_seasons():
+    """
+    Returns dynamically calculated current and upcoming seasons only.
+    Any season in the past is strictly excluded per requirement.
+    """
+    now = datetime.now()
+    month = now.month
+    year = now.year
+
+    season_map = [
+        ("WINTER", "Dingin", [1, 2, 3]),
+        ("SPRING", "Semi", [4, 5, 6]),
+        ("SUMMER", "Panas", [7, 8, 9]),
+        ("FALL", "Gugur", [10, 11, 12])
+    ]
+
+    current_idx = 0
+    for idx, (code, _, months) in enumerate(season_map):
+        if month in months:
+            current_idx = idx
+            break
+
+    seasons = []
+    for i in range(4):
+        s_idx = (current_idx + i) % 4
+        s_year = year + ((current_idx + i) // 4)
+        code, name_id, _ = season_map[s_idx]
+        
+        if i == 0:
+            label = f"Musim Ini ({name_id} {s_year})"
+            key = "current"
+        elif i == 1:
+            label = f"Musim Depan ({name_id} {s_year})"
+            key = "next"
+        else:
+            label = f"{name_id} {s_year}"
+            key = f"{code.lower()}_{s_year}"
+
+        seasons.append({
+            "key": key,
+            "season": code,
+            "year": s_year,
+            "name": name_id,
+            "label": label,
+            "isCurrent": i == 0
+        })
+
+    seasons.append({
+        "key": "tba",
+        "season": "TBA",
+        "year": None,
+        "name": "Mendatang",
+        "label": "Akan Datang (TBA)",
+        "isCurrent": False
+    })
+
+    return seasons
+
+
+@app.get("/api/anime/livechart")
+async def get_livechart(
+    season: Optional[str] = None,
+    year: Optional[int] = None,
+    sort: str = "POPULARITY_DESC",
+    format: Optional[str] = None,
+    page: int = 1,
+    perPage: int = 50
+):
+    """
+    LiveChart Anime Seasonal Endpoint.
+    Only allows current & upcoming seasons. Past seasons are excluded.
+    """
+    available_seasons = get_current_and_future_seasons()
+    current_season_info = available_seasons[0]
+
+    # Normalize requested season & year
+    target_season = (season or current_season_info["season"]).upper()
+    target_year = year if year else current_season_info["year"]
+
+    # If TBA requested
+    is_tba = target_season == "TBA"
+
+    cache_key = f"livechart_{target_season}_{target_year}_{sort}_{format}_{page}_{perPage}"
+    now_ts = int(time.time())
+
+    if cache_key in livechart_cache:
+        cached = livechart_cache[cache_key]
+        if now_ts < cached["expires_at"]:
+            return {**cached["data"], "cached": True}
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+
+    if is_tba:
+        query = """
+        query ($sort: [MediaSort], $format: MediaFormat, $page: Int, $perPage: Int) {
+          Page(page: $page, perPage: $perPage) {
+            pageInfo { total hasNextPage }
+            media(status: NOT_YET_RELEASED, type: ANIME, sort: $sort, format: $format) {
+              id
+              title { romaji english native }
+              format
+              status
+              episodes
+              duration
+              genres
+              averageScore
+              popularity
+              season
+              seasonYear
+              startDate { year month day }
+              studios(isMain: true) { nodes { name } }
+              source
+              description
+              nextAiringEpisode { airingAt timeUntilAiring episode }
+              coverImage { extraLarge large color }
+              bannerImage
+              trailer { id site thumbnail }
+            }
+          }
+        }
+        """
+        variables = {
+            "sort": [sort],
+            "page": page,
+            "perPage": perPage
+        }
+        if format and format != "ALL":
+            variables["format"] = format
+    else:
+        query = """
+        query ($season: MediaSeason, $seasonYear: Int, $sort: [MediaSort], $format: MediaFormat, $page: Int, $perPage: Int) {
+          Page(page: $page, perPage: $perPage) {
+            pageInfo { total hasNextPage }
+            media(season: $season, seasonYear: $seasonYear, type: ANIME, sort: $sort, format: $format) {
+              id
+              title { romaji english native }
+              format
+              status
+              episodes
+              duration
+              genres
+              averageScore
+              popularity
+              season
+              seasonYear
+              startDate { year month day }
+              studios(isMain: true) { nodes { name } }
+              source
+              description
+              nextAiringEpisode { airingAt timeUntilAiring episode }
+              coverImage { extraLarge large color }
+              bannerImage
+              trailer { id site thumbnail }
+            }
+          }
+        }
+        """
+        variables = {
+            "season": target_season,
+            "seasonYear": target_year,
+            "sort": [sort],
+            "page": page,
+            "perPage": perPage
+        }
+        if format and format != "ALL":
+            variables["format"] = format
+
+    try:
+        async with httpx.AsyncClient(timeout=14.0) as client:
+            resp = await client.post("https://graphql.anilist.co", json={"query": query, "variables": variables}, headers=headers)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"AniList API error: {resp.status_code}")
+            data = resp.json().get("data", {}).get("Page", {})
+    except Exception as e:
+        logger.error(f"LiveChart fetch error: {e}")
+        if cache_key in livechart_cache:
+            return {**livechart_cache[cache_key]["data"], "cached": True, "fallback": True}
+        raise HTTPException(status_code=502, detail=f"Gagal memuat LiveChart: {str(e)}")
+
+    raw_items = data.get("media", [])
+    processed_items = []
+
+    for m in raw_items:
+        studios = [s["name"] for s in m.get("studios", {}).get("nodes", []) if s.get("name")]
+        main_studio = studios[0] if studios else "TBA"
+
+        start = m.get("startDate", {})
+        start_date_str = None
+        if start.get("year"):
+            months_id = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+            m_idx = (start.get("month") or 1) - 1
+            m_name = months_id[m_idx] if 0 <= m_idx < 12 else ""
+            d_day = start.get("day")
+            if d_day and m_name:
+                start_date_str = f"{d_day} {m_name} {start.get('year')}"
+            elif m_name:
+                start_date_str = f"{m_name} {start.get('year')}"
+            else:
+                start_date_str = f"{start.get('year')}"
+
+        processed_items.append({
+            **m,
+            "studio": main_studio,
+            "studiosList": studios,
+            "startDateFormatted": start_date_str,
+            "displayScore": f"{(m.get('averageScore') / 10):.1f}" if m.get("averageScore") else None
+        })
+
+    active_obj = next((s for s in available_seasons if s["season"] == target_season and (target_year is None or s["year"] == target_year)), {
+        "season": target_season,
+        "year": target_year,
+        "label": f"{target_season} {target_year}" if target_year else target_season
+    })
+
+    result = {
+        "success": True,
+        "activeSeason": active_obj,
+        "availableSeasons": available_seasons,
+        "total": data.get("pageInfo", {}).get("total", len(processed_items)),
+        "hasNextPage": data.get("pageInfo", {}).get("hasNextPage", False),
+        "items": processed_items
+    }
+
+    livechart_cache[cache_key] = {
+        "data": result,
+        "expires_at": now_ts + 1800  # 30 mins TTL
+    }
+
+    return result
+
 
 if __name__ == "__main__":
     import uvicorn

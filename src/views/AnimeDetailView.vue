@@ -79,10 +79,10 @@
 
               <!-- Primary CTAs -->
               <div class="action-buttons-row">
-                <router-link :to="`/watch?id=${anime.id}&ep=1`" class="btn btn-primary play-btn-lg">
+                <button type="button" class="btn btn-primary play-btn-lg" @click="handlePlayClick(1)">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                   <span>Mulai Nonton (Episode 1)</span>
-                </router-link>
+                </button>
 
                 <button class="btn btn-secondary fav-btn" @click="handleToggleWatchlist">
                   <svg width="18" height="18" viewBox="0 0 24 24" :fill="isInWatchlist ? '#e50914' : 'none'" :stroke="isInWatchlist ? '#e50914' : 'currentColor'" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
@@ -127,7 +127,7 @@
 
           <!-- Single Movie/OVA Card CTA -->
           <div v-if="totalEpisodes === 1" class="single-movie-cta-wrap">
-            <router-link :to="`/watch?id=${anime.id}&ep=1`" class="single-movie-banner">
+            <button type="button" class="single-movie-banner" @click="handlePlayClick(1)">
               <div class="movie-play-circle">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               </div>
@@ -138,17 +138,18 @@
               <div class="movie-action-arrow">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
               </div>
-            </router-link>
+            </button>
           </div>
 
           <!-- Grid of Episode Cards -->
           <div v-else class="episodes-grid">
-            <router-link 
+            <button 
+              type="button"
               v-for="ep in filteredEpisodes" 
               :key="ep.num" 
-              :to="`/watch?id=${anime.id}&ep=${ep.num}`" 
               class="episode-card"
               :class="{ 'has-progress': ep.progress && ep.progress > 0 }"
+              @click="handlePlayClick(ep.num)"
             >
               <div class="ep-number-tag">Episode {{ ep.num }}</div>
               <div class="ep-progress-info" v-if="ep.progressText">{{ ep.progressText }}</div>
@@ -159,7 +160,7 @@
               <div class="ep-progress-bar" v-if="ep.progress">
                 <div class="progress-fill" :style="{ width: ep.progress + '%' }"></div>
               </div>
-            </router-link>
+            </button>
           </div>
         </section>
 
@@ -278,7 +279,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import { isAuthenticated, showLoginModal } from '../stores/auth.js';
 import { 
   getAnimeDetails, 
   getSafeImageUrl, 
@@ -296,6 +298,15 @@ import {
 } from '../storage.js';
 
 const route = useRoute();
+const router = useRouter();
+
+function handlePlayClick(ep = 1) {
+  if (!isAuthenticated.value) {
+    showLoginModal.value = true;
+    return;
+  }
+  router.push(`/watch?id=${anime.value?.id}&ep=${ep}`);
+}
 
 const anime = ref(null);
 const loading = ref(true);
@@ -411,13 +422,22 @@ async function loadAnimeData() {
     // Watchlist
     isInWatchlist.value = getWatchlistStatus(data.id);
 
-    // Check shared server translation
-    lookupTranslation(data.id, originalSynopsis.value)
-      .then(res => {
-        if (res.found && res.text) {
-          indonesianSynopsis.value = res.text;
+    // Automatic Indonesian translation (instant cache lookup, or auto-fetch in background)
+    lookupTranslation(data.id)
+      .then(async (res) => {
+        if (res.found && res.translation) {
+          indonesianSynopsis.value = res.translation;
           isIndonesian.value = true;
           isServerCached.value = true;
+        } else if (originalSynopsis.value) {
+          try {
+            const trRes = await translateSynopsis(originalSynopsis.value, data.id);
+            if (trRes.translation) {
+              indonesianSynopsis.value = trRes.translation;
+              isIndonesian.value = true;
+              isServerCached.value = true;
+            }
+          } catch (_) {}
         }
       })
       .catch(() => {});
@@ -444,9 +464,9 @@ async function toggleTranslation() {
 
   isTranslating.value = true;
   try {
-    const res = await translateSynopsis(anime.value.id, originalSynopsis.value);
-    if (res.text) {
-      indonesianSynopsis.value = res.text;
+    const res = await translateSynopsis(originalSynopsis.value, anime.value.id);
+    if (res.translation) {
+      indonesianSynopsis.value = res.translation;
       isIndonesian.value = true;
       isServerCached.value = res.source === 'server_db';
     }
@@ -869,6 +889,10 @@ watch(() => [route.query.id, route.params.id], () => {
   gap: 0.45rem;
   position: relative;
   overflow: hidden;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
   transition: all 0.2s ease;
 }
 
@@ -928,6 +952,10 @@ watch(() => [route.query.id, route.params.id], () => {
   padding: 1.25rem 1.6rem;
   text-decoration: none;
   transition: all 0.2s;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
 }
 
 .single-movie-banner:hover {

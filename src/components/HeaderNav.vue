@@ -42,13 +42,22 @@
             </button>
           </li>
           <li>
-            <button 
+            <router-link 
+              to="/schedule" 
               class="nav-item-btn" 
-              :class="{ active: currentTab === 'airing' && $route.path === '/' }"
-              @click="selectTab('airing')"
+              :class="{ active: $route.path === '/schedule' }"
             >
               Jadwal
-            </button>
+            </router-link>
+          </li>
+          <li>
+            <router-link 
+              to="/livechart" 
+              class="nav-item-btn" 
+              :class="{ active: $route.path === '/livechart' }"
+            >
+              LiveChart
+            </router-link>
           </li>
           <li>
             <button 
@@ -74,7 +83,7 @@
       <!-- Header Search Input -->
       <div class="header-search-wrapper" ref="searchWrapperRef">
         <div class="search-input-box" :class="{ 'focused': isSearchOpen }">
-          <span class="search-icon">
+          <span class="search-icon" @click="handleSearchSubmit" title="Tekan Enter untuk mencari" style="cursor: pointer;">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -86,7 +95,8 @@
             v-model="searchQuery" 
             @input="onSearchInput"
             @focus="isSearchOpen = true"
-            placeholder="Cari judul, misal frieren" 
+            @keydown.enter="handleSearchSubmit"
+            placeholder="Cari anime, lalu tekan Enter..." 
             autocomplete="off" 
           />
           <span class="search-shortcut" v-if="!searchQuery">/</span>
@@ -94,11 +104,11 @@
         </div>
 
         <!-- Search Autocomplete Dropdown -->
-        <div class="search-results-dropdown" v-if="isSearchOpen && (searchResults.length > 0 || isSearching)">
+        <div class="search-results-dropdown" v-if="isSearchOpen && (searchResults.length > 0 || isSearching || searchQuery.trim().length > 0)">
           <div v-if="isSearching" class="search-loading">
             <span class="spinner-small"></span> Mencari anime...
           </div>
-          <div v-else>
+          <div v-else-if="searchResults.length > 0">
             <div 
               v-for="item in searchResults" 
               :key="item.id" 
@@ -117,6 +127,14 @@
                 </div>
               </div>
             </div>
+            <!-- View all results button -->
+            <div class="search-view-all-btn" @click="handleSearchSubmit">
+              <span>Lihat semua hasil untuk "<strong>{{ searchQuery }}</strong>" →</span>
+            </div>
+          </div>
+          <div v-else-if="searchQuery.trim()" class="search-empty-state">
+            <p>Tidak ada pratinjau cepat untuk "{{ searchQuery }}".</p>
+            <button type="button" class="search-deep-btn" @click="handleSearchSubmit">Cari di Katalog Penuh ↵</button>
           </div>
         </div>
       </div>
@@ -137,7 +155,8 @@
         <!-- Authenticated User Profile -->
         <div v-if="currentUser" class="user-profile-menu" ref="profileMenuRef">
           <button class="profile-trigger-btn" @click="isProfileOpen = !isProfileOpen">
-            <div class="user-avatar">{{ (currentUser.displayName || currentUser.username).charAt(0).toUpperCase() }}</div>
+            <img v-if="currentUser.photoURL" :src="currentUser.photoURL" :alt="currentUser.displayName || currentUser.username" class="user-avatar user-avatar-img" />
+            <div v-else class="user-avatar">{{ (currentUser.displayName || currentUser.username).charAt(0).toUpperCase() }}</div>
             <div class="user-details-pill">
               <span class="user-name-text">{{ currentUser.displayName || currentUser.username }}</span>
               <span class="user-badge-vip" :class="{ 'admin-badge': currentUser.role === 'admin' }">
@@ -246,6 +265,13 @@ function openAnime(anime) {
   searchQuery.value = '';
   searchResults.value = [];
   router.push(`/anime?id=${anime.id}`);
+}
+
+function handleSearchSubmit() {
+  const q = searchQuery.value.trim();
+  if (!q) return;
+  isSearchOpen.value = false;
+  router.push({ path: '/', query: { search: q } });
 }
 
 function handleLogout() {
@@ -554,6 +580,55 @@ onUnmounted(() => {
 .search-score {
   color: #eab308;
   font-weight: 700;
+}
+
+.search-view-all-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(229, 9, 20, 0.12);
+  color: #fca5a5;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+}
+
+.search-view-all-btn:hover {
+  background: #e50914;
+  color: #fff;
+}
+
+.search-empty-state {
+  padding: 1.2rem 1rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.search-deep-btn {
+  background: rgba(229, 9, 20, 0.15);
+  border: 1px solid rgba(229, 9, 20, 0.3);
+  color: #f87171;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-deep-btn:hover {
+  background: #e50914;
+  color: #fff;
 }
 
 .header-actions {

@@ -29,6 +29,49 @@
           @seeked="onVideoSeeked"
         ></video>
 
+        <!-- VIP Locked Access Screen (Displayed when user is not logged in) -->
+        <div v-if="!isAuthenticated" class="vip-locked-theater-overlay">
+          <div class="vip-locked-backdrop-glow"></div>
+          <div class="vip-locked-card">
+            <div class="vip-locked-badge">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e50914" stroke-width="2.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              <span>AKSES KHUSUS VIP & UNDANGAN</span>
+            </div>
+            
+            <h2 class="vip-locked-title">Streaming Video Terkunci</h2>
+            <p class="vip-locked-desc">
+              Aplikasi ini bersifat privat khusus anggota terdaftar. Masuk dengan akun yang dibuatkan Admin atau klaim Kode Undangan resmi untuk mulai menonton anime.
+            </p>
+
+            <div class="vip-locked-actions">
+              <button class="btn btn-primary vip-btn-glow" @click="showLoginModal = true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                  <polyline points="10 17 15 12 10 7"></polyline>
+                  <line x1="15" y1="12" x2="3" y2="12"></line>
+                </svg>
+                <span>Masuk Akun VIP</span>
+              </button>
+
+              <button class="btn btn-secondary vip-btn-invite" @click="showInviteModal = true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2">
+                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
+                  <line x1="12" y1="9" x2="12" y2="15"></line>
+                </svg>
+                <span>Klaim Kode Undangan</span>
+              </button>
+            </div>
+            
+            <div class="vip-locked-footer-hint">
+              <span>👑 Dikelola oleh Admin &bull; Akses Terbatas & Privat</span>
+            </div>
+          </div>
+        </div>
+
+
         <!-- Floating Skip Opening Overlay Button (Appears during opening 0:00 - 3:00) -->
         <transition name="fade-scale">
           <button 
@@ -384,8 +427,14 @@ import {
   translateSynopsis, 
   searchKusonime, 
   getKusonimeDownloads,
-  apiUrl 
+  apiUrl,
+  getAuthToken
 } from '../api.js';
+import { 
+  isAuthenticated, 
+  showLoginModal, 
+  showInviteModal 
+} from '../stores/auth.js';
 import { 
   saveHistory, 
   updateWatchProgress, 
@@ -626,20 +675,34 @@ async function initWatch() {
     // 4. Fetch ARM Mapping
     fetchArmMapping(details.id);
 
-    // 5. Fetch persistent SQLite translation
-    lookupTranslation(animeId).then(res => {
+    // 5. Fetch persistent SQLite translation (or auto-translate in background)
+    lookupTranslation(animeId).then(async (res) => {
       if (res.found && res.translation) {
         indonesianSynopsis.value = res.translation;
         isIndonesian.value = true;
         isServerCached.value = true;
+      } else if (originalSynopsis.value) {
+        try {
+          const trRes = await translateSynopsis(originalSynopsis.value, animeId);
+          if (trRes.translation) {
+            indonesianSynopsis.value = trRes.translation;
+            isIndonesian.value = true;
+            isServerCached.value = true;
+          }
+        } catch (_) {}
       }
     });
 
     // 6. Fetch Kusonime Batch Downloads
     fetchKusonime(details);
 
-    // 7. Load Episode Stream
-    loadEpisodeStream(ep);
+    // 7. Load Episode Stream (Only if authenticated)
+    if (isAuthenticated.value) {
+      loadEpisodeStream(ep);
+    } else {
+      isLoadingStream.value = false;
+      showLoginModal.value = true;
+    }
 
   } catch (err) {
     console.error('Failed to init watch:', err);
@@ -649,6 +712,12 @@ async function initWatch() {
 }
 
 async function loadEpisodeStream(ep) {
+  if (!isAuthenticated.value) {
+    isLoadingStream.value = false;
+    showLoginModal.value = true;
+    return;
+  }
+
   isLoadingStream.value = true;
   showPlayOverlay.value = false;
   showResumeBanner.value = false;
@@ -663,13 +732,30 @@ async function loadEpisodeStream(ep) {
     // 1. Fetch Subtitles in parallel
     fetchSubtitles(title, altTitle, ep);
 
-    // 2. Fetch Streams from backend with primary and alt titles
-    let res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}`));
+    // 2. Fetch Streams with auth token
+    const token = getAuthToken();
+    const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
+
+    let res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
+      headers: authHeaders
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      loadingMessage.value = 'Akses VIP Terkunci. Silakan masuk atau klaim kode undangan.';
+      streamStatusText.value = 'Akses streaming VIP terkunci.';
+      isLoadingStream.value = false;
+      showLoginModal.value = true;
+      return;
+    }
+
     let data = await res.json();
 
     // Fallback to Romaji title explicitly if empty
     if ((!data.sources || data.sources.length === 0) && altTitle && altTitle !== title) {
-      res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}`));
+      res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
+        headers: authHeaders
+      });
       data = await res.json();
     }
 
@@ -677,7 +763,9 @@ async function loadEpisodeStream(ep) {
     if (!data.sources || data.sources.length === 0) {
       const simplified = title.split(':')[0].replace(/\s+(Season|\bS\b|\bPart\b|\bII\b|\b2nd\b).*$/i, '').trim();
       if (simplified && simplified !== title && simplified !== altTitle) {
-        res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(simplified)}&ep=${ep}`));
+        res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(simplified)}&ep=${ep}${tokenQuery}`), {
+          headers: authHeaders
+        });
         data = await res.json();
       }
     }
@@ -894,6 +982,10 @@ function switchQuality(q) {
 }
 
 function switchEpisode(epNum) {
+  if (!isAuthenticated.value) {
+    showLoginModal.value = true;
+    return;
+  }
   if (currentEpisode.value === epNum) return;
 
   // Save current episode progress
@@ -1062,13 +1154,20 @@ function applySubtitleTrack(sub) {
   track.src = apiUrl(sub.vtt_url);
   track.default = true;
 
-  videoEl.appendChild(track);
-
-  if (videoEl.textTracks && videoEl.textTracks.length > 0) {
-    for (let i = 0; i < videoEl.textTracks.length; i++) {
-      videoEl.textTracks[i].mode = 'showing';
+  const enableTrackMode = () => {
+    if (track.track) {
+      track.track.mode = 'showing';
     }
-  }
+    if (videoEl.textTracks && videoEl.textTracks.length > 0) {
+      for (let i = 0; i < videoEl.textTracks.length; i++) {
+        videoEl.textTracks[i].mode = 'showing';
+      }
+    }
+  };
+
+  track.addEventListener('load', enableTrackMode);
+  videoEl.appendChild(track);
+  enableTrackMode();
 }
 
 // ---------------- ARM & Kusonime & Translation ----------------
@@ -1177,6 +1276,23 @@ function handleKeydown(e) {
   }
 }
 
+watch(isAuthenticated, (isAuth) => {
+  if (isAuth && anime.value) {
+    loadEpisodeStream(currentEpisode.value);
+  } else if (!isAuth) {
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      hlsInstance = null;
+    }
+    const videoEl = videoRef.value;
+    if (videoEl) {
+      videoEl.pause();
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    }
+  }
+});
+
 watch(() => route.query.ep, (newEp) => {
   if (newEp && Number(newEp) !== currentEpisode.value) {
     currentEpisode.value = Number(newEp);
@@ -1266,6 +1382,19 @@ onUnmounted(() => {
   object-fit: contain;
   background: #000;
   display: block;
+}
+
+.native-hls-player::cue,
+video::cue {
+  background-color: rgba(10, 12, 18, 0.85);
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
 }
 
 /* Floating Skip Opening Button */
@@ -1402,6 +1531,127 @@ onUnmounted(() => {
   color: #94a3b8;
   margin-top: 0.1rem;
 }
+
+/* VIP Locked Theater Overlay */
+.vip-locked-theater-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(20, 10, 15, 0.96) 0%, rgba(6, 7, 10, 0.99) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 1.5rem;
+  text-align: center;
+  backdrop-filter: blur(16px);
+}
+
+.vip-locked-backdrop-glow {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(229, 9, 20, 0.3) 0%, transparent 70%);
+  filter: blur(45px);
+  pointer-events: none;
+}
+
+.vip-locked-card {
+  position: relative;
+  z-index: 2;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.vip-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(229, 9, 20, 0.15);
+  border: 1px solid rgba(229, 9, 20, 0.4);
+  color: #ff4d4d;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.vip-locked-title {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.vip-locked-desc {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.vip-locked-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.vip-btn-glow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #e50914;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.65rem 1.3rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(229, 9, 20, 0.5);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.vip-btn-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 26px rgba(229, 9, 20, 0.7);
+}
+
+.vip-btn-invite {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.65rem 1.3rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vip-btn-invite:hover {
+  background: rgba(234, 179, 8, 0.18);
+  border-color: #fbbf24;
+  transform: translateY(-2px);
+}
+
+.vip-locked-footer-hint {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 0.4rem;
+}
+
 
 .resume-banner-actions {
   display: flex;

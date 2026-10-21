@@ -31,10 +31,10 @@
           </p>
 
           <div class="hero-buttons">
-            <router-link :to="`/watch?id=${anime.id}&ep=1`" class="btn btn-primary hero-btn-play">
+            <button type="button" @click="handleHeroPlay(anime.id)" class="btn btn-primary hero-btn-play">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               <span>Tonton Sekarang</span>
-            </router-link>
+            </button>
             <router-link :to="`/anime?id=${anime.id}`" class="btn btn-secondary hero-btn-info">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               <span>Detail Anime</span>
@@ -102,6 +102,31 @@
 
     <!-- ================= Main Grid Container ================= -->
     <div class="content-container main-content-wrap">
+      <!-- In-Page Search Bar Banner -->
+      <div class="home-search-bar-wrap">
+        <div class="home-search-box">
+          <svg class="home-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input 
+            type="text" 
+            v-model="searchKeyword" 
+            @keydown.enter="onInPageSearch" 
+            placeholder="Cari judul anime (misal: Naruto, One Piece, Frieren, Solo Leveling)..." 
+            autocomplete="off"
+          />
+          <button v-if="searchKeyword" class="btn-clear-search" @click="clearSearch" title="Hapus pencarian">✕</button>
+          <button class="btn btn-primary btn-sm btn-submit-search" @click="onInPageSearch">
+            <span>Cari</span>
+          </button>
+        </div>
+        <div v-if="searchKeyword" class="search-active-pill">
+          <span>Hasil pencarian: <strong>"{{ searchKeyword }}"</strong> ({{ animeList.length }} judul)</span>
+          <button @click="clearSearch" class="pill-close">✕ Reset Pencarian</button>
+        </div>
+      </div>
+
       <!-- Filter Chips & Selects -->
       <div class="filter-bar" v-if="!['watchlist', 'history'].includes(currentTab)">
         <div class="genre-scroll-wrapper">
@@ -234,6 +259,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AnimeSkeletonGrid from '../components/AnimeSkeletonGrid.vue';
+import { isAuthenticated, showLoginModal } from '../stores/auth.js';
 import { 
   getTrendingAnime, 
   getPopularThisSeason, 
@@ -262,6 +288,7 @@ const route = useRoute();
 const router = useRouter();
 
 const currentTab = ref(route.query.tab || 'trending');
+const searchKeyword = ref((route.query.search || route.query.q || '').toString());
 const heroAnimeList = ref([]);
 const heroIndex = ref(0);
 let heroTimer = null;
@@ -301,6 +328,9 @@ function setGenre(genre) {
 }
 
 function getTabTitle() {
+  if (searchKeyword.value.trim()) {
+    return `Hasil Pencarian: "${searchKeyword.value.trim()}"`;
+  }
   switch (currentTab.value) {
     case 'season': return 'Anime Musim Ini (Airing)';
     case 'top-rated': return 'Top Rating Sepanjang Masa';
@@ -312,6 +342,9 @@ function getTabTitle() {
 }
 
 function getEmptyMessage() {
+  if (searchKeyword.value.trim()) {
+    return `Tidak ada anime yang cocok dengan kata kunci "${searchKeyword.value.trim()}". Periksa ejaan atau coba kata kunci lain.`;
+  }
   if (currentTab.value === 'watchlist') return 'Kamu belum menambahkan anime ke koleksi. Klik tombol + Koleksi di halaman detail anime.';
   if (currentTab.value === 'history') return 'Kamu belum memiliki riwayat menonton. Mulai tonton anime favoritmu sekarang!';
   return 'Tidak ada anime yang cocok dengan filter yang dipilih.';
@@ -333,7 +366,19 @@ function navigateToDetail(animeId) {
   router.push(`/anime?id=${animeId}`);
 }
 
+function handleHeroPlay(animeId) {
+  if (!isAuthenticated.value) {
+    showLoginModal.value = true;
+    return;
+  }
+  router.push(`/watch?id=${animeId}&ep=1`);
+}
+
 function navigateToWatch(animeId, ep = 1) {
+  if (!isAuthenticated.value) {
+    showLoginModal.value = true;
+    return;
+  }
   router.push(`/watch?id=${animeId}&ep=${ep}`);
 }
 
@@ -348,6 +393,18 @@ function handleClearHistory() {
 async function fetchCurrentList() {
   isLoading.value = true;
   try {
+    const q = searchKeyword.value.trim();
+    if (q) {
+      const filters = {
+        genre: selectedGenre.value,
+        format: selectedFormat.value,
+        sort: selectedSort.value
+      };
+      const res = await searchAnime(q, filters, 1, 36);
+      animeList.value = Array.isArray(res) ? res : (res?.media || []);
+      return;
+    }
+
     if (currentTab.value === 'watchlist') {
       animeList.value = getWatchlist();
     } else if (currentTab.value === 'history') {
@@ -360,9 +417,8 @@ async function fetchCurrentList() {
       const res = await getTopRated(1, 24);
       animeList.value = Array.isArray(res) ? res : (res?.media || []);
     } else if (currentTab.value === 'airing') {
-      const res = await getAiringSchedule(1, 24);
-      const rawList = Array.isArray(res) ? res : (res?.airingSchedules || []);
-      animeList.value = rawList.map(s => s.media || s).filter(Boolean);
+      router.replace('/schedule');
+      return;
     } else {
       // Default trending / genre search
       if (selectedGenre.value !== 'ALL' || selectedFormat.value !== 'ALL' || selectedSort.value !== 'TRENDING_DESC') {
@@ -389,6 +445,25 @@ async function fetchCurrentList() {
   }
 }
 
+function onInPageSearch() {
+  const q = searchKeyword.value.trim();
+  if (q) {
+    router.replace({ query: { ...route.query, search: q } });
+    fetchCurrentList();
+  } else {
+    clearSearch();
+  }
+}
+
+function clearSearch() {
+  searchKeyword.value = '';
+  const newQuery = { ...route.query };
+  delete newQuery.search;
+  delete newQuery.q;
+  router.replace({ query: newQuery });
+  fetchCurrentList();
+}
+
 function startHeroCarousel() {
   clearInterval(heroTimer);
   heroTimer = setInterval(() => {
@@ -409,6 +484,14 @@ watch(() => props.tab, (newTab) => {
 watch(() => route.query.tab, (newTab) => {
   if (newTab && newTab !== currentTab.value) {
     currentTab.value = newTab;
+    fetchCurrentList();
+  }
+});
+
+watch(() => [route.query.search, route.query.q], ([newSearch, newQ]) => {
+  const q = (newSearch || newQ || '').toString().trim();
+  if (q !== searchKeyword.value.trim()) {
+    searchKeyword.value = q;
     fetchCurrentList();
   }
 });
@@ -1116,5 +1199,107 @@ onUnmounted(() => {
     font-size: 0.78rem;
     padding: 0.45rem 0.65rem;
   }
+}
+
+/* ================= In-Page Search Bar Banner ================= */
+.home-search-bar-wrap {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.home-search-box {
+  display: flex;
+  align-items: center;
+  background: #12141c;
+  border: 1.5px solid #242938;
+  border-radius: 12px;
+  padding: 0.5rem 0.85rem;
+  gap: 0.65rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+
+.home-search-box:focus-within {
+  border-color: #e50914;
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.2), 0 8px 24px rgba(0, 0, 0, 0.6);
+  background: #161922;
+}
+
+.home-search-icon {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.home-search-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.home-search-box input::placeholder {
+  color: #64748b;
+}
+
+.btn-clear-search {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #94a3b8;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+
+.btn-clear-search:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.btn-submit-search {
+  padding: 0.45rem 1.1rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.search-active-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(229, 9, 20, 0.12);
+  border: 1px solid rgba(229, 9, 20, 0.3);
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #fca5a5;
+  gap: 1rem;
+}
+
+.pill-close {
+  background: rgba(229, 9, 20, 0.2);
+  border: 1px solid rgba(229, 9, 20, 0.4);
+  color: #fff;
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pill-close:hover {
+  background: #e50914;
 }
 </style>

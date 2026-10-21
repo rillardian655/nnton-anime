@@ -36,10 +36,10 @@
           <div class="detail-sub" v-if="displaySubTitle">{{ displaySubTitle }}</div>
 
           <div class="banner-actions">
-            <router-link :to="`/watch?id=${anime.id}&ep=1`" class="btn btn-primary play-btn" @click="$emit('close')">
+            <button type="button" class="btn btn-primary play-btn" @click="handlePlayClick(1)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               <span>Mulai Nonton (Ep 1)</span>
-            </router-link>
+            </button>
             <button class="btn btn-secondary fav-btn" @click="handleToggleWatchlist">
               <svg width="16" height="16" viewBox="0 0 24 24" :fill="isInWatchlist ? '#e50914' : 'none'" :stroke="isInWatchlist ? '#e50914' : 'currentColor'" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
               <span>{{ isInWatchlist ? 'Tersimpan' : '+ Simpan Koleksi' }}</span>
@@ -82,10 +82,10 @@
 
           <!-- Single Movie / OVA Hero CTA -->
           <div v-if="totalEpisodes === 1" class="single-movie-cta">
-            <router-link 
-              :to="`/watch?id=${anime.id}&ep=1`" 
+            <button 
+              type="button"
               class="single-movie-card"
-              @click="$emit('close')"
+              @click="handlePlayClick(1)"
             >
               <div class="movie-play-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
@@ -97,25 +97,25 @@
               <div class="movie-arrow">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
               </div>
-            </router-link>
+            </button>
           </div>
 
           <!-- Grid of Episode Pills for Series -->
           <div v-else class="episodes-pills-grid">
-            <router-link 
+            <button 
+              type="button"
               v-for="ep in filteredEpisodes" 
               :key="ep.num" 
-              :to="`/watch?id=${anime.id}&ep=${ep.num}`"
               class="modal-ep-pill"
               :class="{ 'ep-has-progress': ep.progress && ep.progress > 0 }"
-              @click="$emit('close')"
+              @click="handlePlayClick(ep.num)"
             >
               <div class="pill-ep-num">Ep {{ ep.num }}</div>
               <div class="pill-ep-time" v-if="ep.progressText">{{ ep.progressText }}</div>
               <div class="pill-ep-progress-bar" v-if="ep.progress">
                 <div class="progress-fill" :style="{ width: ep.progress + '%' }"></div>
               </div>
-            </router-link>
+            </button>
           </div>
         </div>
 
@@ -220,6 +220,8 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { isAuthenticated, showLoginModal } from '../stores/auth.js';
 import { 
   getSafeImageUrl, 
   lookupTranslation, 
@@ -243,6 +245,16 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
+const router = useRouter();
+
+function handlePlayClick(ep = 1) {
+  if (!isAuthenticated.value) {
+    showLoginModal.value = true;
+    return;
+  }
+  emit('close');
+  router.push(`/watch?id=${props.anime?.id}&ep=${ep}`);
+}
 
 const originalSynopsis = ref('');
 const indonesianSynopsis = ref('');
@@ -367,13 +379,21 @@ watch(() => props.anime, async (newAnime) => {
   // 3. Fetch Kusonime Batch downloads
   fetchKusonime(newAnime);
 
-  // 4. Automatically check shared SQLite database for translation
+  // 4. Automatically check shared SQLite database for translation (or auto-translate)
   try {
     const res = await lookupTranslation(newAnime.id);
     if (res.found && res.translation) {
       indonesianSynopsis.value = res.translation;
       isIndonesian.value = true;
       isServerCached.value = true;
+    } else if (originalSynopsis.value) {
+      translateSynopsis(originalSynopsis.value, newAnime.id).then(trRes => {
+        if (trRes.translation) {
+          indonesianSynopsis.value = trRes.translation;
+          isIndonesian.value = true;
+          isServerCached.value = true;
+        }
+      }).catch(() => {});
     }
   } catch (e) {
     console.warn('Translation auto lookup error:', e);
@@ -834,6 +854,15 @@ function handleToggleWatchlist() {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+}
+
+.single-movie-card {
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
 }
 
 .modal-ep-pill:hover {

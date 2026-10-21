@@ -47,6 +47,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true
       },
+      '/api/video': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
       '/api/subtitles': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true
@@ -72,6 +76,10 @@ export default defineConfig({
         changeOrigin: true
       },
       '/api/admin': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '/api/anime': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true
       }
@@ -293,42 +301,6 @@ export default defineConfig({
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(JSON.stringify(results));
-        });
-
-        // Real-time Indonesian / English Translation Endpoint
-        server.middlewares.use('/api/translate', async (req, res) => {
-          try {
-            const urlObj = new URL(req.url, 'http://localhost');
-            const text = urlObj.searchParams.get('text');
-            const targetLang = urlObj.searchParams.get('to') || 'id';
-            const sourceLang = urlObj.searchParams.get('from') || 'en';
-
-            if (!text) {
-              res.statusCode = 400;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: 'Text parameter required' }));
-              return;
-            }
-
-            // Truncate to 500 chars per chunk for free translation API
-            const cleanText = text.substring(0, 500);
-            const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(cleanText)}&langpair=${sourceLang}|${targetLang}`;
-            
-            const trResp = await fetch(myMemoryUrl, {
-              headers: { 'User-Agent': 'Mozilla/5.0' }
-            });
-            const trData = await trResp.json();
-            const translatedText = trData.responseData?.translatedText || cleanText;
-
-            res.statusCode = 200;
-            res.setHeader('Content-Type', 'application/json');
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.end(JSON.stringify({ success: true, translation: translatedText }));
-          } catch (err) {
-            res.statusCode = 500;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: err.message }));
-          }
         });
       }
     }

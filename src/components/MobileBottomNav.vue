@@ -34,7 +34,7 @@
       <!-- 3. Jadwal Rilis -->
       <button 
         class="nav-tab-btn" 
-        :class="{ active: isHomeActive && currentTab === 'airing' }"
+        :class="{ active: route.path === '/schedule' || route.path === '/livechart' || (isHomeActive && currentTab === 'airing') }"
         @click="goToTab('airing')"
       >
         <div class="tab-icon-wrap">
@@ -174,6 +174,11 @@ const isHomeActive = computed(() => route.path === '/');
 const isAccountActive = computed(() => route.path === '/admin' || isSheetOpen.value);
 
 function goToTab(tab) {
+  if (tab === 'airing') {
+    router.push('/schedule');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
   if (route.path !== '/') {
     router.push({ path: '/', query: { tab } });
   } else {

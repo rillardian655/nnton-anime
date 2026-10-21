@@ -2,6 +2,9 @@
   <div 
     v-if="isVisible" 
     class="door-splash-container"
+    :class="{ 'is-dismissing': isDismissing }"
+    @click="dismissSplash"
+    title="Klik untuk lewati intro"
   >
     <!-- Background Cinema Void with Soft Clean Ambient Tone (No heavy AI red flare) -->
     <div class="splash-background">
@@ -90,15 +93,25 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 
-const SPLASH_SESSION_KEY = 'anipulse_splash_played';
-// Only display if this is the first time opening the app in the current session
-const isVisible = ref(!sessionStorage.getItem(SPLASH_SESSION_KEY));
+// Always show on app launch / full page reload
+const isVisible = ref(true);
+const isDismissing = ref(false);
+
+function dismissSplash() {
+  if (isDismissing.value) return;
+  isDismissing.value = true;
+  setTimeout(() => {
+    isVisible.value = false;
+  }, 250);
+}
 
 onMounted(() => {
-  if (!isVisible.value) return;
-
-  // Mark session so internal page navigation or reload doesn't replay the splash screen
-  sessionStorage.setItem(SPLASH_SESSION_KEY, 'true');
+  // Clear any legacy sessionStorage flags
+  try {
+    sessionStorage.removeItem('anipulse_splash_played');
+  } catch (e) {
+    // Ignore storage errors in restricted contexts
+  }
 
   // Timeline:
   // 0.0s - 1.7s: Realistic matte double cinema doors closed with brushed handles
