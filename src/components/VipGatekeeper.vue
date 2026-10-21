@@ -219,6 +219,16 @@
               Masuk di Sini →
             </button>
           </div>
+
+          <!-- Optional Server IP changer on connection issue -->
+          <div v-if="showServerConfig" class="gate-server-box">
+            <span class="server-box-lbl">Pengaturan IP Server Backend:</span>
+            <div class="server-box-row">
+              <input v-model="customServerUrl" type="text" placeholder="http://192.168.1.11:8000" class="server-box-input" />
+              <button type="button" class="btn btn-primary btn-sm" @click="saveServerAddress">Simpan</button>
+            </div>
+            <span class="server-box-hint">Pastikan HP dan laptop terhubung ke Wi-Fi yang sama.</span>
+          </div>
         </form>
       </div>
     </div>
@@ -228,7 +238,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { loginUser } from '../stores/auth.js';
-import { claimInvite } from '../api.js';
+import { claimInvite, getApiBaseUrl, setBackendUrl } from '../api.js';
 
 const activeTab = ref('login');
 const loginUsername = ref('');
@@ -243,6 +253,16 @@ const claimDisplayName = ref('');
 const isLoading = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
+const showServerConfig = ref(false);
+const customServerUrl = ref(localStorage.getItem('anipulse_backend_url') || getApiBaseUrl() || 'http://192.168.1.11:8000');
+
+function saveServerAddress() {
+  const url = customServerUrl.value.trim().replace(/\/+$/, '');
+  setBackendUrl(url);
+  errorMessage.value = '';
+  successMessage.value = '✓ Alamat IP server berhasil disimpan: ' + url;
+  showServerConfig.value = false;
+}
 
 function switchTab(tab) {
   activeTab.value = tab;
@@ -264,7 +284,13 @@ async function handleLogin() {
     const result = await loginUser(loginUsername.value.trim(), loginPassword.value);
     successMessage.value = `Akses berhasil dibuka! Selamat datang, ${result.user?.displayName || result.user?.username}.`;
   } catch (err) {
-    errorMessage.value = err.message || 'Gagal masuk. Periksa kembali username dan kata sandi kamu.';
+    const msg = err.message || '';
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('koneksi') || msg.includes('Server backend')) {
+      errorMessage.value = `Tidak dapat menghubungi server (${getApiBaseUrl()}). Pastikan server.py aktif di laptop dan HP terhubung ke Wi-Fi yang sama.`;
+      showServerConfig.value = true;
+    } else {
+      errorMessage.value = msg || 'Gagal masuk. Periksa kembali username dan kata sandi kamu.';
+    }
   } finally {
     isLoading.value = false;
   }
@@ -635,6 +661,49 @@ onMounted(() => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.gate-server-box {
+  margin-top: 1rem;
+  padding: 0.75rem 0.9rem;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px dashed rgba(59, 130, 246, 0.4);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.server-box-lbl {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #93c5fd;
+}
+
+.server-box-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.server-box-input {
+  flex: 1;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  color: #f8fafc;
+  font-family: monospace;
+}
+
+.server-box-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.server-box-hint {
+  font-size: 0.68rem;
+  color: #64748b;
 }
 
 .fade-enter-active, .fade-leave-active {

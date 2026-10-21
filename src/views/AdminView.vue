@@ -58,6 +58,44 @@
           </div>
         </div>
 
+        <!-- Section: Pengaturan IP Server Backend (Mobile Connection) -->
+        <div class="admin-card server-config-card">
+          <div class="card-header-bar">
+            <div class="card-header-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+              <h3>Konfigurasi Alamat IP Server Backend (Aplikasi HP)</h3>
+            </div>
+            <span class="badge-hint">Atur IP laptop agar HP langsung terhubung</span>
+          </div>
+
+          <div class="server-config-body">
+            <div class="server-field">
+              <label for="serverUrlInput">Alamat URL Server Backend:</label>
+              <div class="server-input-row">
+                <input 
+                  id="serverUrlInput" 
+                  v-model="customBackendUrl" 
+                  type="text" 
+                  placeholder="http://192.168.1.11:8000" 
+                  class="admin-input-text"
+                />
+                <button type="button" class="btn btn-primary btn-sm" @click="saveServerUrl">
+                  Simpan IP Server
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" @click="testServerConnection" :disabled="isTestingServer">
+                  {{ isTestingServer ? 'Menguji...' : 'Uji Koneksi' }}
+                </button>
+              </div>
+              <p v-if="serverTestMessage" class="server-status-msg" :class="{ 'msg-success': serverTestOk, 'msg-error': !serverTestOk }">
+                {{ serverTestMessage }}
+              </p>
+              <p class="server-note">
+                IP Laptop saat ini: <code>http://192.168.1.11:8000</code>. Jika laptop berpindah Wi-Fi atau hotspot, cukup ubah IP di sini agar aplikasi HP dapat terus terhubung.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <!-- Section: Buat Akun & Link Undangan -->
         <div class="admin-card create-invite-section">
           <!-- Creation Mode Switcher -->
@@ -485,8 +523,44 @@ import {
   adminToggleUser, 
   adminDeleteUser, 
   adminDeleteInvite, 
-  adminGetStats 
+  adminGetStats,
+  setBackendUrl,
+  getApiBaseUrl 
 } from '../api.js';
+
+// Server Backend Configuration State
+const customBackendUrl = ref(localStorage.getItem('anipulse_backend_url') || getApiBaseUrl() || 'http://192.168.1.11:8000');
+const isTestingServer = ref(false);
+const serverTestMessage = ref('');
+const serverTestOk = ref(false);
+
+function saveServerUrl() {
+  const url = customBackendUrl.value.trim().replace(/\/+$/, '');
+  setBackendUrl(url);
+  serverTestMessage.value = '✓ Alamat IP server backend berhasil disimpan: ' + url;
+  serverTestOk.value = true;
+}
+
+async function testServerConnection() {
+  isTestingServer.value = true;
+  serverTestMessage.value = '';
+  try {
+    const url = customBackendUrl.value.trim().replace(/\/+$/, '');
+    const res = await fetch(`${url}/api/auth/csrf`, { method: 'GET' });
+    if (res.ok) {
+      serverTestOk.value = true;
+      serverTestMessage.value = '✓ Koneksi berhasil! Server backend merespons 200 OK.';
+    } else {
+      serverTestOk.value = false;
+      serverTestMessage.value = `Server merespons status HTTP ${res.status}.`;
+    }
+  } catch (err) {
+    serverTestOk.value = false;
+    serverTestMessage.value = `Gagal terhubung ke server: ${err.message}. Pastikan server.py berjalan dan HP berada di Wi-Fi yang sama.`;
+  } finally {
+    isTestingServer.value = false;
+  }
+}
 
 const creationMode = ref('invite'); // 'invite' | 'direct'
 
@@ -840,6 +914,71 @@ onMounted(() => {
   border-radius: 16px;
   padding: 1.6rem 1.8rem;
   margin-bottom: 1.8rem;
+}
+
+/* Server Config Card */
+.server-config-card {
+  border-color: rgba(59, 130, 246, 0.25);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.04) 0%, rgba(18, 20, 28, 0.95) 100%);
+}
+
+.server-config-body {
+  margin-top: 1.2rem;
+}
+
+.server-field label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  margin-bottom: 0.5rem;
+}
+
+.server-input-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.server-input-row .admin-input-text {
+  flex: 1;
+  min-width: 200px;
+}
+
+.server-status-msg {
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+}
+
+.server-status-msg.msg-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.server-status-msg.msg-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.server-note {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.server-note code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #38bdf8;
+  font-family: monospace;
 }
 
 /* Creation Mode Switcher Tabs */
