@@ -428,7 +428,8 @@ import {
   searchKusonime, 
   getKusonimeDownloads,
   apiUrl,
-  getAuthToken
+  getAuthToken,
+  safeFetchJson
 } from '../api.js';
 import { 
   isAuthenticated, 
@@ -749,14 +750,14 @@ async function loadEpisodeStream(ep) {
       return;
     }
 
-    let data = await res.json();
+    let data = await safeFetchJson(res, 'Stream Episode');
 
     // Fallback to Romaji title explicitly if empty
     if ((!data.sources || data.sources.length === 0) && altTitle && altTitle !== title) {
       res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
         headers: authHeaders
       });
-      data = await res.json();
+      data = await safeFetchJson(res, 'Stream Episode Alt');
     }
 
     // Fallback to cleaned title (without Season or subtitle suffix)
@@ -766,7 +767,7 @@ async function loadEpisodeStream(ep) {
         res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(simplified)}&ep=${ep}${tokenQuery}`), {
           headers: authHeaders
         });
-        data = await res.json();
+        data = await safeFetchJson(res, 'Stream Episode Simplified');
       }
     }
 

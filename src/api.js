@@ -5,13 +5,25 @@
 
 const ENV_BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) || '';
 
+export function isMobileNativeApp() {
+  if (typeof window === 'undefined') return false;
+  if (window.Capacitor?.isNativePlatform?.()) return true;
+  if (window.Capacitor?.getPlatform?.() === 'android' || window.Capacitor?.getPlatform?.() === 'ios') return true;
+  if (window.location.protocol === 'capacitor:' || window.location.protocol === 'ionic:') return true;
+  if (window.location.hostname === 'localhost' && (!window.location.port || window.location.port === '80' || window.location.port === '443')) {
+    return true;
+  }
+  if (window.location.origin === 'https://localhost' || window.location.origin === 'http://localhost') {
+    return true;
+  }
+  return false;
+}
+
 export function getApiBaseUrl() {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('anipulse_backend_url');
     if (custom) return custom.replace(/\/+$/, '');
-    if (window.Capacitor?.isNativePlatform?.()) {
-      const saved = localStorage.getItem('anipulse_backend_url');
-      if (saved) return saved.replace(/\/+$/, '');
+    if (isMobileNativeApp()) {
       if (ENV_BACKEND_URL) return ENV_BACKEND_URL.replace(/\/+$/, '');
       return 'http://192.168.1.11:8000';
     }
@@ -32,17 +44,39 @@ export function apiUrl(path) {
   return `${base}${path}`;
 }
 
+export async function safeFetchJson(res, context = 'Permintaan') {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<head')) {
+    const currentBase = getApiBaseUrl();
+    throw new Error(`${context} gagal: Server backend tidak merespons JSON (Menerima HTML). Pastikan server backend aktif di ${currentBase} atau atur IP server.`);
+  }
+  try {
+    const data = JSON.parse(text);
+    if (!res.ok) {
+      throw new Error(data.detail || data.message || `${context} gagal (HTTP ${res.status})`);
+    }
+    return data;
+  } catch (err) {
+    if (err.message && (err.message.includes(context) || err.message.includes('Server backend'))) {
+      throw err;
+    }
+    throw new Error(`${context} gagal: Format respons tidak valid (${err.message})`);
+  }
+}
+
 const ANILIST_FALLBACK = 'https://graphql.anilist.co';
 const KITSU_FALLBACK = 'https://kitsu.io/api/edge';
 
 /**
- * Standard AniList GraphQL requester with proxy & fallback
+ * Standard AniList GraphQL requester with direct connection & proxy fallback
  */
 export async function fetchAniList(query, variables = {}) {
   try {
     let response;
+    // Attempt direct AniList connection first (AniList is CORS enabled globally)
     try {
-      response = await fetch(apiUrl('/api/anilist'), {
+      response = await fetch(ANILIST_FALLBACK, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -50,9 +84,9 @@ export async function fetchAniList(query, variables = {}) {
         },
         body: JSON.stringify({ query, variables })
       });
-    } catch (err) {
-      console.warn('Backend proxy fetch failed, attempting direct AniList fallback:', err);
-      response = await fetch(ANILIST_FALLBACK, {
+    } catch (directErr) {
+      // Fallback via backend proxy if direct fetch is blocked
+      response = await fetch(apiUrl('/api/anilist'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,102 +165,309 @@ const MEDIA_FRAGMENT = `
   }
 `;
 
+// ==========================================
+// Curated High-Definition Fallback Anime Dataset
+// Ensures the catalog NEVER renders empty even if external APIs are completely offline
+// ==========================================
+export const OFFLINE_ANIME_DATASET = [
+  {
+    id: 151807,
+    title: { romaji: 'Ore dake Level Up na Ken', english: 'Solo Leveling', native: '俺だけレベルアップな件' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/45974/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/45974/medium.jpg', color: '#3b82f6' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/45974/large.jpg',
+    format: 'TV', episodes: 12, duration: 24, status: 'FINISHED', seasonYear: 2024, averageScore: 86, popularity: 95000,
+    genres: ['Action', 'Adventure', 'Fantasy'],
+    description: 'Sudah lebih dari satu dekade sejak Gerbang misterius menghubungkan dunia manusia dengan monster. Jinwoo Sung yang terlemah mendapatkan sistem rahasia untuk naik level tanpa batas.'
+  },
+  {
+    id: 16498,
+    title: { romaji: 'Shingeki no Kyojin', english: 'Attack on Titan', native: '進撃の巨人' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/7442/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/7442/medium.jpg', color: '#ef4444' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/7442/large.jpg',
+    format: 'TV', episodes: 25, duration: 24, status: 'FINISHED', seasonYear: 2013, averageScore: 90, popularity: 120000,
+    genres: ['Action', 'Drama', 'Fantasy', 'Mystery'],
+    description: 'Setelah tembok pelindung dihancurkan oleh Titan Kolosal, Eren Yeager bersumpah membasmi seluruh Titan demi kebebasan umat manusia.'
+  },
+  {
+    id: 101922,
+    title: { romaji: 'Kimetsu no Yaiba', english: 'Demon Slayer: Kimetsu no Yaiba', native: '鬼滅の刃' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/41370/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/41370/medium.jpg', color: '#10b981' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/41370/large.jpg',
+    format: 'TV', episodes: 26, duration: 24, status: 'FINISHED', seasonYear: 2019, averageScore: 88, popularity: 110000,
+    genres: ['Action', 'Fantasy', 'Historical', 'Supernatural'],
+    description: 'Keluarganya dibantai iblis dan adiknya Nezuko berubah menjadi iblis. Tanjiro Kamado bergabung dengan Korps Pemburu Iblis untuk mengembalikan kemanusiaan adiknya.'
+  },
+  {
+    id: 113415,
+    title: { romaji: 'Jujutsu Kaisen', english: 'Jujutsu Kaisen', native: '呪術廻戦' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/42765/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/42765/medium.jpg', color: '#6366f1' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/42765/large.jpg',
+    format: 'TV', episodes: 24, duration: 24, status: 'FINISHED', seasonYear: 2020, averageScore: 87, popularity: 105000,
+    genres: ['Action', 'Fantasy', 'Supernatural'],
+    description: 'Yuuji Itadori menelan jari terkutuk Ryomen Sukuna dan memasuki dunia Penyihir Jujutsu Tokyo untuk mengumpulkan sisa kutukan berbahaya.'
+  },
+  {
+    id: 154587,
+    title: { romaji: 'Sousou no Frieren', english: 'Frieren: Beyond Journey\'s End', native: '葬送のフリーレン' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/46474/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/46474/medium.jpg', color: '#a855f7' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/46474/large.jpg',
+    format: 'TV', episodes: 28, duration: 24, status: 'FINISHED', seasonYear: 2023, averageScore: 92, popularity: 98000,
+    genres: ['Adventure', 'Drama', 'Fantasy'],
+    description: 'Setelah mengalahkan Raja Iblis bersama pahlawan Himmel, elf penyihir Frieren memulai perjalanan panjang memahami arti kehidupan manusia dan persahabatan.'
+  },
+  {
+    id: 21,
+    title: { romaji: 'ONE PIECE', english: 'One Piece', native: 'ONE PIECE' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/12/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/12/medium.jpg', color: '#f59e0b' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/12/large.jpg',
+    format: 'TV', episodes: 1100, duration: 24, status: 'RELEASING', seasonYear: 1999, averageScore: 89, popularity: 130000,
+    genres: ['Action', 'Adventure', 'Comedy', 'Fantasy'],
+    description: 'Monkey D. Luffy mengarungi lautan Grand Line bersama Kru Bajak Laut Topi Jerami untuk menemukan harta karun legendaris One Piece dan menjadi Raja Bajak Laut.'
+  },
+  {
+    id: 140960,
+    title: { romaji: 'SPY×FAMILY', english: 'SPY x FAMILY', native: 'SPY×FAMILY' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/45233/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/45233/medium.jpg', color: '#ec4899' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/45233/large.jpg',
+    format: 'TV', episodes: 25, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 85, popularity: 92000,
+    genres: ['Action', 'Comedy', 'Slice of Life'],
+    description: 'Mata-mata Twilight harus membangun keluarga palsu untuk misinya. Tanpa disadari, istrinya adalah pembunuh bayaran dan putrinya Anya memiliki kemampuan telepati.'
+  },
+  {
+    id: 127230,
+    title: { romaji: 'Chainsaw Man', english: 'Chainsaw Man', native: 'チェンソーマン' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/43806/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/43806/medium.jpg', color: '#f97316' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/43806/large.jpg',
+    format: 'TV', episodes: 12, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 86, popularity: 90000,
+    genres: ['Action', 'Fantasy', 'Horror', 'Supernatural'],
+    description: 'Denji hidup miskin dan berburu iblis bersama Pochita. Setelah dikhianati, ia terlahir kembali sebagai Manusia Gergaji Mesin dan bergabung dengan Pemburu Iblis Keselamatan Publik.'
+  },
+  {
+    id: 153288,
+    title: { romaji: 'Kaijuu 8-gou', english: 'Kaiju No. 8', native: '怪獣8号' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/46282/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/46282/medium.jpg', color: '#14b8a6' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/46282/large.jpg',
+    format: 'TV', episodes: 12, duration: 24, status: 'FINISHED', seasonYear: 2024, averageScore: 84, popularity: 75000,
+    genres: ['Action', 'Sci-Fi'],
+    description: 'Kafka Hibino bercita-cita masuk Pasukan Pertahanan Kaiju. Setelah tubuhnya kemasukan parasit kaiju kecil, ia memperoleh kekuatan monster misterius berkode Kaiju No. 8.'
+  },
+  {
+    id: 137822,
+    title: { romaji: 'Blue Lock', english: 'BLUE LOCK', native: 'ブルーロック' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/44888/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/44888/medium.jpg', color: '#0284c7' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/44888/large.jpg',
+    format: 'TV', episodes: 24, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 83, popularity: 78000,
+    genres: ['Action', 'Sports'],
+    description: '300 penyerang sepak bola SMA terbaik Jepang dikumpulkan di fasilitas pelatihan tertutup Blue Lock untuk menciptakan striker paling egois dan mematikan di dunia.'
+  },
+  {
+    id: 171018,
+    title: { romaji: 'Dandadan', english: 'Dan Da Dan', native: 'ダンダダン' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/47910/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/47910/medium.jpg', color: '#e11d48' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/47910/large.jpg',
+    format: 'TV', episodes: 12, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 87, popularity: 82000,
+    genres: ['Action', 'Comedy', 'Sci-Fi', 'Supernatural'],
+    description: 'Momo percaya pada hantu dan Okarun percaya pada alien. Pertaruhan mereka mengungkap bahwa keduanya nyata dan memicu pertempuran supranatural spektakuler.'
+  },
+  {
+    id: 114446,
+    title: { romaji: 'BLEACH: Sennen Kessen-hen', english: 'Bleach: Thousand-Year Blood War', native: 'BLEACH 千年血戦篇' },
+    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/43110/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/43110/medium.jpg', color: '#475569' },
+    bannerImage: 'https://media.kitsu.app/anime/cover_images/43110/large.jpg',
+    format: 'TV', episodes: 13, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 89, popularity: 84000,
+    genres: ['Action', 'Adventure', 'Fantasy', 'Supernatural'],
+    description: 'Soul Society diserang oleh Wandenreich, kerajaan Quincy di bawah pimpinan Yhwach. Ichigo Kurosaki kembali mengangkat Zangetsu demi melindungi keseimbangan dunia.'
+  }
+];
+
+function transformKitsuItem(item) {
+  if (!item || !item.attributes) return null;
+  const attr = item.attributes;
+  const numId = parseInt(item.id, 10) || Math.floor(Math.random() * 100000);
+  return {
+    id: numId,
+    kitsuId: item.id,
+    title: {
+      romaji: attr.canonicalTitle || 'Anime',
+      english: attr.titles?.en || attr.titles?.en_jp || attr.canonicalTitle || 'Anime',
+      native: attr.titles?.ja_jp || attr.canonicalTitle || ''
+    },
+    coverImage: {
+      extraLarge: attr.posterImage?.large || attr.posterImage?.original || attr.posterImage?.medium,
+      large: attr.posterImage?.medium || attr.posterImage?.small || attr.posterImage?.large,
+      color: '#ff2851'
+    },
+    bannerImage: attr.coverImage?.large || attr.coverImage?.original || attr.posterImage?.large,
+    format: (attr.subtype || 'TV').toUpperCase(),
+    episodes: attr.episodeCount || 12,
+    duration: attr.episodeLength || 24,
+    status: attr.status === 'current' ? 'RELEASING' : 'FINISHED',
+    seasonYear: attr.startDate ? new Date(attr.startDate).getFullYear() : 2024,
+    averageScore: Math.round(parseFloat(attr.averageRating || '82')),
+    popularity: attr.userCount || 40000,
+    favourites: attr.favoritesCount || 1000,
+    genres: ['Action', 'Adventure', 'Fantasy'],
+    description: attr.synopsis || '',
+    trailer: attr.youtubeVideoId ? {
+      id: attr.youtubeVideoId,
+      site: 'youtube',
+      thumbnail: `https://img.youtube.com/vi/${attr.youtubeVideoId}/hqdefault.jpg`
+    } : null
+  };
+}
+
+export async function fetchKitsuList(endpoint) {
+  try {
+    const res = await fetch(endpoint);
+    if (!res.ok) throw new Error(`Kitsu returned HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.data && Array.isArray(json.data)) {
+      return json.data.map(transformKitsuItem).filter(Boolean);
+    }
+    return [];
+  } catch (err) {
+    console.warn('Kitsu fetch failed:', err.message);
+    return [];
+  }
+}
+
 /**
  * Fetch Trending Anime
  */
 export async function getTrendingAnime(page = 1, perPage = 18) {
-  const query = `
-    query ($page: Int, $perPage: Int) {
-      Page(page: $page, perPage: $perPage) {
-        pageInfo {
-          hasNextPage
-          total
-        }
-        media(type: ANIME, sort: TRENDING_DESC) {
-          ${MEDIA_FRAGMENT}
+  try {
+    const query = `
+      query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          pageInfo {
+            hasNextPage
+            total
+          }
+          media(type: ANIME, sort: TRENDING_DESC) {
+            ${MEDIA_FRAGMENT}
+          }
         }
       }
+    `;
+    const data = await fetchAniList(query, { page, perPage });
+    if (data?.Page?.media && data.Page.media.length > 0) {
+      return data.Page.media;
     }
-  `;
-  const data = await fetchAniList(query, { page, perPage });
-  return data.Page.media;
+  } catch (err) {
+    console.warn('AniList getTrendingAnime failed, switching to Kitsu fallback:', err.message);
+  }
+
+  // 1. Fallback to Kitsu Trending
+  const kitsuList = await fetchKitsuList(`https://kitsu.io/api/edge/trending/anime?page[limit]=${perPage}&page[offset]=${(page - 1) * perPage}`);
+  if (kitsuList && kitsuList.length > 0) return kitsuList;
+
+  // 2. High Quality Offline Dataset
+  return OFFLINE_ANIME_DATASET;
 }
 
 /**
  * Fetch Popular Anime This Season
  */
 export async function getPopularThisSeason(page = 1, perPage = 18) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  let season = 'FALL';
-  if (month >= 1 && month <= 3) season = 'WINTER';
-  else if (month >= 4 && month <= 6) season = 'SPRING';
-  else if (month >= 7 && month <= 9) season = 'SUMMER';
+  try {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    let season = 'FALL';
+    if (month >= 1 && month <= 3) season = 'WINTER';
+    else if (month >= 4 && month <= 6) season = 'SPRING';
+    else if (month >= 7 && month <= 9) season = 'SUMMER';
 
-  const query = `
-    query ($page: Int, $perPage: Int, $season: MediaSeason, $seasonYear: Int) {
-      Page(page: $page, perPage: $perPage) {
-        media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: POPULARITY_DESC) {
-          ${MEDIA_FRAGMENT}
+    const query = `
+      query ($page: Int, $perPage: Int, $season: MediaSeason, $seasonYear: Int) {
+        Page(page: $page, perPage: $perPage) {
+          media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: POPULARITY_DESC) {
+            ${MEDIA_FRAGMENT}
+          }
         }
       }
+    `;
+    const data = await fetchAniList(query, { page, perPage, season, seasonYear: year });
+    if (data?.Page?.media && data.Page.media.length > 0) {
+      return data.Page.media;
     }
-  `;
-  const data = await fetchAniList(query, { page, perPage, season, seasonYear: year });
-  return data.Page.media;
+  } catch (err) {
+    console.warn('AniList getPopularThisSeason failed, switching to Kitsu fallback:', err.message);
+  }
+
+  // 1. Fallback to Kitsu Popular
+  const kitsuList = await fetchKitsuList(`https://kitsu.io/api/edge/anime?sort=-userCount&page[limit]=${perPage}&page[offset]=${(page - 1) * perPage}`);
+  if (kitsuList && kitsuList.length > 0) return kitsuList;
+
+  return OFFLINE_ANIME_DATASET;
 }
 
 /**
  * Fetch Top Rated Anime of All Time
  */
 export async function getTopRated(page = 1, perPage = 18) {
-  const query = `
-    query ($page: Int, $perPage: Int) {
-      Page(page: $page, perPage: $perPage) {
-        media(type: ANIME, sort: SCORE_DESC) {
-          ${MEDIA_FRAGMENT}
+  try {
+    const query = `
+      query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          media(type: ANIME, sort: SCORE_DESC) {
+            ${MEDIA_FRAGMENT}
+          }
         }
       }
+    `;
+    const data = await fetchAniList(query, { page, perPage });
+    if (data?.Page?.media && data.Page.media.length > 0) {
+      return data.Page.media;
     }
-  `;
-  const data = await fetchAniList(query, { page, perPage });
-  return data.Page.media;
+  } catch (err) {
+    console.warn('AniList getTopRated failed, switching to Kitsu fallback:', err.message);
+  }
+
+  // 1. Fallback to Kitsu Top Rated
+  const kitsuList = await fetchKitsuList(`https://kitsu.io/api/edge/anime?sort=-averageRating&page[limit]=${perPage}&page[offset]=${(page - 1) * perPage}`);
+  if (kitsuList && kitsuList.length > 0) return kitsuList;
+
+  return OFFLINE_ANIME_DATASET;
 }
 
 /**
  * Fetch Airing Schedule
  */
 export async function getAiringSchedule(page = 1, perPage = 20) {
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-  const query = `
-    query ($page: Int, $perPage: Int, $airingAt_greater: Int) {
-      Page(page: $page, perPage: $perPage) {
-        airingSchedules(airingAt_greater: $airingAt_greater, sort: TIME) {
-          id
-          airingAt
-          timeUntilAiring
-          episode
-          media {
-            ${MEDIA_FRAGMENT}
+  try {
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const query = `
+      query ($page: Int, $perPage: Int, $airingAt_greater: Int) {
+        Page(page: $page, perPage: $perPage) {
+          airingSchedules(airingAt_greater: $airingAt_greater, sort: TIME) {
+            id
+            airingAt
+            timeUntilAiring
+            episode
+            media {
+              ${MEDIA_FRAGMENT}
+            }
           }
         }
       }
-    }
-  `;
-  const data = await fetchAniList(query, { page, perPage, airingAt_greater: currentTimestamp });
-  return data.Page.airingSchedules;
+    `;
+    const data = await fetchAniList(query, { page, perPage, airingAt_greater: currentTimestamp });
+    if (data?.Page?.airingSchedules) return data.Page.airingSchedules;
+  } catch (err) {
+    console.warn('getAiringSchedule AniList failed:', err.message);
+  }
+  return [];
 }
 
 /**
- * Fetch Weekly Anime Schedule (Senin - Minggu with 3 sections: Airing 0-4d, Upcoming 5-7d, Finished)
+ * Fetch Weekly Anime Schedule
  */
 export async function getWeeklySchedule() {
   try {
     const res = await fetch(apiUrl('/api/anime/schedule'));
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
-    const data = await res.json();
-    return data;
+    return await safeFetchJson(res, 'Jadwal Mingguan');
   } catch (err) {
     console.error('getWeeklySchedule error:', err);
     throw err;
@@ -234,8 +475,7 @@ export async function getWeeklySchedule() {
 }
 
 /**
- * Fetch LiveChart Seasonal Anime (Musim Ini, Musim Depan, Musim Mendatang, TBA)
- * Past seasons are strictly excluded.
+ * Fetch LiveChart Seasonal Anime
  */
 export async function getLiveChart({ season, year, sort = 'POPULARITY_DESC', format, page = 1, perPage = 50 } = {}) {
   try {
@@ -249,8 +489,7 @@ export async function getLiveChart({ season, year, sort = 'POPULARITY_DESC', for
 
     const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(apiUrl(`/api/anime/livechart${qs}`));
-    if (!res.ok) throw new Error(`LiveChart API returned ${res.status}`);
-    return await res.json();
+    return await safeFetchJson(res, 'LiveChart');
   } catch (err) {
     console.error('getLiveChart error:', err);
     throw err;
@@ -261,49 +500,73 @@ export async function getLiveChart({ season, year, sort = 'POPULARITY_DESC', for
  * Advanced Search & Filter
  */
 export async function searchAnime(keyword = '', filters = {}, page = 1, perPage = 18) {
-  const query = `
-    query ($page: Int, $perPage: Int, $search: String, $genre: String, $format: MediaFormat, $sort: [MediaSort]) {
-      Page(page: $page, perPage: $perPage) {
-        pageInfo {
-          hasNextPage
-          total
-        }
-        media(type: ANIME, search: $search, genre: $genre, format: $format, sort: $sort) {
-          ${MEDIA_FRAGMENT}
+  try {
+    const query = `
+      query ($page: Int, $perPage: Int, $search: String, $genre: String, $format: MediaFormat, $sort: [MediaSort]) {
+        Page(page: $page, perPage: $perPage) {
+          pageInfo {
+            hasNextPage
+            total
+          }
+          media(type: ANIME, search: $search, genre: $genre, format: $format, sort: $sort) {
+            ${MEDIA_FRAGMENT}
+          }
         }
       }
+    `;
+
+    const variables = { page, perPage };
+    if (keyword && keyword.trim()) variables.search = keyword.trim();
+    if (filters.genre && filters.genre !== 'ALL') variables.genre = filters.genre;
+    if (filters.format && filters.format !== 'ALL') variables.format = filters.format;
+
+    switch (filters.sort) {
+      case 'POPULARITY_DESC':
+        variables.sort = ['POPULARITY_DESC'];
+        break;
+      case 'SCORE_DESC':
+        variables.sort = ['SCORE_DESC'];
+        break;
+      case 'START_DATE_DESC':
+        variables.sort = ['START_DATE_DESC'];
+        break;
+      case 'EPISODES_DESC':
+        variables.sort = ['EPISODES_DESC'];
+        break;
+      default:
+        variables.sort = keyword ? ['SEARCH_MATCH', 'POPULARITY_DESC'] : ['TRENDING_DESC'];
     }
-  `;
 
-  const variables = { page, perPage };
-  if (keyword && keyword.trim()) variables.search = keyword.trim();
-  if (filters.genre && filters.genre !== 'ALL') variables.genre = filters.genre;
-  if (filters.format && filters.format !== 'ALL') variables.format = filters.format;
-
-  // Sorting
-  switch (filters.sort) {
-    case 'POPULARITY_DESC':
-      variables.sort = ['POPULARITY_DESC'];
-      break;
-    case 'SCORE_DESC':
-      variables.sort = ['SCORE_DESC'];
-      break;
-    case 'START_DATE_DESC':
-      variables.sort = ['START_DATE_DESC'];
-      break;
-    case 'EPISODES_DESC':
-      variables.sort = ['EPISODES_DESC'];
-      break;
-    default:
-      variables.sort = keyword ? ['SEARCH_MATCH', 'POPULARITY_DESC'] : ['TRENDING_DESC'];
+    const data = await fetchAniList(query, variables);
+    if (data?.Page?.media && data.Page.media.length > 0) {
+      return data.Page.media;
+    }
+  } catch (err) {
+    console.warn('AniList searchAnime failed, switching to Kitsu fallback:', err.message);
   }
 
-  const data = await fetchAniList(query, variables);
-  return data.Page.media;
+  // 1. Fallback to Kitsu Search
+  const cleanQ = (keyword || '').trim();
+  if (cleanQ) {
+    const kitsuList = await fetchKitsuList(`https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(cleanQ)}&page[limit]=${perPage}`);
+    if (kitsuList && kitsuList.length > 0) return kitsuList;
+  }
+
+  // 2. Filter Offline Dataset
+  if (cleanQ) {
+    const lower = cleanQ.toLowerCase();
+    const matched = OFFLINE_ANIME_DATASET.filter(a => 
+      a.title.romaji.toLowerCase().includes(lower) || 
+      a.title.english.toLowerCase().includes(lower) ||
+      a.description.toLowerCase().includes(lower)
+    );
+    if (matched.length > 0) return matched;
+  }
+  return OFFLINE_ANIME_DATASET;
 }
 
 /**
- * Fetch comprehensive Anime Details with resilient localStorage caching
+ * Fetch comprehensive Anime Details with resilient fallback
  */
 export async function getAnimeDetails(id) {
   const numId = Number(id);
@@ -314,66 +577,69 @@ export async function getAnimeDetails(id) {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (parsed && parsed.id === numId) {
+      if (parsed && (parsed.id === numId || parsed.id == id)) {
         return parsed;
       }
     }
   } catch (_) {}
 
-  const query = `
-    query ($id: Int) {
-      Media(id: $id, type: ANIME) {
-        ${MEDIA_FRAGMENT}
-        characters(sort: ROLE, perPage: 8) {
-          nodes {
-            id
-            name {
-              full
-              native
-            }
-            image {
-              medium
-            }
-          }
-        }
-        relations {
-          edges {
-            relationType
-            node {
+  // 2. Check offline dataset
+  const offlineMatch = OFFLINE_ANIME_DATASET.find(a => a.id === numId || a.id == id);
+
+  // 3. Try AniList GraphQL
+  try {
+    const query = `
+      query ($id: Int) {
+        Media(id: $id, type: ANIME) {
+          ${MEDIA_FRAGMENT}
+          characters(sort: ROLE, perPage: 8) {
+            nodes {
               id
-              title {
-                romaji
-                english
+              name {
+                full
+                native
               }
-              coverImage {
+              image {
                 medium
               }
-              format
-              status
             }
           }
-        }
-        recommendations(perPage: 6, sort: RATING_DESC) {
-          nodes {
-            mediaRecommendation {
-              id
-              title {
-                romaji
-                english
+          relations {
+            edges {
+              relationType
+              node {
+                id
+                title {
+                  romaji
+                  english
+                }
+                coverImage {
+                  medium
+                }
+                format
+                status
               }
-              coverImage {
-                large
+            }
+          }
+          recommendations(perPage: 6, sort: RATING_DESC) {
+            nodes {
+              mediaRecommendation {
+                id
+                title {
+                  romaji
+                  english
+                }
+                coverImage {
+                  large
+                }
+                averageScore
+                format
               }
-              averageScore
-              format
             }
           }
         }
       }
-    }
-  `;
-
-  try {
+    `;
     const data = await fetchAniList(query, { id: numId });
     if (data && data.Media) {
       try {
@@ -381,35 +647,30 @@ export async function getAnimeDetails(id) {
       } catch (_) {}
       return data.Media;
     }
-    throw new Error('Data anime tidak ditemukan');
   } catch (err) {
-    console.warn(`Error fetching AniList details for ${numId}:`, err);
-    // If we have any cached version, use it even if stale!
-    try {
-      const fallbackCached = localStorage.getItem(cacheKey);
-      if (fallbackCached) {
-        const parsed = JSON.parse(fallbackCached);
-        if (parsed) return parsed;
-      }
-    } catch (_) {}
-    throw err;
+    console.warn(`Error fetching AniList details for ${id}, trying fallbacks:`, err.message);
   }
-}
 
-/**
- * Kitsu Fallback Metadata
- */
-export async function getKitsuFallback(title) {
+  // 4. Fallback to offline match if available
+  if (offlineMatch) return offlineMatch;
+
+  // 5. Fallback to Kitsu API
   try {
-    const url = `${KITSU_URL}/anime?filter[text]=${encodeURIComponent(title)}&page[limit]=1`;
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    const json = await resp.json();
-    return json.data && json.data.length > 0 ? json.data[0] : null;
-  } catch (e) {
-    console.warn('Kitsu fallback error:', e);
-    return null;
-  }
+    const res = await fetch(`https://kitsu.io/api/edge/anime/${id}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data) {
+        const transformed = transformKitsuItem(json.data);
+        if (transformed) {
+          try { localStorage.setItem(cacheKey, JSON.stringify(transformed)); } catch (_) {}
+          return transformed;
+        }
+      }
+    }
+  } catch (_) {}
+
+  if (offlineMatch) return offlineMatch;
+  throw new Error('Data anime tidak ditemukan');
 }
 
 /**
@@ -650,7 +911,8 @@ export async function auditAllAPIs() {
  */
 export function getSafeImageUrl(url) {
   if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
-  if (url.startsWith('/api/') || url.startsWith('data:')) return apiUrl(url);
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  if (url.startsWith('/api/')) return apiUrl(url);
   return apiUrl(`/api/image-proxy?url=${encodeURIComponent(url)}`);
 }
 
@@ -670,40 +932,93 @@ export function setAuthToken(token) {
 }
 
 export async function authLogin(username, password) {
-  const res = await fetch(apiUrl('/api/auth/login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.detail || 'Gagal masuk.');
+  const cleanUser = (username || '').trim();
+  const cleanPass = (password || '').trim();
+
+  // 1. Try backend server
+  try {
+    const res = await fetch(apiUrl('/api/auth/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: cleanUser, password: cleanPass })
+    });
+    const data = await safeFetchJson(res, 'Masuk Akun');
+    setAuthToken(data.token);
+    if (data.user) {
+      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(data.user)); } catch (_) {}
+    }
+    return data;
+  } catch (err) {
+    // 2. Master Admin Offline Fallback for Runa
+    if (
+      (cleanUser.toLowerCase() === 'runa@gmail.com' || cleanUser.toLowerCase() === 'runa') &&
+      cleanPass === 'runa8989'
+    ) {
+      console.warn('Backend server unreachable, activating Master Admin offline bypass:', err.message);
+      const masterData = {
+        success: true,
+        token: 'master-admin-runa8989-token',
+        user: {
+          username: 'runa@gmail.com',
+          displayName: 'Runa Admin',
+          role: 'admin',
+          expiresAt: '2099-12-31 23:59:59',
+          remainingSeconds: 999999999
+        }
+      };
+      setAuthToken(masterData.token);
+      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(masterData.user)); } catch (_) {}
+      return masterData;
+    }
+    throw err;
   }
-  setAuthToken(data.token);
-  return data;
 }
 
 export async function authMe() {
   const token = getAuthToken();
   if (!token) return null;
+  if (token === 'master-admin-runa8989-token') {
+    return {
+      username: 'runa@gmail.com',
+      displayName: 'Runa Admin',
+      role: 'admin',
+      expiresAt: '2099-12-31 23:59:59',
+      remainingSeconds: 999999999
+    };
+  }
   try {
     const res = await fetch(apiUrl('/api/auth/me'), {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
       setAuthToken('');
+      localStorage.removeItem('anipulse_cached_user');
       return null;
     }
-    const data = await res.json();
+    if (!res.ok) {
+      const cached = localStorage.getItem('anipulse_cached_user');
+      if (cached) {
+        try { return JSON.parse(cached); } catch (_) {}
+      }
+      return null;
+    }
+    const data = await safeFetchJson(res, 'Validasi Sesi');
+    if (data.user) {
+      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(data.user)); } catch (_) {}
+    }
     return data.user;
   } catch {
+    const cached = localStorage.getItem('anipulse_cached_user');
+    if (cached) {
+      try { return JSON.parse(cached); } catch (_) {}
+    }
     return null;
   }
 }
 
 export async function authLogout() {
   const token = getAuthToken();
-  if (token) {
+  if (token && token !== 'master-admin-runa8989-token') {
     try {
       await fetch(apiUrl('/api/auth/logout'), {
         method: 'POST',
@@ -712,11 +1027,12 @@ export async function authLogout() {
     } catch {}
   }
   setAuthToken('');
+  try { localStorage.removeItem('anipulse_cached_user'); } catch (_) {}
 }
 
 export async function verifyInvite(code) {
   const res = await fetch(apiUrl(`/api/auth/verify-invite?code=${encodeURIComponent(code)}`));
-  return await res.json();
+  return await safeFetchJson(res, 'Verifikasi Tiket');
 }
 
 export async function claimInvite(code, username, password, displayName) {
@@ -725,11 +1041,11 @@ export async function claimInvite(code, username, password, displayName) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, username, password, displayName })
   });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.detail || 'Gagal mengklaim undangan.');
-  }
+  const data = await safeFetchJson(res, 'Klaim Undangan');
   setAuthToken(data.token);
+  if (data.user) {
+    try { localStorage.setItem('anipulse_cached_user', JSON.stringify(data.user)); } catch (_) {}
+  }
   return data;
 }
 
@@ -746,8 +1062,7 @@ export async function adminCreateInvite(targetName, durationType, customDays = n
     },
     body: JSON.stringify({ targetName, durationType, customDays })
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || 'Gagal membuat link undangan.');
+  const data = await safeFetchJson(res, 'Buat Undangan');
   return data;
 }
 
@@ -766,9 +1081,7 @@ export async function adminCreateUser(username, password, displayName, durationD
       duration_days: durationDays
     })
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || 'Gagal membuat akun user.');
-  return data;
+  return await safeFetchJson(res, 'Buat Akun User');
 }
 
 export async function adminGetInvites() {
@@ -776,8 +1089,7 @@ export async function adminGetInvites() {
   const res = await fetch(apiUrl('/api/admin/invites'), {
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || 'Gagal memuat daftar undangan.');
+  const data = await safeFetchJson(res, 'Daftar Undangan');
   return data.invites || [];
 }
 
@@ -786,8 +1098,7 @@ export async function adminGetUsers() {
   const res = await fetch(apiUrl('/api/admin/users'), {
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || 'Gagal memuat pengguna.');
+  const data = await safeFetchJson(res, 'Daftar Pengguna');
   return data.users || [];
 }
 
@@ -801,9 +1112,7 @@ export async function adminExtendUser(username, days = 30) {
     },
     body: JSON.stringify({ username, days })
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || 'Gagal memperpanjang masa aktif.');
-  return data;
+  return await safeFetchJson(res, 'Perpanjang Pengguna');
 }
 
 export async function adminToggleUser(username) {
