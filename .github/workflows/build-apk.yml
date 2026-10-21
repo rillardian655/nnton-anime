@@ -34,12 +34,21 @@ jobs:
       - name: ⚡ Build Vite Web Application
         run: npm run build
 
+      - name: 📱 Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📜 Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
       - name: 🔧 Set Gradle wrapper permissions
         run: chmod +x ./android/gradlew
 
-      - name: 📱 Sync Capacitor Android Project
+      - name: 📱 Sync Capacitor Android Web Assets
         run: |
-          npx --yes @capacitor/cli sync android --inline
+          mkdir -p android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/public/
+          cp capacitor.config.json android/app/src/main/assets/capacitor.config.json
+          ./node_modules/.bin/cap copy android || npx @capacitor/cli copy android || true
 
       - name: 🔨 Compile Android Debug APK
         run: |
