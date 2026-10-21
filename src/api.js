@@ -12,7 +12,8 @@ export function getApiBaseUrl() {
     if (window.Capacitor?.isNativePlatform?.()) {
       const saved = localStorage.getItem('anipulse_backend_url');
       if (saved) return saved.replace(/\/+$/, '');
-      return ENV_BACKEND_URL ? ENV_BACKEND_URL.replace(/\/+$/, '') : '';
+      if (ENV_BACKEND_URL) return ENV_BACKEND_URL.replace(/\/+$/, '');
+      return 'http://192.168.1.11:8000';
     }
   }
   return ENV_BACKEND_URL ? ENV_BACKEND_URL.replace(/\/+$/, '') : '';
