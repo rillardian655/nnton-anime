@@ -12,7 +12,19 @@
 
       <!-- Video Player Viewport -->
       <div class="theater-player-box" id="theaterBox">
+        <!-- Embed Stream Player (MultiEmbed / 2Embed / VidSrc failover) -->
+        <iframe 
+          v-if="activeEmbedUrl && isAuthenticated"
+          :src="activeEmbedUrl" 
+          class="native-hls-player native-embed-iframe"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen
+        ></iframe>
+
+        <!-- Direct HLS / MP4 Player (Kodik / AniLibria streams) -->
         <video 
+          v-show="!activeEmbedUrl"
           ref="videoRef" 
           class="native-hls-player" 
           controls 
@@ -515,6 +527,7 @@ function skipOpening(isAuto = false) {
 
 const currentSources = ref([]);
 const selectedSourceIndex = ref(0);
+const activeEmbedUrl = ref('');
 const selectedQuality = ref(720);
 const availableVideos = ref([]);
 const subtitlesList = ref([]);
@@ -712,6 +725,30 @@ async function initWatch() {
   }
 }
 
+function getBackupEmbedSources(animeObj, ep) {
+  const animeId = animeObj?.id || '';
+  return [
+    {
+      title: 'Server MultiEmbed (HD Multi-Sub)',
+      type: 'embed',
+      is_subtitles_original: true,
+      embed_url: `https://multiembed.mov/?video_id=${animeId}&anime=1&s=1&e=${ep}`
+    },
+    {
+      title: 'Server 2Embed (Cadangan)',
+      type: 'embed',
+      is_subtitles_original: false,
+      embed_url: `https://www.2embed.cc/embed/anime/${animeId}/${ep}`
+    },
+    {
+      title: 'Server VidSrc (Cloud Player)',
+      type: 'embed',
+      is_subtitles_original: false,
+      embed_url: `https://vidsrc.me/embed/anime?id=${animeId}&ep=${ep}`
+    }
+  ];
+}
+
 async function loadEpisodeStream(ep) {
   if (!isAuthenticated.value) {
     isLoadingStream.value = false;
@@ -723,11 +760,12 @@ async function loadEpisodeStream(ep) {
   showPlayOverlay.value = false;
   showResumeBanner.value = false;
   hasAutoSkippedThisEp.value = false;
-  loadingMessage.value = `Menghubungkan ke Kodik HLS (Episode ${ep})...`;
+  loadingMessage.value = `Menghubungkan ke server stream (Episode ${ep})...`;
   streamStatusText.value = `Menghubungkan ke server stream (Episode ${ep})...`;
 
   const title = anime.value?.title?.english || anime.value?.title?.romaji || '';
   const altTitle = anime.value?.title?.romaji || '';
+  const backupSources = getBackupEmbedSources(anime.value, ep);
 
   try {
     // 1. Fetch Subtitles in parallel
@@ -738,51 +776,51 @@ async function loadEpisodeStream(ep) {
     const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
     const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
 
-    let res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
-      headers: authHeaders
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    if (res.status === 401 || res.status === 403) {
-      loadingMessage.value = 'Akses VIP Terkunci. Silakan masuk atau klaim kode undangan.';
-      streamStatusText.value = 'Akses streaming VIP terkunci.';
-      isLoadingStream.value = false;
-      showLoginModal.value = true;
-      return;
-    }
-
-    let data = await safeFetchJson(res, 'Stream Episode');
-
-    // Fallback to Romaji title explicitly if empty
-    if ((!data.sources || data.sources.length === 0) && altTitle && altTitle !== title) {
-      res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
-        headers: authHeaders
+    let res = null;
+    try {
+      res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
+        headers: authHeaders,
+        signal: controller.signal
       });
-      data = await safeFetchJson(res, 'Stream Episode Alt');
+    } catch (netErr) {
+      console.warn('Backend fetch timeout/error, using embed failover:', netErr.message);
+    } finally {
+      clearTimeout(timeoutId);
     }
 
-    // Fallback to cleaned title (without Season or subtitle suffix)
-    if (!data.sources || data.sources.length === 0) {
-      const simplified = title.split(':')[0].replace(/\s+(Season|\bS\b|\bPart\b|\bII\b|\b2nd\b).*$/i, '').trim();
-      if (simplified && simplified !== title && simplified !== altTitle) {
-        res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(simplified)}&ep=${ep}${tokenQuery}`), {
-          headers: authHeaders
-        });
-        data = await safeFetchJson(res, 'Stream Episode Simplified');
+    let dataSources = [];
+    if (res && res.ok) {
+      const data = await safeFetchJson(res, 'Stream Episode');
+      if (data && Array.isArray(data.sources) && data.sources.length > 0) {
+        dataSources = data.sources;
       }
     }
 
-    if (!data.sources || data.sources.length === 0) {
-      loadingMessage.value = `Episode ${ep} belum tersedia di server streaming.`;
-      streamStatusText.value = `Episode ${ep} belum tersedia di server streaming.`;
-      isLoadingStream.value = false;
-      return;
+    // Fallback to Romaji title explicitly if empty
+    if (dataSources.length === 0 && altTitle && altTitle !== title) {
+      try {
+        const altRes = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
+          headers: authHeaders
+        });
+        if (altRes.ok) {
+          const altData = await safeFetchJson(altRes, 'Stream Episode Alt');
+          if (altData && Array.isArray(altData.sources) && altData.sources.length > 0) {
+            dataSources = altData.sources;
+          }
+        }
+      } catch (_) {}
     }
 
-    currentSources.value = data.sources;
+    // Combine backend HLS sources with backup embed sources
+    const mergedSources = [...dataSources, ...backupSources];
+    currentSources.value = mergedSources;
     selectedSourceIndex.value = 0;
 
     // Prefer original Japanese sub audio track
-    const subIdx = data.sources.findIndex(s => s.is_subtitles_original);
+    const subIdx = mergedSources.findIndex(s => s.is_subtitles_original);
     if (subIdx !== -1) {
       selectedSourceIndex.value = subIdx;
     }
@@ -790,17 +828,53 @@ async function loadEpisodeStream(ep) {
     playSelectedSource();
 
   } catch (err) {
-    console.error('Stream load error:', err);
-    loadingMessage.value = 'Gagal memuat video: ' + err.message;
-    streamStatusText.value = 'Gagal memuat video: ' + err.message;
-    isLoadingStream.value = false;
+    console.warn('Stream load error, activating fallback embed servers:', err);
+    currentSources.value = backupSources;
+    selectedSourceIndex.value = 0;
+    playSelectedSource();
   }
 }
 
 function playSelectedSource() {
   const source = currentSources.value[selectedSourceIndex.value];
-  if (!source || !source.videos || source.videos.length === 0) {
-    loadingMessage.value = 'Video tidak tersedia untuk pengisi suara ini.';
+  if (!source) {
+    loadingMessage.value = 'Server stream tidak ditemukan.';
+    isLoadingStream.value = false;
+    return;
+  }
+
+  // Destroy previous HLS instance if any
+  if (hlsInstance) {
+    hlsInstance.destroy();
+    hlsInstance = null;
+  }
+  clearTimeout(safetyTimer);
+
+  // If source is an iframe embed player
+  if (source.type === 'embed' || source.embed_url) {
+    const videoEl = videoRef.value;
+    if (videoEl) {
+      videoEl.pause();
+      videoEl.removeAttribute('src');
+    }
+    activeEmbedUrl.value = source.embed_url;
+    availableVideos.value = [];
+    isLoadingStream.value = false;
+    showPlayOverlay.value = false;
+    streamStatusText.value = `Memutar: ${source.title}`;
+    return;
+  }
+
+  // Direct HLS / MP4 playback
+  activeEmbedUrl.value = '';
+  if (!source.videos || source.videos.length === 0) {
+    const firstEmbed = currentSources.value.find(s => s.embed_url);
+    if (firstEmbed) {
+      activeEmbedUrl.value = firstEmbed.embed_url;
+      streamStatusText.value = `Memutar: ${firstEmbed.title}`;
+    } else {
+      loadingMessage.value = 'Video tidak tersedia untuk server ini.';
+    }
     isLoadingStream.value = false;
     return;
   }
@@ -1548,12 +1622,7 @@ video::cue {
 }
 
 .vip-locked-backdrop-glow {
-  position: absolute;
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle, rgba(229, 9, 20, 0.3) 0%, transparent 70%);
-  filter: blur(45px);
-  pointer-events: none;
+  display: none;
 }
 
 .vip-locked-card {
@@ -1570,9 +1639,9 @@ video::cue {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  background: rgba(229, 9, 20, 0.15);
-  border: 1px solid rgba(229, 9, 20, 0.4);
-  color: #ff4d4d;
+  background: rgba(229, 9, 20, 0.12);
+  border: 1px solid rgba(229, 9, 20, 0.3);
+  color: #ef4444;
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1617,13 +1686,11 @@ video::cue {
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(229, 9, 20, 0.5);
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: background-color 0.15s;
 }
 
 .vip-btn-glow:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 26px rgba(229, 9, 20, 0.7);
+  background: #b91c1c;
 }
 
 .vip-btn-invite {

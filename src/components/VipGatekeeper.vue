@@ -1,17 +1,12 @@
 <template>
   <div class="vip-gatekeeper-root">
-    <!-- Ambient Background Glows -->
-    <div class="ambient-glow glow-top"></div>
-    <div class="ambient-glow glow-bottom"></div>
-
     <div class="gatekeeper-container">
-      <!-- VIP Card -->
+      <!-- VIP Security Card -->
       <div class="gatekeeper-card">
         <!-- Brand Header -->
         <div class="gatekeeper-header">
           <div class="brand-badge-vip">
-            <span class="pulsing-dot"></span>
-            <span class="badge-text">VIP PRIVATE GATEWAY</span>
+            <span class="badge-text">VIP ACCESS PORTAL</span>
           </div>
 
           <div class="logo-box">
@@ -79,7 +74,7 @@
         <!-- 1. LOGIN FORM -->
         <form v-if="activeTab === 'login'" @submit.prevent="handleLogin" class="gate-form">
           <div class="form-group">
-            <label for="gateUser">Nama Pengguna (Username / Email)</label>
+            <label for="gateUser">Nama Pengguna atau Email</label>
             <div class="input-wrap">
               <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -89,7 +84,7 @@
                 id="gateUser" 
                 v-model="loginUsername" 
                 type="text" 
-                placeholder="misal: runa@gmail.com" 
+                placeholder="Masukkan username atau email..." 
                 required 
                 autocomplete="username"
               />
@@ -119,14 +114,14 @@
 
           <button type="submit" class="btn-gate-submit" :disabled="isLoading">
             <span v-if="isLoading" class="spinner-small"></span>
-            <span>{{ isLoading ? 'Memverifikasi Akses...' : 'Buka Akses & Masuk' }}</span>
+            <span>{{ isLoading ? 'Memverifikasi...' : 'Buka Akses & Masuk' }}</span>
           </button>
 
           <!-- Invite Ticket Prompt -->
           <div class="invite-ticket-callout">
             <div class="callout-left">
-              <span class="callout-badge">TIKET VIP</span>
-              <p class="callout-text">Punya Kode Undangan dari Admin atau teman?</p>
+              <span class="callout-badge">UNDANGAN</span>
+              <p class="callout-text">Punya Kode Undangan resmi?</p>
             </div>
             <button type="button" class="btn-callout-action" @click="switchTab('claim')">
               Klaim Tiket →
@@ -137,9 +132,9 @@
         <!-- 2. CLAIM INVITE FORM -->
         <form v-else-if="activeTab === 'claim'" @submit.prevent="handleClaimInvite" class="gate-form">
           <div class="form-group">
-            <label for="claimCode">Kode Tiket / Undangan VIP</label>
+            <label for="claimCode">Kode Tiket Undangan</label>
             <div class="input-wrap">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2">
+              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
                 <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
                 <line x1="12" y1="9" x2="12" y2="15"></line>
               </svg>
@@ -147,7 +142,7 @@
                 id="claimCode" 
                 v-model="inviteCode" 
                 type="text" 
-                placeholder="Contoh: INV-146206CD" 
+                placeholder="INV-XXXXXX" 
                 required 
                 style="text-transform: uppercase; font-family: monospace; letter-spacing: 1px;"
                 @input="inviteCode = inviteCode.toUpperCase()"
@@ -205,7 +200,7 @@
                 id="claimDisplay" 
                 v-model="claimDisplayName" 
                 type="text" 
-                placeholder="Nama yang muncul di profil..." 
+                placeholder="Nama panggilan kamu..." 
               />
             </div>
           </div>
@@ -217,7 +212,7 @@
 
           <div class="invite-ticket-callout">
             <div class="callout-left">
-              <span class="callout-badge" style="background: rgba(255,255,255,0.1); color: #fff;">INFO</span>
+              <span class="callout-badge" style="background: rgba(255,255,255,0.08); color: #cbd5e1;">LOGIN</span>
               <p class="callout-text">Sudah memiliki akun terdaftar?</p>
             </div>
             <button type="button" class="btn-callout-action" @click="switchTab('login')">
@@ -225,56 +220,18 @@
             </button>
           </div>
         </form>
-
-        <!-- Footer / Server Config Accordion -->
-        <div class="gate-footer">
-          <div class="server-status-pill" @click="showServerConfig = !showServerConfig">
-            <span class="status-indicator" :class="serverStatusClass"></span>
-            <span class="server-label">Server: <strong>{{ currentBackendHost }}</strong></span>
-            <span class="server-config-toggle">{{ showServerConfig ? '▲ Tutup' : '⚙️ Atur' }}</span>
-          </div>
-
-          <!-- Collapsible Server IP Settings -->
-          <transition name="fade">
-            <div v-if="showServerConfig" class="server-config-drawer">
-              <p class="config-desc">
-                Sesuaikan alamat IP jika backend berjalan di jaringan Wi-Fi lain atau domain tunnel:
-              </p>
-              <div class="config-row">
-                <input 
-                  type="text" 
-                  v-model="tempServerUrl" 
-                  placeholder="http://192.168.1.11:8000"
-                  class="config-input"
-                />
-                <button type="button" class="btn-config-save" @click="saveServerUrl">Simpan</button>
-              </div>
-              <div class="config-actions">
-                <button type="button" class="btn-config-sub" @click="testServerConnection">
-                  Tes Koneksi
-                </button>
-                <button type="button" class="btn-config-sub" @click="resetServerUrl">
-                  Reset Default
-                </button>
-              </div>
-              <p v-if="pingResult" class="ping-result" :class="{ 'ping-ok': pingOk, 'ping-fail': !pingOk }">
-                {{ pingResult }}
-              </p>
-            </div>
-          </transition>
-        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { loginUser } from '../stores/auth.js';
-import { getApiBaseUrl, setBackendUrl, claimInvite } from '../api.js';
+import { claimInvite } from '../api.js';
 
 const activeTab = ref('login');
-const loginUsername = ref('runa@gmail.com');
+const loginUsername = ref('');
 const loginPassword = ref('');
 const showPassword = ref(false);
 
@@ -286,14 +243,6 @@ const claimDisplayName = ref('');
 const isLoading = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
-
-// Server Configuration Drawer
-const showServerConfig = ref(false);
-const currentBackendHost = ref(getApiBaseUrl() || 'http://192.168.1.11:8000');
-const tempServerUrl = ref(currentBackendHost.value);
-const serverStatusClass = ref('status-unknown');
-const pingResult = ref('');
-const pingOk = ref(false);
 
 function switchTab(tab) {
   activeTab.value = tab;
@@ -354,54 +303,6 @@ async function handleClaimInvite() {
   }
 }
 
-function saveServerUrl() {
-  if (!tempServerUrl.value.trim()) {
-    resetServerUrl();
-    return;
-  }
-  let url = tempServerUrl.value.trim().replace(/\/+$/, '');
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = `http://${url}`;
-  }
-  setBackendUrl(url);
-  currentBackendHost.value = url;
-  testServerConnection();
-}
-
-function resetServerUrl() {
-  setBackendUrl('');
-  tempServerUrl.value = 'http://192.168.1.11:8000';
-  currentBackendHost.value = 'http://192.168.1.11:8000';
-  testServerConnection();
-}
-
-async function testServerConnection() {
-  pingResult.value = 'Memeriksa koneksi server...';
-  serverStatusClass.value = 'status-testing';
-  try {
-    const target = (currentBackendHost.value || 'http://192.168.1.11:8000').replace(/\/+$/, '');
-    const startTime = performance.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-
-    const res = await fetch(`${target}/docs`, {
-      method: 'GET',
-      mode: 'no-cors',
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    const latency = Math.round(performance.now() - startTime);
-
-    pingOk.value = true;
-    serverStatusClass.value = 'status-online';
-    pingResult.value = `✓ Server terhubung (${latency}ms)`;
-  } catch (err) {
-    pingOk.value = false;
-    serverStatusClass.value = 'status-offline';
-    pingResult.value = `✕ Server tidak merespons. Pastikan laptop & HP di Wi-Fi yang sama.`;
-  }
-}
-
 onMounted(() => {
   // Check if URL has invite parameter
   const urlParams = new URLSearchParams(window.location.search);
@@ -410,9 +311,6 @@ onMounted(() => {
     inviteCode.value = code.toUpperCase();
     activeTab.value = 'claim';
   }
-
-  // Ping current server
-  testServerConnection();
 });
 </script>
 
@@ -421,57 +319,30 @@ onMounted(() => {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: radial-gradient(circle at 50% 20%, #151821 0%, #090a0f 65%, #050608 100%);
+  background-color: #0b0c10;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem;
   overflow-y: auto;
   min-height: 100vh;
   box-sizing: border-box;
 }
 
-.ambient-glow {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  pointer-events: none;
-  opacity: 0.15;
-}
-
-.glow-top {
-  width: 320px;
-  height: 320px;
-  background: #ff2851;
-  top: -100px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.glow-bottom {
-  width: 280px;
-  height: 280px;
-  background: #eab308;
-  bottom: -100px;
-  right: 10%;
-}
-
 .gatekeeper-container {
   width: 100%;
-  max-width: 440px;
+  max-width: 420px;
   margin: auto;
   position: relative;
   z-index: 2;
 }
 
 .gatekeeper-card {
-  background: rgba(18, 20, 29, 0.88);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: #12141c;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 2rem 1.75rem;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
 }
 
 .gatekeeper-header {
@@ -482,45 +353,29 @@ onMounted(() => {
 .brand-badge-vip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  background: rgba(234, 179, 8, 0.12);
-  border: 1px solid rgba(234, 179, 8, 0.35);
-  border-radius: 999px;
-  font-size: 0.68rem;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 0.65rem;
   font-weight: 700;
-  letter-spacing: 1.2px;
-  color: #facc15;
-  margin-bottom: 1rem;
+  letter-spacing: 1px;
+  color: #cbd5e1;
+  margin-bottom: 0.85rem;
   text-transform: uppercase;
 }
 
-.pulsing-dot {
-  width: 6px;
-  height: 6px;
-  background-color: #facc15;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #facc15;
-  animation: pulse-dot 1.8s infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
-
 .logo-box {
-  width: 64px;
-  height: 64px;
+  width: 58px;
+  height: 58px;
   margin: 0 auto 0.75rem auto;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  background: #181b24;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(255, 40, 81, 0.2);
 }
 
 .brand-logo-img {
@@ -530,22 +385,22 @@ onMounted(() => {
 }
 
 .brand-title {
-  font-size: 1.85rem;
+  font-size: 1.75rem;
   font-weight: 900;
   letter-spacing: -0.5px;
-  margin: 0 0 0.35rem 0;
+  margin: 0 0 0.3rem 0;
   line-height: 1.1;
 }
 
-.text-white { color: #ffffff; }
-.text-red { color: #ff2851; }
+.text-white { color: #f8fafc; }
+.text-red { color: #e50914; }
 
 .vip-subtag {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 800;
-  color: #000;
-  background: #facc15;
+  color: #ffffff;
+  background: #b91c1c;
   padding: 2px 6px;
   border-radius: 4px;
   margin-left: 6px;
@@ -554,7 +409,7 @@ onMounted(() => {
 
 .brand-tagline {
   color: #94a3b8;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   margin: 0;
   line-height: 1.4;
 }
@@ -565,21 +420,21 @@ onMounted(() => {
   align-items: flex-start;
   gap: 10px;
   padding: 0.75rem 1rem;
-  border-radius: 10px;
+  border-radius: 8px;
   margin-bottom: 1.25rem;
   font-size: 0.82rem;
   line-height: 1.4;
 }
 
 .alert-error {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
   color: #fca5a5;
 }
 
 .alert-success {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.25);
   color: #86efac;
 }
 
@@ -587,11 +442,11 @@ onMounted(() => {
 .gate-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.28);
+  gap: 6px;
+  background: #090a0f;
   padding: 4px;
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
+  border-radius: 10px;
+  margin-bottom: 1.35rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -599,43 +454,41 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 8px;
+  gap: 7px;
+  padding: 9px 12px;
+  border-radius: 7px;
   background: transparent;
   border: none;
   color: #94a3b8;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .tab-btn.active {
-  background: #ff2851;
+  background: #e50914;
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(255, 40, 81, 0.35);
 }
 
 /* Forms */
 .gate-form {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 1rem;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.35rem;
   text-align: left;
 }
 
 .form-group label {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: #cbd5e1;
-  letter-spacing: 0.2px;
 }
 
 .input-wrap {
@@ -653,20 +506,19 @@ onMounted(() => {
 
 .input-wrap input {
   width: 100%;
-  padding: 11px 12px 11px 38px;
-  background: rgba(10, 12, 18, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  padding: 10px 12px 10px 38px;
+  background: #090a0f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   color: #ffffff;
-  font-size: 0.9rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  font-size: 0.88rem;
+  transition: border-color 0.2s;
   box-sizing: border-box;
 }
 
 .input-wrap input:focus {
   outline: none;
-  border-color: #ff2851;
-  box-shadow: 0 0 0 3px rgba(255, 40, 81, 0.2);
+  border-color: #e50914;
 }
 
 .btn-toggle-pw {
@@ -692,21 +544,19 @@ onMounted(() => {
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 13px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #ff2851 0%, #dc2626 100%);
+  padding: 12px;
+  border-radius: 8px;
+  background: #e50914;
   color: #ffffff;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
   border: none;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(255, 40, 81, 0.35);
-  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  transition: background-color 0.15s;
 }
 
 .btn-gate-submit:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 28px rgba(255, 40, 81, 0.5);
+  background: #b91c1c;
 }
 
 .btn-gate-submit:disabled {
@@ -715,13 +565,12 @@ onMounted(() => {
 }
 
 .btn-gold-submit {
-  background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
-  color: #000;
-  box-shadow: 0 8px 24px rgba(234, 179, 8, 0.35);
+  background: #d97706;
+  color: #ffffff;
 }
 
 .btn-gold-submit:hover:not(:disabled) {
-  box-shadow: 0 10px 28px rgba(234, 179, 8, 0.5);
+  background: #b45309;
 }
 
 /* Callout Box */
@@ -729,11 +578,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  margin-top: 0.25rem;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  margin-top: 0.2rem;
 }
 
 .callout-left {
@@ -744,18 +593,18 @@ onMounted(() => {
 }
 
 .callout-badge {
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(234, 179, 8, 0.2);
-  color: #facc15;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(217, 119, 6, 0.2);
+  color: #fbbf24;
   display: inline-block;
   width: fit-content;
 }
 
 .callout-text {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: #94a3b8;
   margin: 0;
 }
@@ -763,8 +612,8 @@ onMounted(() => {
 .btn-callout-action {
   background: none;
   border: none;
-  color: #facc15;
-  font-size: 0.8rem;
+  color: #fbbf24;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -775,118 +624,9 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* Footer & Server Status */
-.gate-footer {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.server-status-pill {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.76rem;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.status-indicator {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.status-online { background-color: #22c55e; box-shadow: 0 0 6px #22c55e; }
-.status-testing { background-color: #eab308; box-shadow: 0 0 6px #eab308; }
-.status-offline { background-color: #ef4444; box-shadow: 0 0 6px #ef4444; }
-.status-unknown { background-color: #64748b; }
-
-.server-config-toggle {
-  color: #60a5fa;
-  font-weight: 600;
-  margin-left: 6px;
-}
-
-.server-config-drawer {
-  margin-top: 10px;
-  padding: 12px;
-  background: rgba(10, 12, 18, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  text-align: left;
-}
-
-.config-desc {
-  font-size: 0.72rem;
-  color: #94a3b8;
-  margin: 0 0 8px 0;
-  line-height: 1.4;
-}
-
-.config-row {
-  display: flex;
-  gap: 6px;
-}
-
-.config-input {
-  flex: 1;
-  padding: 7px 10px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  color: #ffffff;
-  font-size: 0.8rem;
-  font-family: monospace;
-}
-
-.btn-config-save {
-  padding: 7px 14px;
-  background: #ff2851;
-  border: none;
-  border-radius: 6px;
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.config-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.btn-config-sub {
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  border-radius: 6px;
-  color: #cbd5e1;
-  font-size: 0.72rem;
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-.btn-config-sub:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.ping-result {
-  font-size: 0.72rem;
-  margin: 6px 0 0 0;
-}
-
-.ping-ok { color: #4ade80; }
-.ping-fail { color: #f87171; }
-
 .spinner-small {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: #ffffff;
   border-radius: 50%;

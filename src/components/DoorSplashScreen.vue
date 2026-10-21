@@ -158,27 +158,11 @@ onMounted(() => {
 }
 
 .ambient-glow {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 500px;
-  height: 500px;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, rgba(229, 9, 20, 0.08) 35%, transparent 70%);
-  filter: blur(50px);
-  pointer-events: none;
+  display: none;
 }
 
 .cinema-light-beam {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 700px;
-  height: 700px;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 40%, transparent 65%);
-  filter: blur(40px);
-  animation: beamSequence 4.4s ease-out forwards;
+  display: none;
 }
 
 /* ================= Center Content: Clean Logo & Brand ================= */
@@ -203,11 +187,7 @@ onMounted(() => {
 }
 
 .logo-soft-glow {
-  position: absolute;
-  inset: -14px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(229, 9, 20, 0.3) 0%, transparent 70%);
-  animation: softPulse 2.5s infinite ease-in-out;
+  display: none;
 }
 
 .logo-circle-badge {

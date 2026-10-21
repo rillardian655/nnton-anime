@@ -1,7 +1,7 @@
 <template>
   <div class="home-page">
     <!-- ================= Cinematic Hero Billboard ================= -->
-    <section class="hero-billboard" v-if="heroAnimeList.length > 0">
+    <section class="hero-billboard" v-if="heroAnimeList.length > 0 && !searchKeyword.trim()">
       <div 
         class="hero-slide"
         v-for="(anime, idx) in heroAnimeList" 
@@ -59,7 +59,7 @@
     </section>
 
     <!-- ================= Continue Watching Bar ================= -->
-    <section class="continue-watching-section" v-if="historyList.length > 0 && currentTab !== 'history'">
+    <section class="continue-watching-section" v-if="historyList.length > 0 && currentTab !== 'history' && !searchKeyword.trim()">
       <div class="content-container">
         <div class="section-title-wrap">
           <div class="title-left">
@@ -127,8 +127,8 @@
         </div>
       </div>
 
-      <!-- Filter Chips & Selects -->
-      <div class="filter-bar" v-if="!['watchlist', 'history'].includes(currentTab)">
+      <!-- Filter Chips & Selects (Hidden during search to maximize results view) -->
+      <div class="filter-bar" v-if="!['watchlist', 'history'].includes(currentTab) && !searchKeyword.trim()">
         <div class="genre-scroll-wrapper">
           <button 
             class="chip-btn" 
@@ -450,6 +450,7 @@ function onInPageSearch() {
   if (q) {
     router.replace({ query: { ...route.query, search: q } });
     fetchCurrentList();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
     clearSearch();
   }
@@ -462,6 +463,7 @@ function clearSearch() {
   delete newQuery.q;
   router.replace({ query: newQuery });
   fetchCurrentList();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function startHeroCarousel() {
@@ -493,6 +495,7 @@ watch(() => [route.query.search, route.query.q], ([newSearch, newQ]) => {
   if (q !== searchKeyword.value.trim()) {
     searchKeyword.value = q;
     fetchCurrentList();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 });
 
@@ -509,7 +512,7 @@ onUnmounted(() => {
 
 <style scoped>
 .home-page {
-  padding-bottom: 5rem;
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
