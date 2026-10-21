@@ -57,7 +57,7 @@ jobs:
       - name: 🏷️ Prepare APK for Download
         run: |
           mkdir -p build-output
-          cp android/app/build/outputs/apk/debug/app-debug.apk build-output/AniPulse-VIP-v1.0.apk
+          find android/app/build/outputs -name "*.apk" -exec cp -v {} build-output/AniPulse-VIP-v1.0.apk \;
           ls -la build-output/
 
       - name: 🚀 Upload APK Artifact to GitHub Actions
