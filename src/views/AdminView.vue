@@ -546,7 +546,7 @@ async function testServerConnection() {
   serverTestMessage.value = '';
   try {
     const url = customBackendUrl.value.trim().replace(/\/+$/, '');
-    const res = await fetch(`${url}/api/auth/csrf`, { method: 'GET' });
+    const res = await fetch(`${url}/api/health`, { method: 'GET' });
     if (res.ok) {
       serverTestOk.value = true;
       serverTestMessage.value = '✓ Koneksi berhasil! Server backend merespons 200 OK.';
