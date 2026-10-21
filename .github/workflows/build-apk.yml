@@ -57,8 +57,16 @@ jobs:
       - name: 🏷️ Prepare APK for Download
         run: |
           mkdir -p build-output
-          find android/app/build/outputs -name "*.apk" -exec cp -v {} build-output/AniPulse-VIP-v1.0.apk \;
-          ls -la build-output/
+          APK_FILE=$(find android -name "*.apk" | head -n 1)
+          echo "Found APK: $APK_FILE"
+          if [ -n "$APK_FILE" ]; then
+            cp -v "$APK_FILE" build-output/AniPulse-VIP-v1.0.apk
+            ls -lh build-output/
+          else
+            echo "::error::No APK file found in android directory!"
+            find android -maxdepth 4 -type d
+            exit 1
+          fi
 
       - name: 🚀 Upload APK Artifact to GitHub Actions
         uses: actions/upload-artifact@v4
