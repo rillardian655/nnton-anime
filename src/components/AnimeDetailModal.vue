@@ -1,7 +1,16 @@
 <template>
   <div class="modal-overlay" v-if="anime" @click.self="$emit('close')">
     <div class="detail-card">
-      <button class="modal-close-btn" @click="$emit('close')" aria-label="Tutup">✕</button>
+      <!-- Mobile Top Drag Handle -->
+      <div class="sheet-drag-pill" @click="$emit('close')"></div>
+
+      <!-- Floating Glass Close Button -->
+      <button class="modal-close-btn" @click="$emit('close')" aria-label="Tutup">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
 
       <!-- Banner / Backdrop Header -->
       <div class="detail-banner-wrap">
@@ -17,12 +26,14 @@
             <span class="score-badge" v-if="anime.averageScore">★ {{ (anime.averageScore / 10).toFixed(1) }}</span>
             <span class="format-badge">{{ anime.format || 'TV' }}</span>
             <span class="status-badge" :class="{ 'status-releasing': anime.status === 'RELEASING' }">
+              <span class="status-dot"></span>
               {{ anime.status === 'RELEASING' ? 'Sedang Rilis' : 'Tamat' }}
             </span>
             <span class="year-badge" v-if="anime.seasonYear">{{ anime.seasonYear }}</span>
           </div>
-          <h2 class="detail-title">{{ anime.title?.english || anime.title?.romaji }}</h2>
-          <div class="detail-sub">{{ anime.title?.romaji }} <span v-if="anime.title?.native">({{ anime.title?.native }})</span></div>
+          
+          <h2 class="detail-title">{{ displayTitle }}</h2>
+          <div class="detail-sub" v-if="displaySubTitle">{{ displaySubTitle }}</div>
 
           <div class="banner-actions">
             <router-link :to="`/watch?id=${anime.id}&ep=1`" class="btn btn-primary play-btn" @click="$emit('close')">
@@ -31,7 +42,7 @@
             </router-link>
             <button class="btn btn-secondary fav-btn" @click="handleToggleWatchlist">
               <svg width="16" height="16" viewBox="0 0 24 24" :fill="isInWatchlist ? '#e50914' : 'none'" :stroke="isInWatchlist ? '#e50914' : 'currentColor'" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-              <span>{{ isInWatchlist ? 'Hapus Koleksi' : '+ Simpan Koleksi' }}</span>
+              <span>{{ isInWatchlist ? 'Tersimpan' : '+ Simpan Koleksi' }}</span>
             </button>
           </div>
         </div>
@@ -41,8 +52,7 @@
       <div class="detail-body">
         <!-- Genres Tags -->
         <div class="genre-tags">
-          <span class="genre-prefix">Genre:</span>
-          <span v-for="g in anime.genres" :key="g" class="genre-tag">{{ g }}</span>
+          <span class="genre-tag" v-for="g in anime.genres" :key="g">{{ g }}</span>
         </div>
 
         <!-- Airing Countdown Alert for Releasing Anime -->
@@ -56,11 +66,12 @@
           <div class="episodes-section-header">
             <div>
               <h3 class="section-heading">Pilih Episode</h3>
-              <p class="episodes-subtext">Pilih nomor episode untuk langsung ditonton di pemutar video theater:</p>
+              <p class="episodes-subtext">Pilih episode untuk langsung diputar:</p>
             </div>
             <div class="ep-header-controls">
-              <span class="ep-count-tag">{{ totalEpisodes }} Episode Rilis</span>
+              <span class="ep-count-tag">{{ totalEpisodes }} Episode</span>
               <input 
+                v-if="totalEpisodes > 12"
                 type="text" 
                 v-model="epSearchQuery" 
                 placeholder="Cari ep (1, 2...)" 
@@ -69,8 +80,28 @@
             </div>
           </div>
 
-          <!-- Grid of Episode Pills -->
-          <div class="episodes-pills-grid">
+          <!-- Single Movie / OVA Hero CTA -->
+          <div v-if="totalEpisodes === 1" class="single-movie-cta">
+            <router-link 
+              :to="`/watch?id=${anime.id}&ep=1`" 
+              class="single-movie-card"
+              @click="$emit('close')"
+            >
+              <div class="movie-play-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              </div>
+              <div class="movie-info">
+                <div class="movie-title">Tonton Film Lengkap (Episode 1)</div>
+                <div class="movie-meta">{{ anime.duration ? `${anime.duration} Menit` : 'Durasi Penuh' }} • Kualitas HD Sub Indo</div>
+              </div>
+              <div class="movie-arrow">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </div>
+            </router-link>
+          </div>
+
+          <!-- Grid of Episode Pills for Series -->
+          <div v-else class="episodes-pills-grid">
             <router-link 
               v-for="ep in filteredEpisodes" 
               :key="ep.num" 
@@ -88,16 +119,6 @@
           </div>
         </div>
 
-        <!-- Cross-Database ARM Mapping -->
-        <div class="arm-badges-wrap" v-if="armMapping">
-          <span class="arm-badge" v-if="armMapping.anilist">AniList: {{ armMapping.anilist }}</span>
-          <span class="arm-badge" v-if="armMapping.myanimelist">MAL: {{ armMapping.myanimelist }}</span>
-          <span class="arm-badge" v-if="armMapping.themoviedb">TMDB: {{ armMapping.themoviedb }}</span>
-          <span class="arm-badge" v-if="armMapping.imdb">IMDb: {{ armMapping.imdb }}</span>
-          <span class="arm-badge" v-if="armMapping.anidb">AniDB: {{ armMapping.anidb }}</span>
-          <span class="arm-badge" v-if="armMapping.kitsu">Kitsu: {{ armMapping.kitsu }}</span>
-        </div>
-
         <!-- Synopsis Section with Shared Server Translation -->
         <div class="synopsis-box">
           <div class="synopsis-header">
@@ -106,7 +127,7 @@
             <div class="translation-controls">
               <span v-if="isIndonesian && isServerCached" class="cached-pill" title="Terjemahan tersimpan di server lokal">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"></path></svg>
-                <span>Tersimpan di Server</span>
+                <span>Sub Indo</span>
               </span>
 
               <button 
@@ -116,7 +137,7 @@
               >
                 <svg v-if="!isTranslating" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                 <span v-else class="spinner-small"></span>
-                <span>{{ isTranslating ? 'Menerjemahkan...' : (isIndonesian ? 'Lihat Bahasa Asli' : 'Terjemahkan ke Indonesia') }}</span>
+                <span>{{ isTranslating ? 'Menerjemahkan...' : (isIndonesian ? 'Bahasa Asli' : 'Terjemahkan ke Indonesia') }}</span>
               </button>
             </div>
           </div>
@@ -181,6 +202,17 @@
             ></iframe>
           </div>
         </div>
+
+        <!-- Subtle Cross-Database Mapping at the Bottom -->
+        <div class="arm-badges-wrap" v-if="armMapping">
+          <span class="arm-title">ID Metadata:</span>
+          <span class="arm-badge" v-if="armMapping.anilist">AniList {{ armMapping.anilist }}</span>
+          <span class="arm-badge" v-if="armMapping.myanimelist">MAL {{ armMapping.myanimelist }}</span>
+          <span class="arm-badge" v-if="armMapping.themoviedb">TMDB {{ armMapping.themoviedb }}</span>
+          <span class="arm-badge" v-if="armMapping.imdb">IMDb {{ armMapping.imdb }}</span>
+          <span class="arm-badge" v-if="armMapping.anidb">AniDB {{ armMapping.anidb }}</span>
+          <span class="arm-badge" v-if="armMapping.kitsu">Kitsu {{ armMapping.kitsu }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -225,6 +257,21 @@ const epSearchQuery = ref('');
 const airingNotice = ref('');
 const armMapping = ref(null);
 const kusonimeDownloads = ref([]);
+
+const displayTitle = computed(() => {
+  return props.anime?.title?.english || props.anime?.title?.romaji || 'Anime';
+});
+
+const displaySubTitle = computed(() => {
+  const eng = props.anime?.title?.english?.trim();
+  const rom = props.anime?.title?.romaji?.trim();
+  const nat = props.anime?.title?.native?.trim();
+
+  if (eng && rom && eng.toLowerCase() !== rom.toLowerCase()) {
+    return nat ? `${rom} • ${nat}` : rom;
+  }
+  return nat || '';
+});
 
 const filteredEpisodes = computed(() => {
   const q = epSearchQuery.value.trim().toLowerCase();
@@ -375,13 +422,13 @@ function handleToggleWatchlist() {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 250;
+  z-index: 1200;
   padding: 1.5rem;
   overflow-y: auto;
   animation: fadeIn 0.2s ease;
@@ -390,43 +437,52 @@ function handleToggleWatchlist() {
 .detail-card {
   position: relative;
   background: #12141c;
-  border: 1px solid #2a3044;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+  border: 1px solid #232838;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
   border-radius: 20px;
   width: 100%;
   max-width: 840px;
-  max-height: 90vh;
+  max-height: 88vh;
   overflow-y: auto;
+  overflow-x: hidden;
   color: #fff;
   animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.sheet-drag-pill {
+  display: none;
+}
+
 .modal-close-btn {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  top: 1.1rem;
+  right: 1.1rem;
+  background: rgba(18, 20, 28, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   color: #fff;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 20;
+  z-index: 30;
   transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .modal-close-btn:hover {
-  background: rgba(229, 9, 20, 0.8);
-  transform: rotate(90deg);
+  background: #e50914;
+  border-color: #e50914;
+  transform: scale(1.05);
 }
 
 .detail-banner-wrap {
   position: relative;
-  height: 290px;
+  height: 310px;
   overflow: hidden;
   border-radius: 20px 20px 0 0;
 }
@@ -435,17 +491,18 @@ function handleToggleWatchlist() {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform: scale(1.02);
 }
 
 .detail-banner-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(18, 20, 28, 0.2) 0%, rgba(18, 20, 28, 0.8) 60%, #12141c 100%);
+  background: linear-gradient(180deg, rgba(12, 13, 18, 0.15) 0%, rgba(12, 13, 18, 0.55) 45%, #12141c 100%);
 }
 
 .detail-banner-content {
   position: absolute;
-  bottom: 1.5rem;
+  bottom: 1.4rem;
   left: 2rem;
   right: 2rem;
   z-index: 10;
@@ -453,88 +510,134 @@ function handleToggleWatchlist() {
 
 .badge-row {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.6rem;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .score-badge {
-  background: #eab308;
+  background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
   color: #000;
   font-weight: 800;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   padding: 0.2rem 0.55rem;
-  border-radius: 4px;
+  border-radius: 5px;
+  letter-spacing: 0.02em;
 }
 
-.format-badge, .status-badge, .year-badge {
-  background: rgba(255, 255, 255, 0.15);
-  font-size: 0.78rem;
+.format-badge, .year-badge {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.74rem;
   font-weight: 600;
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
+  padding: 0.18rem 0.5rem;
+  border-radius: 5px;
+  color: #f1f5f9;
+}
+
+.status-badge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.18rem 0.55rem;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .status-releasing {
-  background: rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  display: inline-block;
+}
+
+.status-releasing .status-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px #34d399;
 }
 
 .detail-title {
   font-size: 1.65rem;
   font-weight: 800;
   line-height: 1.25;
-  margin-bottom: 0.25rem;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+  margin-bottom: 0.2rem;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
 }
 
 .detail-sub {
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   color: #94a3b8;
-  margin-bottom: 1rem;
+  margin-bottom: 0.95rem;
+  font-weight: 500;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .banner-actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .play-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  padding: 0.65rem 1.4rem;
+  padding: 0.7rem 1.4rem;
   font-weight: 700;
-  font-size: 0.92rem;
-  background: #e50914;
+  font-size: 0.9rem;
+  background: linear-gradient(135deg, #e50914 0%, #b80610 100%);
   color: #fff;
-  border-radius: 6px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(229, 9, 20, 0.35);
+  text-decoration: none;
   transition: all 0.2s;
 }
 
 .play-btn:hover {
-  background: #ff1f2d;
+  background: linear-gradient(135deg, #ff1f2d 0%, #c90713 100%);
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(229, 9, 20, 0.5);
 }
 
 .fav-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.65rem 1.1rem;
-  font-size: 0.88rem;
-  background: rgba(255, 255, 255, 0.12);
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.7rem 1.1rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
   color: #fff;
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
   transition: all 0.2s;
 }
 
 .fav-btn:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .detail-body {
@@ -551,20 +654,21 @@ function handleToggleWatchlist() {
   align-items: center;
 }
 
-.genre-prefix {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #94a3b8;
+.genre-tag {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.25rem 0.7rem;
+  border-radius: 9999px;
+  transition: all 0.2s;
 }
 
-.genre-tag {
-  background: #181b26;
-  border: 1px solid #2a3044;
-  color: #cbd5e1;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.25rem 0.65rem;
-  border-radius: 9999px;
+.genre-tag:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 .airing-alert-box {
@@ -592,8 +696,8 @@ function handleToggleWatchlist() {
 /* ================= Episodes Selector Section ================= */
 .episodes-selector-section {
   background: #181b26;
-  border: 1px solid #2a3044;
-  border-radius: 12px;
+  border: 1px solid #232838;
+  border-radius: 14px;
   padding: 1.25rem;
 }
 
@@ -631,7 +735,7 @@ function handleToggleWatchlist() {
   font-size: 0.76rem;
   font-weight: 700;
   padding: 0.3rem 0.65rem;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .ep-search-input {
@@ -649,10 +753,68 @@ function handleToggleWatchlist() {
   border-color: #e50914;
 }
 
+/* Single Movie / Full CTA Card */
+.single-movie-cta {
+  margin-top: 0.25rem;
+}
+
+.single-movie-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: linear-gradient(135deg, rgba(229, 9, 20, 0.12) 0%, rgba(30, 34, 48, 0.5) 100%);
+  border: 1px solid rgba(229, 9, 20, 0.35);
+  border-radius: 12px;
+  padding: 0.9rem 1.15rem;
+  text-decoration: none;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.single-movie-card:hover {
+  background: linear-gradient(135deg, rgba(229, 9, 20, 0.22) 0%, rgba(30, 34, 48, 0.75) 100%);
+  border-color: #e50914;
+  transform: translateY(-1px);
+}
+
+.movie-play-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e50914;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+}
+
+.movie-info {
+  flex: 1;
+}
+
+.movie-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #fff;
+}
+
+.movie-meta {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-top: 0.15rem;
+}
+
+.movie-arrow {
+  color: #94a3b8;
+}
+
+/* Episode Pills Grid */
 .episodes-pills-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 0.5rem;
+  gap: 0.55rem;
   max-height: 280px;
   overflow-y: auto;
   padding-right: 0.3rem;
@@ -661,10 +823,10 @@ function handleToggleWatchlist() {
 .modal-ep-pill {
   position: relative;
   background: #12141c;
-  border: 1px solid #2a3044;
+  border: 1px solid #232838;
   color: #cbd5e1;
-  padding: 0.55rem 0.4rem;
-  border-radius: 6px;
+  padding: 0.6rem 0.4rem;
+  border-radius: 8px;
   text-align: center;
   text-decoration: none;
   transition: all 0.15s ease;
@@ -688,12 +850,12 @@ function handleToggleWatchlist() {
 
 .pill-ep-time {
   font-size: 0.65rem;
-  color: #94a3b8;
+  color: #ff6b72;
   margin-top: 0.1rem;
 }
 
 .modal-ep-pill:hover .pill-ep-time {
-  color: #ffe4e6;
+  color: #fff;
 }
 
 .pill-ep-progress-bar {
@@ -710,27 +872,39 @@ function handleToggleWatchlist() {
   background: #e50914;
 }
 
-/* ================= ARM Badges ================= */
+/* ================= Subtle Database Identifiers Row ================= */
 .arm-badges-wrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.arm-title {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 0.25rem;
 }
 
 .arm-badge {
-  background: #181b26;
-  border: 1px solid #2a3044;
-  color: #94a3b8;
   font-size: 0.72rem;
-  padding: 0.2rem 0.5rem;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.2rem 0.55rem;
   border-radius: 4px;
 }
 
 /* ================= Synopsis ================= */
 .synopsis-box {
   background: #181b26;
-  border: 1px solid #2a3044;
-  border-radius: 12px;
+  border: 1px solid #232838;
+  border-radius: 14px;
   padding: 1.25rem;
 }
 
@@ -752,12 +926,13 @@ function handleToggleWatchlist() {
 .cached-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
   font-size: 0.72rem;
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  padding: 0.2rem 0.5rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
   border-radius: 4px;
 }
 
@@ -765,44 +940,40 @@ function handleToggleWatchlist() {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #cbd5e1;
   background: #12141c;
   border: 1px solid #2a3044;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 600;
   padding: 0.35rem 0.75rem;
   border-radius: 6px;
+  cursor: pointer;
   transition: all 0.2s;
 }
 
 .translate-btn:hover:not(:disabled) {
-  background: #242938;
-  color: #fff;
   border-color: #e50914;
+  color: #fff;
 }
 
 .synopsis-text {
   font-size: 0.88rem;
+  line-height: 1.65;
   color: #cbd5e1;
-  line-height: 1.6;
+  white-space: pre-line;
 }
 
+/* ================= Info Grid ================= */
 .info-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.75rem;
 }
 
-@media (max-width: 640px) {
-  .info-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 .info-card {
   background: #181b26;
-  border: 1px solid #2a3044;
-  border-radius: 8px;
+  border: 1px solid #232838;
+  border-radius: 10px;
   padding: 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
@@ -825,8 +996,8 @@ function handleToggleWatchlist() {
 /* ================= Batch Downloads ================= */
 .batch-downloads-card {
   background: #181b26;
-  border: 1px solid #2a3044;
-  border-radius: 12px;
+  border: 1px solid #232838;
+  border-radius: 14px;
   padding: 1.25rem;
 }
 
@@ -844,7 +1015,7 @@ function handleToggleWatchlist() {
   background: #12141c;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #2a3044;
+  border: 1px solid #232838;
   flex-wrap: wrap;
 }
 
@@ -879,8 +1050,8 @@ function handleToggleWatchlist() {
 /* ================= Trailer ================= */
 .trailer-box {
   background: #181b26;
-  border: 1px solid #2a3044;
-  border-radius: 12px;
+  border: 1px solid #232838;
+  border-radius: 14px;
   padding: 1.25rem;
 }
 
@@ -910,6 +1081,132 @@ function handleToggleWatchlist() {
   display: inline-block;
 }
 
+/* ================= Mobile-First Media Query (< 640px) ================= */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .detail-card {
+    border-radius: 24px 24px 0 0;
+    max-height: 90vh;
+    max-width: 100%;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.9);
+    animation: sheetUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .sheet-drag-pill {
+    display: block;
+    width: 42px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 9999px;
+    margin: 10px auto 4px;
+    position: relative;
+    z-index: 30;
+    cursor: pointer;
+  }
+
+  .modal-close-btn {
+    top: 0.85rem;
+    right: 0.85rem;
+    width: 34px;
+    height: 34px;
+  }
+
+  .detail-banner-wrap {
+    min-height: 250px;
+    height: auto;
+    border-radius: 24px 24px 0 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .detail-banner-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .detail-banner-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(12, 13, 18, 0.1) 0%, rgba(12, 13, 18, 0.7) 45%, #12141c 100%);
+  }
+
+  .detail-banner-content {
+    position: relative;
+    padding-top: 4.8rem;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    margin: 0 1.15rem 1rem;
+    z-index: 10;
+  }
+
+  .detail-title {
+    font-size: 1.25rem;
+    line-height: 1.25;
+    margin-bottom: 0.2rem;
+  }
+
+  .detail-sub {
+    font-size: 0.76rem;
+    margin-bottom: 0.85rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .banner-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+  }
+
+  .play-btn {
+    padding: 0.65rem 0.9rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+
+  .fav-btn {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.82rem;
+    border-radius: 8px;
+  }
+
+  .detail-body {
+    padding: 1.1rem 1.15rem 3rem;
+    gap: 1.2rem;
+  }
+
+  .episodes-selector-section,
+  .synopsis-box,
+  .batch-downloads-card,
+  .trailer-box {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  .info-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.55rem;
+  }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -925,7 +1222,12 @@ function handleToggleWatchlist() {
 }
 
 @keyframes scaleUp {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); opacity: 0.4; }
+  to { transform: translateY(0); opacity: 1; }
 }
 </style>

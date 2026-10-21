@@ -763,9 +763,10 @@ function playSelectedSource() {
     videoEl.addEventListener('canplay', onCanPlay);
 
     const onError = () => {
-      console.warn('Proxy MP4 error, falling back to direct URL:', video.direct_url);
-      if (video.direct_url && videoEl.src !== video.direct_url) {
-        videoEl.src = video.direct_url;
+      console.warn('MP4 playback error, trying alternate stream URL...');
+      const altUrl = (video.direct_url && videoEl.src.includes(video.direct_url)) ? (video.url ? apiUrl(video.url) : null) : video.direct_url;
+      if (altUrl && videoEl.src !== altUrl) {
+        videoEl.src = altUrl;
         videoEl.load();
         videoEl.play().catch(e => {
           showPlayOverlay.value = true;
@@ -778,7 +779,9 @@ function playSelectedSource() {
   }
 
   streamStatusText.value = `Memutar: ${source.title} (${video.quality}p HLS)`;
-  const streamUrl = video.direct_url || apiUrl(video.url);
+  const directHlsUrl = video.direct_url || '';
+  const proxyHlsUrl = video.url ? apiUrl(video.url) : '';
+  let currentHlsUrl = directHlsUrl || proxyHlsUrl;
 
   if (Hls.isSupported()) {
     hlsInstance = new Hls({
@@ -801,7 +804,7 @@ function playSelectedSource() {
       manifestLoadingTimeOut: 20000
     });
 
-    hlsInstance.loadSource(streamUrl);
+    hlsInstance.loadSource(currentHlsUrl);
     hlsInstance.attachMedia(videoEl);
 
     hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -821,10 +824,17 @@ function playSelectedSource() {
       if (data.fatal) {
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            // Switch to direct_url or retry
-            if (video.direct_url && streamUrl !== video.direct_url) {
-              console.log('HLS Network fallback to direct_url:', video.direct_url);
-              hlsInstance.loadSource(video.direct_url);
+            // Failover between direct CDN URL and backend proxy
+            if (proxyHlsUrl && currentHlsUrl !== proxyHlsUrl) {
+              console.log('HLS Network failover to proxy URL:', proxyHlsUrl);
+              currentHlsUrl = proxyHlsUrl;
+              hlsInstance.loadSource(proxyHlsUrl);
+              hlsInstance.startLoad();
+              return;
+            } else if (directHlsUrl && currentHlsUrl !== directHlsUrl) {
+              console.log('HLS Network failover to direct URL:', directHlsUrl);
+              currentHlsUrl = directHlsUrl;
+              hlsInstance.loadSource(directHlsUrl);
               hlsInstance.startLoad();
               return;
             }

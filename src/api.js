@@ -3,15 +3,19 @@
 // Supports Web & Android Native (Capacitor)
 // ==========================================
 
+const ENV_BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) || '';
+
 export function getApiBaseUrl() {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('anipulse_backend_url');
     if (custom) return custom.replace(/\/+$/, '');
     if (window.Capacitor?.isNativePlatform?.()) {
-      return 'http://192.168.1.11:8000';
+      const saved = localStorage.getItem('anipulse_backend_url');
+      if (saved) return saved.replace(/\/+$/, '');
+      return ENV_BACKEND_URL ? ENV_BACKEND_URL.replace(/\/+$/, '') : '';
     }
   }
-  return '';
+  return ENV_BACKEND_URL ? ENV_BACKEND_URL.replace(/\/+$/, '') : '';
 }
 
 export function setBackendUrl(url) {
@@ -704,6 +708,26 @@ export async function adminCreateInvite(targetName, durationType, customDays = n
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || 'Gagal membuat link undangan.');
+  return data;
+}
+
+export async function adminCreateUser(username, password, displayName, durationDays = 30) {
+  const token = getAuthToken();
+  const res = await fetch(apiUrl('/api/admin/create-user'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      username,
+      password,
+      display_name: displayName,
+      duration_days: durationDays
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || 'Gagal membuat akun user.');
   return data;
 }
 

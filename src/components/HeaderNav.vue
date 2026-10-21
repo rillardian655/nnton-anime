@@ -245,7 +245,7 @@ function openAnime(anime) {
   isSearchOpen.value = false;
   searchQuery.value = '';
   searchResults.value = [];
-  emit('openAnimeModal', anime);
+  router.push(`/anime?id=${anime.id}`);
 }
 
 function handleLogout() {

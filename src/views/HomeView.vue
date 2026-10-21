@@ -35,10 +35,10 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               <span>Tonton Sekarang</span>
             </router-link>
-            <button class="btn btn-secondary hero-btn-info" @click="openAnimeModal(anime)">
+            <router-link :to="`/anime?id=${anime.id}`" class="btn btn-secondary hero-btn-info">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               <span>Detail Anime</span>
-            </button>
+            </router-link>
           </div>
         </div>
       </div>
@@ -180,7 +180,7 @@
           v-for="anime in animeList" 
           :key="anime.id" 
           class="anime-card"
-          @click="openAnimeModal(anime)"
+          @click="onCardClick(anime)"
         >
           <div class="poster-wrap">
             <img 
@@ -319,6 +319,18 @@ function getEmptyMessage() {
 
 function openAnimeModal(anime) {
   emit('openAnimeModal', anime);
+}
+
+function onCardClick(anime) {
+  if (currentTab.value === 'history') {
+    navigateToWatch(anime.id, anime.episode || 1);
+  } else {
+    navigateToDetail(anime.id);
+  }
+}
+
+function navigateToDetail(animeId) {
+  router.push(`/anime?id=${animeId}`);
 }
 
 function navigateToWatch(animeId, ep = 1) {

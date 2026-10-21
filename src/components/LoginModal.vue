@@ -108,7 +108,7 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 1300;
   padding: 1rem;
   animation: fadeIn 0.2s ease;
 }

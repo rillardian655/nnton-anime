@@ -58,65 +58,191 @@
           </div>
         </div>
 
-        <!-- Section: Buat Link Undangan Baru -->
+        <!-- Section: Buat Akun & Link Undangan -->
         <div class="admin-card create-invite-section">
-          <div class="card-header-bar">
-            <div class="card-header-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e50914" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-              <h3>Buat Link Undangan Baru (1x Pakai)</h3>
-            </div>
-            <span class="badge-hint">Hanya bisa diklaim 1x oleh penerima</span>
+          <!-- Creation Mode Switcher -->
+          <div class="creation-mode-tabs">
+            <button 
+              type="button"
+              class="mode-tab-btn" 
+              :class="{ active: creationMode === 'invite' }"
+              @click="creationMode = 'invite'"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              <span>Metode 1: Buat Link Undangan (Invite)</span>
+            </button>
+            <button 
+              type="button"
+              class="mode-tab-btn" 
+              :class="{ active: creationMode === 'direct' }"
+              @click="creationMode = 'direct'"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7.5" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+              <span>Metode 2: Buat Akun Langsung (Admin Direct)</span>
+            </button>
           </div>
 
-          <form @submit.prevent="handleCreateInvite" class="create-invite-form">
-            <div class="invite-form-grid">
-              <!-- Nama Penerima -->
-              <div class="form-field">
-                <label for="invTargetName">Nama Penerima / Pemesan:</label>
-                <input 
-                  id="invTargetName" 
-                  v-model="targetName" 
-                  type="text" 
-                  placeholder="Misal: ceta, budi, kawan_kantor..." 
-                  required 
-                />
-                <span class="input-tip">Nama ini akan tercantum di pesan undangan dan mempermudah pelacakan data.</span>
+          <!-- MODE 1: FORM LINK UNDANGAN -->
+          <div v-if="creationMode === 'invite'">
+            <div class="card-header-bar">
+              <div class="card-header-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e50914" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                <h3>Buat Link Undangan Baru (1x Pakai)</h3>
               </div>
-
-              <!-- Durasi Expired -->
-              <div class="form-field">
-                <label for="invDuration">Batas Masa Aktif (Expired):</label>
-                <select id="invDuration" v-model="durationType" class="admin-select">
-                  <option value="1d">1 Hari (24 Jam)</option>
-                  <option value="3d">3 Hari (72 Jam)</option>
-                  <option value="1w">1 Minggu (7 Hari)</option>
-                  <option value="2w">2 Minggu (14 Hari)</option>
-                  <option value="1m">1 Bulan (30 Hari) — Rekomendasi VIP</option>
-                  <option value="custom">Kustom (Isi jumlah hari)</option>
-                </select>
-              </div>
-
-              <!-- Custom Days if selected -->
-              <div class="form-field" v-if="durationType === 'custom'">
-                <label for="invCustomDays">Jumlah Hari Kustom:</label>
-                <input 
-                  id="invCustomDays" 
-                  v-model.number="customDays" 
-                  type="number" 
-                  min="1" 
-                  max="3650" 
-                  placeholder="Contoh: 60" 
-                />
-              </div>
+              <span class="badge-hint">Penerima klik link & buat username/password sendiri</span>
             </div>
 
-            <div class="create-btn-wrap">
-              <button type="submit" class="btn btn-primary btn-generate" :disabled="isCreating">
-                <span v-if="isCreating" class="spinner-small"></span>
-                <span>{{ isCreating ? 'Membuat Link...' : 'Generate Link Undangan VIP (1x Pakai)' }}</span>
-              </button>
+            <form @submit.prevent="handleCreateInvite" class="create-invite-form">
+              <div class="invite-form-grid">
+                <!-- Nama Penerima -->
+                <div class="form-field">
+                  <label for="invTargetName">Nama Penerima / Pemesan:</label>
+                  <input 
+                    id="invTargetName" 
+                    v-model="targetName" 
+                    type="text" 
+                    placeholder="Misal: ceta, budi, kawan_kantor..." 
+                    required 
+                  />
+                  <span class="input-tip">Nama ini akan tercantum di pesan undangan dan mempermudah pelacakan data.</span>
+                </div>
+
+                <!-- Durasi Expired -->
+                <div class="form-field">
+                  <label for="invDuration">Batas Masa Aktif (Expired):</label>
+                  <select id="invDuration" v-model="durationType" class="admin-select">
+                    <option value="1d">1 Hari (24 Jam)</option>
+                    <option value="3d">3 Hari (72 Jam)</option>
+                    <option value="1w">1 Minggu (7 Hari)</option>
+                    <option value="2w">2 Minggu (14 Hari)</option>
+                    <option value="1m">1 Bulan (30 Hari) — Rekomendasi VIP</option>
+                    <option value="custom">Kustom (Isi jumlah hari)</option>
+                  </select>
+                </div>
+
+                <!-- Custom Days if selected -->
+                <div class="form-field" v-if="durationType === 'custom'">
+                  <label for="invCustomDays">Jumlah Hari Kustom:</label>
+                  <input 
+                    id="invCustomDays" 
+                    v-model.number="customDays" 
+                    type="number" 
+                    min="1" 
+                    max="3650" 
+                    placeholder="Contoh: 60" 
+                  />
+                </div>
+              </div>
+
+              <div class="create-btn-wrap">
+                <button type="submit" class="btn btn-primary btn-generate" :disabled="isCreating">
+                  <span v-if="isCreating" class="spinner-small"></span>
+                  <span>{{ isCreating ? 'Membuat Link...' : 'Generate Link Undangan VIP (1x Pakai)' }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- MODE 2: FORM BUAT AKUN LANGSUNG -->
+          <div v-else>
+            <div class="card-header-bar">
+              <div class="card-header-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7.5" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+                <h3>Buat Akun VIP Langsung (Admin Direct)</h3>
+              </div>
+              <span class="badge-hint badge-green">Akun langsung aktif di database tanpa perlu link undangan</span>
             </div>
-          </form>
+
+            <form @submit.prevent="handleCreateDirectUser" class="create-invite-form">
+              <div class="invite-form-grid">
+                <!-- Username -->
+                <div class="form-field">
+                  <label for="dirUsername">Username Pengguna:</label>
+                  <input 
+                    id="dirUsername" 
+                    v-model="directUsername" 
+                    type="text" 
+                    placeholder="Contoh: ceta_anime" 
+                    minlength="3"
+                    required 
+                  />
+                  <span class="input-tip">Huruf kecil, tanpa spasi (min. 3 karakter).</span>
+                </div>
+
+                <!-- Password -->
+                <div class="form-field">
+                  <label for="dirPassword">Password Pengguna:</label>
+                  <input 
+                    id="dirPassword" 
+                    v-model="directPassword" 
+                    type="text" 
+                    placeholder="Contoh: vip12345" 
+                    minlength="6"
+                    required 
+                  />
+                  <span class="input-tip">Minimal 6 karakter.</span>
+                </div>
+
+                <!-- Display Name -->
+                <div class="form-field">
+                  <label for="dirDisplayName">Nama Panggilan / Display Name:</label>
+                  <input 
+                    id="dirDisplayName" 
+                    v-model="directDisplayName" 
+                    type="text" 
+                    placeholder="Contoh: Ceta VIP" 
+                  />
+                </div>
+
+                <!-- Durasi Hari -->
+                <div class="form-field">
+                  <label for="dirDuration">Masa Aktif VIP:</label>
+                  <select id="dirDuration" v-model.number="directDurationDays" class="admin-select">
+                    <option :value="1">1 Hari (Test Akses)</option>
+                    <option :value="7">7 Hari (1 Minggu)</option>
+                    <option :value="30">30 Hari (1 Bulan VIP)</option>
+                    <option :value="90">90 Hari (3 Bulan VIP)</option>
+                    <option :value="365">365 Hari (1 Tahun VIP)</option>
+                    <option :value="3650">LIFETIME ACCESS (Selamanya)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="create-btn-wrap">
+                <button type="submit" class="btn btn-success btn-generate" :disabled="isCreatingDirect">
+                  <span v-if="isCreatingDirect" class="spinner-small"></span>
+                  <span>{{ isCreatingDirect ? 'Membuat Akun...' : '✓ Buat Akun VIP Langsung Sekarang' }}</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Result Direct User Box -->
+            <div v-if="latestDirectUser" class="created-result-card direct-user-result">
+              <div class="created-header">
+                <div class="result-title">
+                  <span class="success-icon">✓</span>
+                  <h4>Akun VIP Berhasil Dibuat & Aktif!</h4>
+                </div>
+                <span class="result-expiry-badge badge-green">{{ latestDirectUser.duration_days >= 3650 ? 'LIFETIME' : `${latestDirectUser.duration_days} Hari` }}</span>
+              </div>
+
+              <div class="account-creds-preview">
+                <div class="cred-item"><strong>Username:</strong> <code>{{ latestDirectUser.username }}</code></div>
+                <div class="cred-item"><strong>Password:</strong> <code>{{ latestDirectUser.plainPassword }}</code></div>
+                <div class="cred-item"><strong>Nama:</strong> <span>{{ latestDirectUser.display_name }}</span></div>
+              </div>
+
+              <div class="wa-message-preview">
+                <div class="wa-header">
+                  <span class="wa-badge">Format Pesan WhatsApp (Siap Kirim ke Teman):</span>
+                  <button class="btn btn-primary btn-sm" @click="copyDirectWaMessage(latestDirectUser)">
+                    {{ copiedDirectWa ? '✓ Pesan Tersalin!' : '📋 Salin Pesan WhatsApp' }}
+                  </button>
+                </div>
+                <pre class="wa-text-box">{{ generateDirectWaText(latestDirectUser) }}</pre>
+              </div>
+            </div>
+          </div>
 
           <!-- Result Generated Box -->
           <div v-if="latestCreatedInvite" class="created-result-card">
@@ -352,6 +478,7 @@ import { ref, computed, onMounted } from 'vue';
 import { isAdmin, showLoginModal } from '../stores/auth.js';
 import { 
   adminCreateInvite, 
+  adminCreateUser,
   adminGetInvites, 
   adminGetUsers, 
   adminExtendUser, 
@@ -361,14 +488,25 @@ import {
   adminGetStats 
 } from '../api.js';
 
+const creationMode = ref('invite'); // 'invite' | 'direct'
+
+// Invite Mode State
 const targetName = ref('');
 const durationType = ref('1m');
 const customDays = ref(30);
 const isCreating = ref(false);
 const latestCreatedInvite = ref(null);
-
 const copiedLink = ref(false);
 const copiedWa = ref(false);
+
+// Direct User Mode State
+const directUsername = ref('');
+const directPassword = ref('');
+const directDisplayName = ref('');
+const directDurationDays = ref(30);
+const isCreatingDirect = ref(false);
+const latestDirectUser = ref(null);
+const copiedDirectWa = ref(false);
 
 const currentTab = ref('invites');
 const inviteSearch = ref('');
@@ -449,6 +587,62 @@ async function copyWaMessage(invite) {
   await navigator.clipboard.writeText(text);
   copiedWa.value = true;
   setTimeout(() => copiedWa.value = false, 2500);
+}
+
+async function handleCreateDirectUser() {
+  if (!directUsername.value.trim() || !directPassword.value.trim()) return;
+  isCreatingDirect.value = true;
+  copiedDirectWa.value = false;
+  try {
+    const res = await adminCreateUser(
+      directUsername.value.trim(),
+      directPassword.value.trim(),
+      directDisplayName.value.trim(),
+      directDurationDays.value
+    );
+    if (res.success && res.user) {
+      latestDirectUser.value = {
+        ...res.user,
+        plainPassword: directPassword.value.trim()
+      };
+      directUsername.value = '';
+      directPassword.value = '';
+      directDisplayName.value = '';
+      await fetchData();
+    }
+  } catch (err) {
+    alert('Gagal membuat akun: ' + err.message);
+  } finally {
+    isCreatingDirect.value = false;
+  }
+}
+
+function generateDirectWaText(user) {
+  const origin = window.location.origin;
+  const name = user.display_name || user.username;
+  const days = user.duration_days >= 3650 ? 'LIFETIME ACCESS (Selamanya)' : `${user.duration_days} Hari`;
+
+  return `Halo ${name}! 🎉
+
+Akun VIP AniPulse kamu sudah berhasil dibuat dan langsung AKTIF:
+🌐 Akses Aplikasi: ${origin}
+👤 Username: ${user.username}
+🔑 Password: ${user.plainPassword}
+⏳ Masa Aktif: ${days}
+
+Cara masuk:
+1. Buka aplikasi AniPulse di link di atas
+2. Klik tombol "Masuk Akun" di menu atau footer
+3. Masukkan Username & Password di atas
+
+Selamat menonton anime favorit subtitle Indonesia tanpa iklan! 🍿✨`;
+}
+
+async function copyDirectWaMessage(user) {
+  const text = generateDirectWaText(user);
+  await navigator.clipboard.writeText(text);
+  copiedDirectWa.value = true;
+  setTimeout(() => copiedDirectWa.value = false, 2500);
 }
 
 async function handleExtendUser(username, days) {
@@ -648,6 +842,96 @@ onMounted(() => {
   margin-bottom: 1.8rem;
 }
 
+/* Creation Mode Switcher Tabs */
+.creation-mode-tabs {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #1e2230;
+  padding-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.mode-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: #0d0f17;
+  border: 1px solid #232838;
+  color: #94a3b8;
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-tab-btn:hover {
+  background: #161a26;
+  color: #fff;
+  border-color: #3b435c;
+}
+
+.mode-tab-btn.active {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: #e50914;
+  color: #ffffff;
+}
+
+.mode-tab-btn.active:last-child {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+  color: #4ade80;
+}
+
+.btn-success {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-success:hover {
+  background: #15803d;
+}
+
+.badge-green {
+  background: rgba(34, 197, 94, 0.15) !important;
+  color: #4ade80 !important;
+  border-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+/* Account Creds Box */
+.account-creds-preview {
+  display: flex;
+  gap: 1.5rem;
+  background: #090a0f;
+  border: 1px solid #1e2332;
+  border-radius: 10px;
+  padding: 0.85rem 1.2rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.cred-item {
+  font-size: 0.88rem;
+  color: #cbd5e1;
+}
+
+.cred-item strong {
+  color: #94a3b8;
+  margin-right: 0.35rem;
+}
+
+.cred-item code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #4ade80;
+  font-weight: 700;
+}
+
 .card-header-bar {
   display: flex;
   align-items: center;
@@ -678,7 +962,7 @@ onMounted(() => {
 
 .invite-form-grid {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   align-items: flex-start;
 }

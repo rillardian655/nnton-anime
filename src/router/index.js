@@ -3,12 +3,23 @@ import HomeView from '../views/HomeView.vue';
 import WatchView from '../views/WatchView.vue';
 import AdminView from '../views/AdminView.vue';
 import InviteView from '../views/InviteView.vue';
+import AnimeDetailView from '../views/AnimeDetailView.vue';
 
 const routes = [
   {
     path: '/',
     name: 'home',
     component: HomeView
+  },
+  {
+    path: '/anime',
+    name: 'anime-detail',
+    component: AnimeDetailView
+  },
+  {
+    path: '/anime/:id',
+    name: 'anime-detail-id',
+    component: AnimeDetailView
   },
   {
     path: '/watch',
@@ -26,12 +37,8 @@ const routes = [
     component: InviteView
   },
   {
-    path: '/anime',
-    redirect: to => ({ path: '/watch', query: to.query })
-  },
-  {
     path: '/anime.html',
-    redirect: to => ({ path: '/watch', query: to.query })
+    redirect: to => ({ path: '/anime', query: to.query })
   },
   {
     path: '/watch.html',

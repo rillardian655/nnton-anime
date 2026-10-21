@@ -738,10 +738,10 @@ async def proxy_hls_manifest(request: Request, url: str = Query(...)):
                 # Resolve relative to base_url
                 full_item_url = urllib.parse.urljoin(base_url, s_line)
                 if ".m3u8" in s_line:
-                    rewritten_line = f"/api/hls/manifest?url={urllib.parse.quote(full_item_url)}"
+                    rewritten_line = f"manifest?url={urllib.parse.quote(full_item_url)}"
                 else:
                     segment_urls.append(full_item_url)
-                    rewritten_line = f"/api/hls/segment?url={urllib.parse.quote(full_item_url)}"
+                    rewritten_line = f"segment?url={urllib.parse.quote(full_item_url)}"
                 rewritten_lines.append(rewritten_line)
             else:
                 rewritten_lines.append(line)
@@ -1519,6 +1519,58 @@ def admin_get_invites(admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/admin/create-user")
+async def admin_create_user(req: Request, admin: dict = Depends(require_admin)):
+    """Directly create a new user account by Admin (without invite code)"""
+    data = await req.json()
+    username = data.get("username", "").strip().lower()
+    password = data.get("password", "").strip()
+    display_name = data.get("display_name", "").strip() or username
+    duration_days = int(data.get("duration_days", 30))
+
+    if not username or len(username) < 3:
+        raise HTTPException(status_code=400, detail="Username minimal 3 karakter.")
+    if not password or len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password minimal 6 karakter.")
+
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Username sudah digunakan. Pilih username lain.")
+
+            pw_hash = hash_password(password)
+            now = datetime.now()
+            if duration_days <= 0 or duration_days >= 3650:
+                expires_at = datetime(2099, 12, 31, 23, 59, 59)
+            else:
+                expires_at = now + timedelta(days=duration_days)
+
+            cursor.execute("""
+            INSERT INTO users (username, password_hash, display_name, role, invite_code, created_at, expires_at, is_active)
+            VALUES (?, ?, ?, 'user', 'DIRECT_ADMIN', ?, ?, 1)
+            """, (username, pw_hash, display_name, now.isoformat(), expires_at.isoformat()))
+            conn.commit()
+
+            return {
+                "success": True,
+                "message": f"Akun {username} berhasil dibuat langsung!",
+                "user": {
+                    "username": username,
+                    "display_name": display_name,
+                    "role": "user",
+                    "expires_at": expires_at.isoformat(),
+                    "duration_days": duration_days
+                }
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Admin create user error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/admin/users")
 def admin_get_users(admin: dict = Depends(require_admin)):
     """Get all registered VIP users with expiry countdown"""
@@ -1762,3 +1814,7 @@ async def proxy_image(request: Request, url: str = Query(...)):
         }
     )
 
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
