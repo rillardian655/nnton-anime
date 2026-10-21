@@ -46,7 +46,7 @@ jobs:
       - name: 🔨 Compile Android Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          ./gradlew assembleDebug --stacktrace --info --no-daemon
 
       - name: 🏷️ Prepare APK for Download
         run: |
