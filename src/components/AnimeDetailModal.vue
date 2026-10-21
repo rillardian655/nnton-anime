@@ -18,6 +18,7 @@
           :src="getSafeImageUrl(anime.bannerImage || anime.coverImage?.extraLarge || anime.coverImage?.large)" 
           :alt="anime.title?.romaji" 
           class="detail-banner-img" 
+          @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
         />
         <div class="detail-banner-gradient"></div>
 
@@ -25,9 +26,9 @@
           <div class="badge-row">
             <span class="score-badge" v-if="anime.averageScore">★ {{ (anime.averageScore / 10).toFixed(1) }}</span>
             <span class="format-badge">{{ anime.format || 'TV' }}</span>
-            <span class="status-badge" :class="{ 'status-releasing': anime.status === 'RELEASING' }">
+            <span class="status-badge" :class="{ 'status-releasing': isAiring }">
               <span class="status-dot"></span>
-              {{ anime.status === 'RELEASING' ? 'Sedang Rilis' : 'Tamat' }}
+              {{ isAiring ? 'Sedang Tayang' : 'Tamat' }}
             </span>
             <span class="year-badge" v-if="anime.seasonYear">{{ anime.seasonYear }}</span>
           </div>
@@ -228,6 +229,8 @@ import {
   translateSynopsis, 
   searchKusonime, 
   getKusonimeDownloads,
+  getEffectiveEpisodeCount,
+  isAiringStatus,
   apiUrl 
 } from '../api.js';
 import { 
@@ -247,13 +250,16 @@ const props = defineProps({
 const emit = defineEmits(['close']);
 const router = useRouter();
 
+const isAiring = computed(() => isAiringStatus(props.anime));
+
 function handlePlayClick(ep = 1) {
   if (!isAuthenticated.value) {
     showLoginModal.value = true;
     return;
   }
   emit('close');
-  router.push(`/watch?id=${props.anime?.id}&ep=${ep}`);
+  const title = encodeURIComponent(props.anime?.title?.english || props.anime?.title?.romaji || '');
+  router.push(`/watch?id=${props.anime?.id}&ep=${ep}&title=${title}`);
 }
 
 const originalSynopsis = ref('');
@@ -304,22 +310,20 @@ function stripHtml(html) {
 }
 
 function computeEpisodeCount(details) {
-  let count = 1;
   airingNotice.value = '';
+  const airing = isAiringStatus(details);
+  const count = getEffectiveEpisodeCount(details);
 
-  if (details.status === 'RELEASING') {
+  if (airing) {
     if (details.nextAiringEpisode && details.nextAiringEpisode.episode) {
-      count = Math.max(1, details.nextAiringEpisode.episode - 1);
       const hours = Math.floor(details.nextAiringEpisode.timeUntilAiring / 3600);
       const days = Math.floor(hours / 24);
       const remHours = hours % 24;
       const timeStr = days > 0 ? `${days} hari ${remHours} jam` : `${hours} jam`;
       airingNotice.value = `Episode ${details.nextAiringEpisode.episode} rilis dalam ${timeStr}`;
-    } else if (details.episodes) {
-      count = details.episodes;
+    } else {
+      airingNotice.value = `Episode ${count + 1} tayang sesuai jadwal`;
     }
-  } else {
-    count = details.episodes || 12;
   }
 
   totalEpisodes.value = count;

@@ -2033,26 +2033,26 @@ def generate_default_weekly_schedule():
     catalog = {
         "Senin": [
             {
-                "id": 159322, "title": {"romaji": "Bleach: Sennen Kessen-hen - Soukoku-tan", "english": "Bleach: Thousand-Year Blood War - The Conflict"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx159322-gYn0r5qf7d3O.jpg"},
-                "genres": ["Action", "Adventure", "Supernatural"], "averageScore": 87, "currentEpisode": 4, "timeText": "23:00",
+                "id": 159322, "title": {"romaji": "BLEACH: Sennen Kessen-hen - Soukoku-tan", "english": "Bleach: Thousand-Year Blood War"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg"},
+                "genres": ["Action", "Adventure", "Supernatural"], "averageScore": 87, "currentEpisode": 3, "timeText": "23:00",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
-                "id": 144576, "title": {"romaji": "Kami no Tou: Ouji no Kikan", "english": "Tower of God Season 2: Return of the Prince"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx144576-R41iRjXUo7T7.jpg"},
+                "id": 144576, "title": {"romaji": "Kami no Tou: Ouji no Kikan", "english": "Tower of God Season 2"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/42765/medium.jpg"},
                 "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 74, "currentEpisode": 16, "timeText": "22:00",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 178550, "title": {"romaji": "Natsume Yuujinchou Shichi", "english": "Natsume's Book of Friends Season 7"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx178550-s6xVn3N2yQ4j.jpg"},
-                "genres": ["Drama", "Slice of Life", "Supernatural"], "averageScore": 86, "currentEpisode": 4, "timeText": "23:30",
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46474/medium.jpg"},
+                "genres": ["Drama", "Slice of Life"], "averageScore": 86, "currentEpisode": 3, "timeText": "23:30",
                 "category": "upcoming", "statusLabel": "Menunggu Update Baru"
             },
             {
                 "id": 166240, "title": {"romaji": "Boku no Kokoro no Yabai Yatsu Season 2", "english": "The Dangers in My Heart Season 2"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx166240-hU873w1sO8L3.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45233/medium.jpg"},
                 "genres": ["Comedy", "Romance"], "averageScore": 88, "episodes": 13, "timeText": "Selesai",
                 "category": "finished", "statusLabel": "Tamat (7 hari lalu)"
             }
@@ -2060,99 +2060,99 @@ def generate_default_weekly_schedule():
         "Selasa": [
             {
                 "id": 171018, "title": {"romaji": "Dandadan", "english": "DAN DA DAN"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171018-b2xN3aUfGq7b.jpg"},
-                "genres": ["Action", "Comedy", "Supernatural"], "averageScore": 86, "currentEpisode": 4, "timeText": "23:00",
+                "coverImage": {"large": "https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg"},
+                "genres": ["Action", "Comedy", "Supernatural", "Sci-Fi"], "averageScore": 87, "currentEpisode": 3, "timeText": "23:00",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 170942, "title": {"romaji": "Ao no Hako", "english": "Blue Box"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx170942-rE7Msn6b5u1j.jpg"},
-                "genres": ["Romance", "Sports"], "averageScore": 82, "currentEpisode": 4, "timeText": "22:30",
+                "coverImage": {"large": "https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg"},
+                "genres": ["Romance", "Sports", "Slice of Life"], "averageScore": 82, "currentEpisode": 3, "timeText": "22:30",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 180104, "title": {"romaji": "NegaPosi Angler", "english": "Negative Positive Angler"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx180104-eD7f1h4B7k6a.jpg"},
-                "genres": ["Drama", "Slice of Life"], "averageScore": 71, "currentEpisode": 4, "timeText": "21:00",
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45974/medium.jpg"},
+                "genres": ["Drama", "Slice of Life"], "averageScore": 71, "currentEpisode": 3, "timeText": "21:00",
                 "category": "upcoming", "statusLabel": "Menunggu Update Baru"
             }
         ],
         "Rabu": [
             {
                 "id": 163134, "title": {"romaji": "Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season", "english": "Re:ZERO Season 3"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx163134-Z2sR4vC8y8Q1.jpg"},
-                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 85, "currentEpisode": 4, "timeText": "21:30",
+                "coverImage": {"large": "https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg"},
+                "genres": ["Action", "Adventure", "Drama", "Fantasy"], "averageScore": 85, "currentEpisode": 4, "timeText": "21:30",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 170947, "title": {"romaji": "Dragon Ball DAIMA", "english": "Dragon Ball DAIMA"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx170947-fL2m9n3p7Q8r.jpg"},
-                "genres": ["Action", "Adventure", "Comedy"], "averageScore": 78, "currentEpisode": 3, "timeText": "22:45",
+                "coverImage": {"large": "https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg"},
+                "genres": ["Action", "Adventure", "Comedy"], "averageScore": 78, "currentEpisode": 2, "timeText": "22:45",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 176166, "title": {"romaji": "Seirei Gensouki 2", "english": "Spirit Chronicles Season 2"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx176166-m4P2k9xR6b5y.jpg"},
-                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 69, "currentEpisode": 4, "timeText": "23:30",
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/43806/medium.jpg"},
+                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 69, "currentEpisode": 3, "timeText": "23:30",
                 "category": "upcoming", "statusLabel": "Menunggu Update Baru"
             }
         ],
         "Kamis": [
             {
                 "id": 169829, "title": {"romaji": "Rurouni Kenshin: Kyoto Douran", "english": "Rurouni Kenshin: Kyoto Disturbance"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx169829-x7M2n9p4Q8v1.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/41370/medium.jpg"},
                 "genres": ["Action", "Adventure", "Drama"], "averageScore": 80, "currentEpisode": 3, "timeText": "23:55",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 173599, "title": {"romaji": "Trillion Game", "english": "Trillion Game"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx173599-L4p7m2x9q1r6.jpg"},
-                "genres": ["Drama"], "averageScore": 75, "currentEpisode": 4, "timeText": "23:00",
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46282/medium.jpg"},
+                "genres": ["Drama"], "averageScore": 75, "currentEpisode": 3, "timeText": "23:00",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 171617, "title": {"romaji": "Hoshifuru Oukoku no Nina", "english": "Nina the Starry Bride"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171617-z5R2m8q4P1y7.jpg"},
-                "genres": ["Drama", "Fantasy", "Romance"], "averageScore": 74, "currentEpisode": 4, "timeText": "21:00",
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46474/medium.jpg"},
+                "genres": ["Drama", "Fantasy", "Romance"], "averageScore": 74, "currentEpisode": 3, "timeText": "21:00",
                 "category": "upcoming", "statusLabel": "Menunggu Update Baru"
             }
         ],
         "Jumat": [
             {
                 "id": 168499, "title": {"romaji": "Sword Art Online Alternative: Gun Gale Online II", "english": "Sword Art Online Alternative: Gun Gale Online II"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx168499-N8m2x5P7q1r4.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/43806/medium.jpg"},
                 "genres": ["Action", "Sci-Fi"], "averageScore": 77, "currentEpisode": 3, "timeText": "22:30",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 169823, "title": {"romaji": "DanMachi V: Houjou no Megami-hen", "english": "Is It Wrong to Try to Pick Up Girls in a Dungeon? V"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx169823-R2p7m5x9q4y1.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/41370/medium.jpg"},
                 "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 82, "currentEpisode": 3, "timeText": "21:00",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 178553, "title": {"romaji": "Sayounara Ryuusei, Konnichiwa Jinsei", "english": "Good Bye, Dragon Life"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx178553-x9M4p2q7y1r6.jpg"},
-                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 66, "currentEpisode": 4, "timeText": "20:30",
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45974/medium.jpg"},
+                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 66, "currentEpisode": 3, "timeText": "20:30",
                 "category": "upcoming", "statusLabel": "Menunggu Update Baru"
             }
         ],
         "Sabtu": [
             {
                 "id": 163270, "title": {"romaji": "BLUE LOCK VS. U-20 JAPAN", "english": "BLUELOCK Season 2"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx163270-b7M2p4q9y1x6.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg"},
                 "genres": ["Action", "Drama", "Sports"], "averageScore": 79, "currentEpisode": 3, "timeText": "22:00",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 178551, "title": {"romaji": "Ranma 1/2 (2024)", "english": "Ranma 1/2 (2024)"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx178551-q7M2p9x4y1r5.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg"},
                 "genres": ["Action", "Comedy", "Martial Arts", "Romance"], "averageScore": 81, "currentEpisode": 3, "timeText": "23:55",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 173517, "title": {"romaji": "Shangri-La Frontier 2nd Season", "english": "Shangri-La Frontier Season 2"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx173517-m9P2q7y4x1r6.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46282/medium.jpg"},
                 "genres": ["Action", "Adventure", "Comedy"], "averageScore": 83, "currentEpisode": 3, "timeText": "16:00",
                 "category": "upcoming", "statusLabel": "Menunggu Update Baru"
             }
@@ -2160,20 +2160,20 @@ def generate_default_weekly_schedule():
         "Minggu": [
             {
                 "id": 21, "title": {"romaji": "ONE PIECE", "english": "One Piece"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx21-YCDoj1EkAxFn.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/12/medium.jpg"},
                 "genres": ["Action", "Adventure", "Comedy", "Fantasy"], "averageScore": 88, "currentEpisode": 1122, "timeText": "08:30",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
                 "id": 177439, "title": {"romaji": "Chi. -Chikyuu no Undou ni Tsuite-", "english": "Orb: On the Movements of the Earth"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx177439-p2M7q9x4y1r6.jpg"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46474/medium.jpg"},
                 "genres": ["Drama", "Historical", "Supernatural"], "averageScore": 85, "currentEpisode": 4, "timeText": "22:45",
                 "category": "airing", "statusLabel": "Sudah Tayang"
             },
             {
-                "id": 177265, "title": {"romaji": "Tensei Kizoku, Kantei Skill de Nariagaru 2", "english": "As a Reincarnated Aristocrat, I'll Use My Appraisal Skill Season 2"},
-                "coverImage": {"large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx177265-x4M9p2q7y1r6.jpg"},
-                "genres": ["Adventure", "Fantasy"], "averageScore": 73, "currentEpisode": 4, "timeText": "22:00",
+                "id": 177265, "title": {"romaji": "Tensei Kizoku, Kantei Skill de Nariagaru 2", "english": "As a Reincarnated Aristocrat Season 2"},
+                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45974/medium.jpg"},
+                "genres": ["Adventure", "Fantasy"], "averageScore": 73, "currentEpisode": 3, "timeText": "22:00",
                 "category": "upcoming", "statusLabel": "Menunggu Update Baru"
             }
         ]

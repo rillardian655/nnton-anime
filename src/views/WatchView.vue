@@ -12,19 +12,8 @@
 
       <!-- Video Player Viewport -->
       <div class="theater-player-box" id="theaterBox">
-        <!-- Embed Stream Player (MultiEmbed / 2Embed / VidSrc failover) -->
-        <iframe 
-          v-if="activeEmbedUrl && isAuthenticated"
-          :src="activeEmbedUrl" 
-          class="native-hls-player native-embed-iframe"
-          frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen
-        ></iframe>
-
-        <!-- Direct HLS / MP4 Player (Kodik / AniLibria streams) -->
+        <!-- Direct HLS / MP4 Player (Single Native Player - Kodik / AniLibria) -->
         <video 
-          v-show="!activeEmbedUrl"
           ref="videoRef" 
           class="native-hls-player" 
           controls 
@@ -166,26 +155,20 @@
 
       <!-- Versi (Server / Audio Dub) & Stream Settings Row (Matches Miru screenshot) -->
       <div class="theater-version-container">
-        <div class="version-item">
-          <label class="version-label">Versi</label>
+        <div class="version-item" v-if="currentSources.length > 0">
+          <label class="version-label">Audio / Sub</label>
           <div class="version-select-box">
             <select 
               v-model="selectedSourceIndex" 
               @change="switchSource(selectedSourceIndex)" 
               class="version-native-select"
             >
-              <option v-if="isLoadingStream && currentSources.length === 0" disabled :value="0">
-                Memuat server stream...
-              </option>
-              <option v-else-if="currentSources.length === 0" disabled :value="0">
-                Server tidak tersedia
-              </option>
               <option 
                 v-for="(src, idx) in currentSources" 
                 :key="idx" 
                 :value="idx"
               >
-                {{ src.title || (src.is_subtitles_original ? 'Kodik (Sub Original)' : `Server ${idx + 1}`) }}
+                {{ src.title || (src.is_subtitles_original ? 'Sub Original (Kazoku / AniLibria)' : `Audio Track ${idx + 1}`) }}
               </option>
             </select>
             <div class="version-chevron">
@@ -441,7 +424,9 @@ import {
   getKusonimeDownloads,
   apiUrl,
   getAuthToken,
-  safeFetchJson
+  safeFetchJson,
+  getEffectiveEpisodeCount,
+  isAiringStatus
 } from '../api.js';
 import { 
   isAuthenticated, 
@@ -527,7 +512,6 @@ function skipOpening(isAuto = false) {
 
 const currentSources = ref([]);
 const selectedSourceIndex = ref(0);
-const activeEmbedUrl = ref('');
 const selectedQuality = ref(720);
 const availableVideos = ref([]);
 const subtitlesList = ref([]);
@@ -602,23 +586,20 @@ function stripHtml(html) {
 
 // ---------------- Episode Count Logic ----------------
 function computeEpisodeCount(details) {
-  let count = 1;
   airingNotice.value = '';
+  const isAiring = isAiringStatus(details);
+  const count = getEffectiveEpisodeCount(details);
 
-  if (details.status === 'RELEASING') {
+  if (isAiring) {
     if (details.nextAiringEpisode && details.nextAiringEpisode.episode) {
-      count = Math.max(1, details.nextAiringEpisode.episode - 1);
-
       const hours = Math.floor(details.nextAiringEpisode.timeUntilAiring / 3600);
       const days = Math.floor(hours / 24);
       const remHours = hours % 24;
       const timeStr = days > 0 ? `${days} hari ${remHours} jam` : `${hours} jam`;
       airingNotice.value = `Episode ${details.nextAiringEpisode.episode} rilis dalam ${timeStr}`;
-    } else if (details.episodes) {
-      count = details.episodes;
+    } else {
+      airingNotice.value = `Episode ${count + 1} tayang sesuai jadwal resmi`;
     }
-  } else {
-    count = details.episodes || 12;
   }
 
   totalEpisodes.value = count;
@@ -643,7 +624,7 @@ async function fetchYummyEpisodes(details) {
 
       if (validEps.length > 0) {
         validEps.sort((a, b) => a.num - b.num);
-        if (details.status === 'RELEASING' && totalEpisodes.value > 0) {
+        if (isAiringStatus(details) && totalEpisodes.value > 0) {
           validEps = validEps.filter(e => e.num <= totalEpisodes.value);
         }
         if (validEps.length > 0) {
@@ -653,7 +634,7 @@ async function fetchYummyEpisodes(details) {
       }
     }
   } catch (err) {
-    console.warn('Yummy episodes fallback:', err);
+    console.warn('Yummy episodes notice:', err);
   }
 }
 
@@ -668,28 +649,34 @@ async function initWatch() {
     return;
   }
 
+  const queryTitle = route.query.title ? decodeURIComponent(route.query.title) : '';
+  if (queryTitle) {
+    anime.value = {
+      id: animeId,
+      title: { english: queryTitle, romaji: queryTitle },
+      status: 'RELEASING'
+    };
+    computeEpisodeCount(anime.value);
+    document.title = `${queryTitle} — Episode ${ep} | AniPulse Theater`;
+    if (isAuthenticated.value) {
+      loadEpisodeStream(ep);
+    }
+  }
+
   try {
     const details = await getAnimeDetails(animeId);
     anime.value = details;
     originalSynopsis.value = stripHtml(details.description || '');
     isFav.value = isFavorite(details.id);
 
-    // Document title
-    document.title = `${details.title?.english || details.title?.romaji} — Episode ${ep} | AniPulse Theater`;
+    document.title = `${details.title?.english || details.title?.romaji || 'Anime'} — Episode ${ep} | AniPulse Theater`;
 
-    // 1. Accurate Episode Count
     computeEpisodeCount(details);
-
-    // 2. Immediate History Record
     saveHistory(details, ep, 0, 0);
 
-    // 3. Query YummyAnime episodes in background
     fetchYummyEpisodes(details);
-
-    // 4. Fetch ARM Mapping
     fetchArmMapping(details.id);
 
-    // 5. Fetch persistent SQLite translation (or auto-translate in background)
     lookupTranslation(animeId).then(async (res) => {
       if (res.found && res.translation) {
         indonesianSynopsis.value = res.translation;
@@ -707,46 +694,21 @@ async function initWatch() {
       }
     });
 
-    // 6. Fetch Kusonime Batch Downloads
     fetchKusonime(details);
 
-    // 7. Load Episode Stream (Only if authenticated)
-    if (isAuthenticated.value) {
+    if (!queryTitle && isAuthenticated.value) {
       loadEpisodeStream(ep);
-    } else {
+    } else if (!isAuthenticated.value) {
       isLoadingStream.value = false;
       showLoginModal.value = true;
     }
 
   } catch (err) {
-    console.error('Failed to init watch:', err);
-    loadingMessage.value = 'Gagal memuat anime: ' + err.message;
-    isLoadingStream.value = false;
-  }
-}
-
-function getBackupEmbedSources(animeObj, ep) {
-  const animeId = animeObj?.id || '';
-  return [
-    {
-      title: 'Server MultiEmbed (HD Multi-Sub)',
-      type: 'embed',
-      is_subtitles_original: true,
-      embed_url: `https://multiembed.mov/?video_id=${animeId}&anime=1&s=1&e=${ep}`
-    },
-    {
-      title: 'Server 2Embed (Cadangan)',
-      type: 'embed',
-      is_subtitles_original: false,
-      embed_url: `https://www.2embed.cc/embed/anime/${animeId}/${ep}`
-    },
-    {
-      title: 'Server VidSrc (Cloud Player)',
-      type: 'embed',
-      is_subtitles_original: false,
-      embed_url: `https://vidsrc.me/embed/anime?id=${animeId}&ep=${ep}`
+    console.warn('initWatch notice:', err);
+    if (!queryTitle && isAuthenticated.value) {
+      loadEpisodeStream(ep);
     }
-  ];
+  }
 }
 
 async function loadEpisodeStream(ep) {
@@ -763,21 +725,19 @@ async function loadEpisodeStream(ep) {
   loadingMessage.value = `Menghubungkan ke server stream (Episode ${ep})...`;
   streamStatusText.value = `Menghubungkan ke server stream (Episode ${ep})...`;
 
-  const title = anime.value?.title?.english || anime.value?.title?.romaji || '';
-  const altTitle = anime.value?.title?.romaji || '';
-  const backupSources = getBackupEmbedSources(anime.value, ep);
+  const queryTitle = route.query.title ? decodeURIComponent(route.query.title) : '';
+  const title = anime.value?.title?.english || anime.value?.title?.romaji || queryTitle || '';
+  const altTitle = anime.value?.title?.romaji || queryTitle || '';
 
   try {
-    // 1. Fetch Subtitles in parallel
     fetchSubtitles(title, altTitle, ep);
 
-    // 2. Fetch Streams with auth token
     const token = getAuthToken();
     const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
     const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     let res = null;
     try {
@@ -786,7 +746,7 @@ async function loadEpisodeStream(ep) {
         signal: controller.signal
       });
     } catch (netErr) {
-      console.warn('Backend fetch timeout/error, using embed failover:', netErr.message);
+      console.warn('Stream API fetch error:', netErr.message);
     } finally {
       clearTimeout(timeoutId);
     }
@@ -799,7 +759,6 @@ async function loadEpisodeStream(ep) {
       }
     }
 
-    // Fallback to Romaji title explicitly if empty
     if (dataSources.length === 0 && altTitle && altTitle !== title) {
       try {
         const altRes = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
@@ -814,13 +773,18 @@ async function loadEpisodeStream(ep) {
       } catch (_) {}
     }
 
-    // Combine backend HLS sources with backup embed sources
-    const mergedSources = [...dataSources, ...backupSources];
-    currentSources.value = mergedSources;
+    if (dataSources.length === 0) {
+      currentSources.value = [];
+      loadingMessage.value = `Stream belum tersedia untuk Episode ${ep}. Silakan pilih episode lain atau coba beberapa saat lagi.`;
+      streamStatusText.value = 'Stream belum tersedia';
+      isLoadingStream.value = false;
+      return;
+    }
+
+    currentSources.value = dataSources;
     selectedSourceIndex.value = 0;
 
-    // Prefer original Japanese sub audio track
-    const subIdx = mergedSources.findIndex(s => s.is_subtitles_original);
+    const subIdx = dataSources.findIndex(s => s.is_subtitles_original);
     if (subIdx !== -1) {
       selectedSourceIndex.value = subIdx;
     }
@@ -828,10 +792,10 @@ async function loadEpisodeStream(ep) {
     playSelectedSource();
 
   } catch (err) {
-    console.warn('Stream load error, activating fallback embed servers:', err);
-    currentSources.value = backupSources;
-    selectedSourceIndex.value = 0;
-    playSelectedSource();
+    console.warn('Stream load error:', err);
+    currentSources.value = [];
+    loadingMessage.value = `Gagal memuat stream Episode ${ep}: ${err.message}`;
+    isLoadingStream.value = false;
   }
 }
 
@@ -843,45 +807,20 @@ function playSelectedSource() {
     return;
   }
 
-  // Destroy previous HLS instance if any
   if (hlsInstance) {
     hlsInstance.destroy();
     hlsInstance = null;
   }
   clearTimeout(safetyTimer);
 
-  // If source is an iframe embed player
-  if (source.type === 'embed' || source.embed_url) {
-    const videoEl = videoRef.value;
-    if (videoEl) {
-      videoEl.pause();
-      videoEl.removeAttribute('src');
-    }
-    activeEmbedUrl.value = source.embed_url;
-    availableVideos.value = [];
-    isLoadingStream.value = false;
-    showPlayOverlay.value = false;
-    streamStatusText.value = `Memutar: ${source.title}`;
-    return;
-  }
-
-  // Direct HLS / MP4 playback
-  activeEmbedUrl.value = '';
   if (!source.videos || source.videos.length === 0) {
-    const firstEmbed = currentSources.value.find(s => s.embed_url);
-    if (firstEmbed) {
-      activeEmbedUrl.value = firstEmbed.embed_url;
-      streamStatusText.value = `Memutar: ${firstEmbed.title}`;
-    } else {
-      loadingMessage.value = 'Video tidak tersedia untuk server ini.';
-    }
+    loadingMessage.value = 'Video tidak tersedia untuk server ini.';
     isLoadingStream.value = false;
     return;
   }
 
   availableVideos.value = source.videos;
 
-  // Match quality
   let video = source.videos.find(v => Number(v.quality) === selectedQuality.value);
   if (!video) {
     video = source.videos[0];

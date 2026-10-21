@@ -120,6 +120,7 @@
                 :src="getSafeImageUrl(anime.coverImage?.large || anime.coverImage?.extraLarge)" 
                 :alt="anime.title?.english || anime.title?.romaji" 
                 loading="lazy" 
+                @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
               />
             </div>
 
@@ -207,7 +208,8 @@ function handlePlayClick(anime) {
     showLoginModal.value = true;
     return;
   }
-  router.push(`/watch?id=${anime.id}&ep=${anime.currentEpisode || 1}`);
+  const title = encodeURIComponent(anime.title?.english || anime.title?.romaji || '');
+  router.push(`/watch?id=${anime.id}&ep=${anime.currentEpisode || 1}&title=${title}`);
 }
 
 const emit = defineEmits(['openAnimeModal']);

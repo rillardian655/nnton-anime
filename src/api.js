@@ -65,6 +65,88 @@ export async function safeFetchJson(res, context = 'Permintaan') {
   }
 }
 
+export const KNOWN_AIRING_EPISODES = {
+  'aonohako': 3,
+  'bluebox': 3,
+  'dandadan': 3,
+  'dragonballdaima': 2,
+  'daima': 2,
+  'rezero': 4,
+  'rezerokarahajimeruisekaiseikatsu3rdseason': 4,
+  'rezeroseason3': 4,
+  'bleachsennenkessenhensokokutan': 3,
+  'bleachthousandyearbloodwar': 3,
+  'bluelock': 3,
+  'bluelockvsu20japan': 3,
+  'bluelockseason2': 3,
+  'ranma12': 3,
+  'ranma122024': 3,
+  'negaposiangler': 3,
+  'negativepositiveangler': 3,
+  'rurounikenshin': 3,
+  'rurounikenshinkyotodouran': 3,
+  'hoshifuruoukokunonina': 3,
+  'ninathestarrybride': 3,
+  'swordartonlinealternativegungaleonlineii': 3,
+  'gungaleonlineii': 3,
+  'danmachiv': 3,
+  'danmachivhoujounomegamihen': 3,
+  'sayounararyuuseikonnichiwajinsei': 3,
+  'goodbyedragonlife': 3,
+  'shangrilafrontier': 3,
+  'shangrilafrontier2ndseason': 3,
+  'chichikyuunoundounitsuite': 4,
+  'orbonthemovementsoftheearth': 4,
+  'tenprogoku': 3,
+  'tensekizokukanteiskilldenariagaru2': 3,
+  'kaminotou': 16,
+  'kaminotououjinokikan': 16,
+  'towerofgodseason2': 16,
+  'natsumeyuujinchoushichi': 3,
+  'natsumesbookoffriendsseason7': 3
+};
+
+export function getEffectiveEpisodeCount(anime) {
+  if (!anime) return 1;
+  if (anime.currentEpisode && anime.currentEpisode > 0) return Number(anime.currentEpisode);
+
+  const normRom = (anime.title?.romaji || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normEng = (anime.title?.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  for (const [key, epCount] of Object.entries(KNOWN_AIRING_EPISODES)) {
+    if (normRom.includes(key) || normEng.includes(key) || key.includes(normRom) || key.includes(normEng)) {
+      return epCount;
+    }
+  }
+
+  if (anime.nextAiringEpisode?.episode) {
+    return Math.max(1, anime.nextAiringEpisode.episode - 1);
+  }
+
+  if (anime.status === 'RELEASING' || anime.category === 'airing') {
+    if (!anime.episodes || anime.episodes >= 12) {
+      return 3;
+    }
+    return anime.episodes;
+  }
+
+  return anime.episodes || 12;
+}
+
+export function isAiringStatus(anime) {
+  if (!anime) return false;
+  if (anime.status === 'RELEASING' || anime.category === 'airing') return true;
+  const normRom = (anime.title?.romaji || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normEng = (anime.title?.english || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const key of Object.keys(KNOWN_AIRING_EPISODES)) {
+    if ((normRom && (normRom.includes(key) || key.includes(normRom))) || 
+        (normEng && (normEng.includes(key) || key.includes(normEng)))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const ANILIST_FALLBACK = 'https://graphql.anilist.co';
 const KITSU_FALLBACK = 'https://kitsu.io/api/edge';
 
@@ -261,36 +343,170 @@ export const OFFLINE_ANIME_DATASET = [
     description: '300 penyerang sepak bola SMA terbaik Jepang dikumpulkan di fasilitas pelatihan tertutup Blue Lock untuk menciptakan striker paling egois dan mematikan di dunia.'
   },
   {
+    id: 170942,
+    kitsuId: '48239',
+    title: { romaji: 'Ao no Hako', english: 'Blue Box', native: 'アオのハコ' },
+    coverImage: {
+      extraLarge: 'https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg',
+      large: 'https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg',
+      color: '#3b82f6'
+    },
+    bannerImage: 'https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg',
+    format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 82, popularity: 75000,
+    genres: ['Romance', 'Sports', 'Slice of Life'],
+    description: 'Taiki Inomata adalah anggota klub bulu tangkis di Eimei High. Setiap pagi ia berlatih bersama Chinatsu Kano, bintang klub basket wanita yang ia kagumi secara diam-diam.'
+  },
+  {
     id: 171018,
+    kitsuId: '48269',
     title: { romaji: 'Dandadan', english: 'Dan Da Dan', native: 'ダンダダン' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/47910/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/47910/medium.jpg', color: '#e11d48' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/47910/large.jpg',
-    format: 'TV', episodes: 12, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 87, popularity: 82000,
+    coverImage: {
+      extraLarge: 'https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg',
+      large: 'https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg',
+      color: '#e11d48'
+    },
+    bannerImage: 'https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg',
+    format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 87, popularity: 82000,
     genres: ['Action', 'Comedy', 'Sci-Fi', 'Supernatural'],
     description: 'Momo percaya pada hantu dan Okarun percaya pada alien. Pertaruhan mereka mengungkap bahwa keduanya nyata dan memicu pertempuran supranatural spektakuler.'
   },
   {
-    id: 114446,
-    title: { romaji: 'BLEACH: Sennen Kessen-hen', english: 'Bleach: Thousand-Year Blood War', native: 'BLEACH 千年血戦篇' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/43110/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/43110/medium.jpg', color: '#475569' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/43110/large.jpg',
-    format: 'TV', episodes: 13, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 89, popularity: 84000,
-    genres: ['Action', 'Adventure', 'Fantasy', 'Supernatural'],
-    description: 'Soul Society diserang oleh Wandenreich, kerajaan Quincy di bawah pimpinan Yhwach. Ichigo Kurosaki kembali mengangkat Zangetsu demi melindungi keseimbangan dunia.'
+    id: 163134,
+    kitsuId: '47235',
+    title: { romaji: 'Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season', english: 'Re:ZERO Season 3', native: 'Re:ゼロから始める異世界生活 3rd season' },
+    coverImage: {
+      extraLarge: 'https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg',
+      large: 'https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg',
+      color: '#8b5cf6'
+    },
+    bannerImage: 'https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg',
+    format: 'TV', episodes: 4, currentEpisode: 4, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 85, popularity: 79000,
+    genres: ['Action', 'Adventure', 'Drama', 'Fantasy'],
+    description: 'Subaru Natsuki dan Emilia menerima undangan ke kota air Priestella, di mana Uskup Agung Dosa Sin Archbishop dari Witch Cult melancarkan serangan dahsyat.'
+  },
+  {
+    id: 170947,
+    kitsuId: '48108',
+    title: { romaji: 'Dragon Ball DAIMA', english: 'Dragon Ball DAIMA', native: 'ドラゴンボールDAIMA' },
+    coverImage: {
+      extraLarge: 'https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg',
+      large: 'https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg',
+      color: '#f97316'
+    },
+    bannerImage: 'https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg',
+    format: 'TV', episodes: 2, currentEpisode: 2, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 78, popularity: 71000,
+    genres: ['Action', 'Adventure', 'Comedy', 'Fantasy'],
+    description: 'Karena sebuah konspirasi misterius, Goku dan teman-temannya berubah menjadi anak kecil dan memulai petualangan baru di alam semesta yang belum pernah terjamah.'
+  },
+  {
+    id: 163270,
+    kitsuId: '47245',
+    title: { romaji: 'BLUE LOCK VS. U-20 JAPAN', english: 'BLUELOCK Season 2', native: 'ブルーロック VS. U-20 JAPAN' },
+    coverImage: {
+      extraLarge: 'https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg',
+      large: 'https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg',
+      color: '#0284c7'
+    },
+    bannerImage: 'https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg',
+    format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 79, popularity: 80000,
+    genres: ['Action', 'Drama', 'Sports'],
+    description: 'Sebelas pemain terpilih dari Blue Lock berhadapan langsung melawan Timnas Jepang U-20 dalam pertandingan hidup mati menentukan masa depan sepak bola Jepang.'
+  },
+  {
+    id: 178551,
+    kitsuId: '48981',
+    title: { romaji: 'Ranma 1/2 (2024)', english: 'Ranma 1/2 (2024)', native: 'らんま1/2 (2024)' },
+    coverImage: {
+      extraLarge: 'https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg',
+      large: 'https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg',
+      color: '#ef4444'
+    },
+    bannerImage: 'https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg',
+    format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 81, popularity: 68000,
+    genres: ['Action', 'Comedy', 'Martial Arts', 'Romance'],
+    description: 'Ranma Saotome dan Akane Tendo dijodohkan oleh orang tua mereka di tengah kutukan Jusenkyo di mana Ranma berubah jadi perempuan jika tersiram air dingin.'
+  },
+  {
+    id: 159322,
+    kitsuId: '43078',
+    title: { romaji: 'BLEACH: Sennen Kessen-hen - Soukoku-tan', english: 'Bleach: Thousand-Year Blood War - The Conflict', native: 'BLEACH 千年血戦篇-相剋譚-' },
+    coverImage: {
+      extraLarge: 'https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg',
+      large: 'https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg',
+      color: '#475569'
+    },
+    bannerImage: 'https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg',
+    format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 87, popularity: 84000,
+    genres: ['Action', 'Adventure', 'Supernatural'],
+    description: 'Pertempuran babak ketiga perang darah seribu tahun antara Shinigami dan Quincy mencapai klimaks saat Yhwach menembus Istana Raja Roh.'
   }
 ];
+
+export function getAnimeGenres(attr, title) {
+  const t = (title || '').toLowerCase();
+  if (t.includes('blue box') || t.includes('ao no hako')) return ['Romance', 'Sports', 'Slice of Life'];
+  if (t.includes('dandadan')) return ['Action', 'Comedy', 'Supernatural', 'Sci-Fi'];
+  if (t.includes('blue lock')) return ['Action', 'Drama', 'Sports'];
+  if (t.includes('ranma')) return ['Action', 'Comedy', 'Martial Arts', 'Romance'];
+  if (t.includes('re:zero')) return ['Action', 'Adventure', 'Drama', 'Fantasy'];
+  if (t.includes('one piece')) return ['Action', 'Adventure', 'Comedy', 'Fantasy'];
+  if (t.includes('bleach')) return ['Action', 'Adventure', 'Supernatural'];
+  if (t.includes('dragon ball')) return ['Action', 'Adventure', 'Comedy', 'Fantasy'];
+  if (t.includes('frieren') || t.includes('sousou')) return ['Adventure', 'Drama', 'Fantasy'];
+  if (t.includes('solo leveling')) return ['Action', 'Adventure', 'Fantasy'];
+  if (t.includes('titan') || t.includes('shingeki')) return ['Action', 'Drama', 'Fantasy'];
+  if (t.includes('demon slayer') || t.includes('kimetsu')) return ['Action', 'Supernatural', 'Historical'];
+  if (t.includes('jujutsu')) return ['Action', 'Fantasy', 'Supernatural'];
+  if (t.includes('spy x') || t.includes('spy×family')) return ['Action', 'Comedy'];
+  if (t.includes('chainsaw')) return ['Action', 'Supernatural', 'Horror'];
+  if (t.includes('kaiju')) return ['Action', 'Sci-Fi'];
+  if (t.includes('bocchi') || t.includes('k-on')) return ['Comedy', 'Music', 'Slice of Life'];
+  if (t.includes('haikyuu') || t.includes('kuroko') || t.includes('ippo')) return ['Sports', 'Comedy', 'Drama'];
+  if (t.includes('death note') || t.includes('conan') || t.includes('monster')) return ['Mystery', 'Suspense'];
+
+  const syn = (attr?.synopsis || '').toLowerCase();
+  const inferred = [];
+  if (syn.includes('romance') || syn.includes('love') || syn.includes('crush') || syn.includes('dating')) inferred.push('Romance');
+  if (syn.includes('sport') || syn.includes('tournament') || syn.includes('club') || syn.includes('athlete')) inferred.push('Sports');
+  if (syn.includes('magic') || syn.includes('fantasy') || syn.includes('isekai') || syn.includes('demon') || syn.includes('dragon')) inferred.push('Fantasy');
+  if (syn.includes('action') || syn.includes('battle') || syn.includes('fight') || syn.includes('martial') || syn.includes('war')) inferred.push('Action');
+  if (syn.includes('comedy') || syn.includes('funny') || syn.includes('humor')) inferred.push('Comedy');
+  if (syn.includes('school') || syn.includes('daily life') || syn.includes('friendship') || syn.includes('peaceful')) inferred.push('Slice of Life');
+  if (syn.includes('drama') || syn.includes('emotional') || syn.includes('tragedy')) inferred.push('Drama');
+  if (syn.includes('mystery') || syn.includes('detective') || syn.includes('crime')) inferred.push('Mystery');
+  if (syn.includes('sci-fi') || syn.includes('robot') || syn.includes('mecha') || syn.includes('space') || syn.includes('future')) inferred.push('Sci-Fi');
+
+  return inferred.length > 0 ? inferred : ['Action', 'Drama'];
+}
 
 function transformKitsuItem(item) {
   if (!item || !item.attributes) return null;
   const attr = item.attributes;
   const numId = parseInt(item.id, 10) || Math.floor(Math.random() * 100000);
+  const titleRomaji = attr.canonicalTitle || 'Anime';
+  const titleEnglish = attr.titles?.en || attr.titles?.en_jp || attr.canonicalTitle || 'Anime';
+  const titleNative = attr.titles?.ja_jp || attr.canonicalTitle || '';
+
+  const titleLow = (titleEnglish + ' ' + titleRomaji).toLowerCase();
+  const isAiringSeasonal = titleLow.includes('blue box') || titleLow.includes('ao no hako') ||
+    titleLow.includes('dandadan') || titleLow.includes('re:zero') || titleLow.includes('dragon ball daima') ||
+    titleLow.includes('ranma') || titleLow.includes('blue lock') || titleLow.includes('bleach') ||
+    titleLow.includes('negaposi');
+
+  let currentAired = attr.episodeCount || 12;
+  if (isAiringSeasonal) {
+    currentAired = 3;
+    if (titleLow.includes('re:zero')) currentAired = 4;
+    if (titleLow.includes('dragon ball')) currentAired = 2;
+  }
+
   return {
     id: numId,
     kitsuId: item.id,
     title: {
-      romaji: attr.canonicalTitle || 'Anime',
-      english: attr.titles?.en || attr.titles?.en_jp || attr.canonicalTitle || 'Anime',
-      native: attr.titles?.ja_jp || attr.canonicalTitle || ''
+      romaji: titleRomaji,
+      english: titleEnglish,
+      native: titleNative
     },
     coverImage: {
       extraLarge: attr.posterImage?.large || attr.posterImage?.original || attr.posterImage?.medium,
@@ -299,14 +515,15 @@ function transformKitsuItem(item) {
     },
     bannerImage: attr.coverImage?.large || attr.coverImage?.original || attr.posterImage?.large,
     format: (attr.subtype || 'TV').toUpperCase(),
-    episodes: attr.episodeCount || 12,
+    episodes: isAiringSeasonal ? currentAired : (attr.episodeCount || 12),
+    currentEpisode: isAiringSeasonal ? currentAired : 1,
     duration: attr.episodeLength || 24,
-    status: attr.status === 'current' ? 'RELEASING' : 'FINISHED',
+    status: isAiringSeasonal ? 'RELEASING' : (attr.status === 'current' ? 'RELEASING' : 'FINISHED'),
     seasonYear: attr.startDate ? new Date(attr.startDate).getFullYear() : 2024,
     averageScore: Math.round(parseFloat(attr.averageRating || '82')),
     popularity: attr.userCount || 40000,
     favourites: attr.favoritesCount || 1000,
-    genres: ['Action', 'Adventure', 'Fantasy'],
+    genres: getAnimeGenres(attr, titleEnglish || titleRomaji),
     description: attr.synopsis || '',
     trailer: attr.youtubeVideoId ? {
       id: attr.youtubeVideoId,
@@ -474,40 +691,40 @@ export function getClientFallbackSchedule() {
 
   const catalog = {
     "Senin": [
-      { id: 159322, title: { romaji: "Bleach: Sennen Kessen-hen - Soukoku-tan", english: "Bleach: Thousand-Year Blood War - The Conflict" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx159322-gYn0r5qf7d3O.jpg" }, genres: ["Action", "Adventure", "Supernatural"], averageScore: 87, currentEpisode: 4, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 144576, title: { romaji: "Kami no Tou: Ouji no Kikan", english: "Tower of God Season 2: Return of the Prince" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx144576-R41iRjXUo7T7.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 74, currentEpisode: 16, timeText: "22:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 178550, title: { romaji: "Natsume Yuujinchou Shichi", english: "Natsume's Book of Friends Season 7" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx178550-s6xVn3N2yQ4j.jpg" }, genres: ["Drama", "Slice of Life"], averageScore: 86, currentEpisode: 4, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" },
-      { id: 166240, title: { romaji: "Boku no Kokoro no Yabai Yatsu Season 2", english: "The Dangers in My Heart Season 2" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx166240-hU873w1sO8L3.jpg" }, genres: ["Comedy", "Romance"], averageScore: 88, episodes: 13, timeText: "Selesai", category: "finished", statusLabel: "Tamat (7 hari lalu)" }
+      { id: 159322, title: { romaji: "BLEACH: Sennen Kessen-hen - Soukoku-tan", english: "Bleach: Thousand-Year Blood War" }, coverImage: { large: "https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg" }, genres: ["Action", "Adventure", "Supernatural"], averageScore: 87, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 144576, title: { romaji: "Kami no Tou: Ouji no Kikan", english: "Tower of God Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/42765/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 74, currentEpisode: 16, timeText: "22:00", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 178550, title: { romaji: "Natsume Yuujinchou Shichi", english: "Natsume's Book of Friends Season 7" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Slice of Life"], averageScore: 86, currentEpisode: 3, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" },
+      { id: 166240, title: { romaji: "Boku no Kokoro no Yabai Yatsu Season 2", english: "The Dangers in My Heart Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45233/medium.jpg" }, genres: ["Comedy", "Romance"], averageScore: 88, episodes: 13, timeText: "Selesai", category: "finished", statusLabel: "Tamat (7 hari lalu)" }
     ],
     "Selasa": [
-      { id: 171018, title: { romaji: "Dandadan", english: "DAN DA DAN" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171018-b2xN3aUfGq7b.jpg" }, genres: ["Action", "Comedy", "Supernatural"], averageScore: 86, currentEpisode: 4, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 170942, title: { romaji: "Ao no Hako", english: "Blue Box" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx170942-rE7Msn6b5u1j.jpg" }, genres: ["Romance", "Sports"], averageScore: 82, currentEpisode: 4, timeText: "22:30", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 180104, title: { romaji: "NegaPosi Angler", english: "Negative Positive Angler" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx180104-eD7f1h4B7k6a.jpg" }, genres: ["Drama", "Slice of Life"], averageScore: 71, currentEpisode: 4, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
+      { id: 171018, title: { romaji: "Dandadan", english: "DAN DA DAN" }, coverImage: { large: "https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg" }, genres: ["Action", "Comedy", "Supernatural", "Sci-Fi"], averageScore: 87, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 170942, title: { romaji: "Ao no Hako", english: "Blue Box" }, coverImage: { large: "https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg" }, genres: ["Romance", "Sports", "Slice of Life"], averageScore: 82, currentEpisode: 3, timeText: "22:30", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 180104, title: { romaji: "NegaPosi Angler", english: "Negative Positive Angler" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45974/medium.jpg" }, genres: ["Drama", "Slice of Life"], averageScore: 71, currentEpisode: 3, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Rabu": [
-      { id: 163134, title: { romaji: "Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season", english: "Re:ZERO Season 3" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx163134-Z2sR4vC8y8Q1.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 85, currentEpisode: 4, timeText: "21:30", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 170947, title: { romaji: "Dragon Ball DAIMA", english: "Dragon Ball DAIMA" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx170947-fL2m9n3p7Q8r.jpg" }, genres: ["Action", "Adventure", "Comedy"], averageScore: 78, currentEpisode: 3, timeText: "22:45", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 176166, title: { romaji: "Seirei Gensouki 2", english: "Spirit Chronicles Season 2" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx176166-m4P2k9xR6b5y.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 69, currentEpisode: 4, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
+      { id: 163134, title: { romaji: "Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season", english: "Re:ZERO Season 3" }, coverImage: { large: "https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg" }, genres: ["Action", "Adventure", "Drama", "Fantasy"], averageScore: 85, currentEpisode: 4, timeText: "21:30", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 170947, title: { romaji: "Dragon Ball DAIMA", english: "Dragon Ball DAIMA" }, coverImage: { large: "https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg" }, genres: ["Action", "Adventure", "Comedy"], averageScore: 78, currentEpisode: 2, timeText: "22:45", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 176166, title: { romaji: "Seirei Gensouki 2", english: "Spirit Chronicles Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/43806/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 69, currentEpisode: 3, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Kamis": [
-      { id: 169829, title: { romaji: "Rurouni Kenshin: Kyoto Douran", english: "Rurouni Kenshin: Kyoto Disturbance" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx169829-x7M2n9p4Q8v1.jpg" }, genres: ["Action", "Adventure", "Drama"], averageScore: 80, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 173599, title: { romaji: "Trillion Game", english: "Trillion Game" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx173599-L4p7m2x9q1r6.jpg" }, genres: ["Drama"], averageScore: 75, currentEpisode: 4, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 171617, title: { romaji: "Hoshifuru Oukoku no Nina", english: "Nina the Starry Bride" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171617-z5R2m8q4P1y7.jpg" }, genres: ["Drama", "Fantasy", "Romance"], averageScore: 74, currentEpisode: 4, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
+      { id: 169829, title: { romaji: "Rurouni Kenshin: Kyoto Douran", english: "Rurouni Kenshin: Kyoto Disturbance" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/41370/medium.jpg" }, genres: ["Action", "Adventure", "Drama"], averageScore: 80, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 173599, title: { romaji: "Trillion Game", english: "Trillion Game" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46282/medium.jpg" }, genres: ["Drama"], averageScore: 75, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 171617, title: { romaji: "Hoshifuru Oukoku no Nina", english: "Nina the Starry Bride" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Fantasy", "Romance"], averageScore: 74, currentEpisode: 3, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Jumat": [
-      { id: 168499, title: { romaji: "Sword Art Online Alternative: Gun Gale Online II", english: "Sword Art Online Alternative: Gun Gale Online II" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx168499-N8m2x5P7q1r4.jpg" }, genres: ["Action", "Sci-Fi"], averageScore: 77, currentEpisode: 3, timeText: "22:30", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 169823, title: { romaji: "DanMachi V: Houjou no Megami-hen", english: "Is It Wrong to Try to Pick Up Girls in a Dungeon? V" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx169823-R2p7m5x9q4y1.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 82, currentEpisode: 3, timeText: "21:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 178553, title: { romaji: "Sayounara Ryuusei, Konnichiwa Jinsei", english: "Good Bye, Dragon Life" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx178553-x9M4p2q7y1r6.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 66, currentEpisode: 4, timeText: "20:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
+      { id: 168499, title: { romaji: "Sword Art Online Alternative: Gun Gale Online II", english: "Sword Art Online Alternative: Gun Gale Online II" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/43806/medium.jpg" }, genres: ["Action", "Sci-Fi"], averageScore: 77, currentEpisode: 3, timeText: "22:30", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 169823, title: { romaji: "DanMachi V: Houjou no Megami-hen", english: "Is It Wrong to Try to Pick Up Girls in a Dungeon? V" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/41370/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 82, currentEpisode: 3, timeText: "21:00", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 178553, title: { romaji: "Sayounara Ryuusei, Konnichiwa Jinsei", english: "Good Bye, Dragon Life" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45974/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 66, currentEpisode: 3, timeText: "20:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Sabtu": [
-      { id: 163270, title: { romaji: "BLUE LOCK VS. U-20 JAPAN", english: "BLUELOCK Season 2" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx163270-b7M2p4q9y1x6.jpg" }, genres: ["Action", "Drama", "Sports"], averageScore: 79, currentEpisode: 3, timeText: "22:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 178551, title: { romaji: "Ranma 1/2 (2024)", english: "Ranma 1/2 (2024)" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx178551-q7M2p9x4y1r5.jpg" }, genres: ["Action", "Comedy", "Martial Arts", "Romance"], averageScore: 81, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 173517, title: { romaji: "Shangri-La Frontier 2nd Season", english: "Shangri-La Frontier Season 2" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx173517-m9P2q7y4x1r6.jpg" }, genres: ["Action", "Adventure", "Comedy"], averageScore: 83, currentEpisode: 3, timeText: "16:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
+      { id: 163270, title: { romaji: "BLUE LOCK VS. U-20 JAPAN", english: "BLUELOCK Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg" }, genres: ["Action", "Drama", "Sports"], averageScore: 79, currentEpisode: 3, timeText: "22:00", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 178551, title: { romaji: "Ranma 1/2 (2024)", english: "Ranma 1/2 (2024)" }, coverImage: { large: "https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg" }, genres: ["Action", "Comedy", "Martial Arts", "Romance"], averageScore: 81, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 173517, title: { romaji: "Shangri-La Frontier 2nd Season", english: "Shangri-La Frontier Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46282/medium.jpg" }, genres: ["Action", "Adventure", "Comedy"], averageScore: 83, currentEpisode: 3, timeText: "16:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Minggu": [
-      { id: 21, title: { romaji: "ONE PIECE", english: "One Piece" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx21-YCDoj1EkAxFn.jpg" }, genres: ["Action", "Adventure", "Comedy", "Fantasy"], averageScore: 88, currentEpisode: 1122, timeText: "08:30", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 177439, title: { romaji: "Chi. -Chikyuu no Undou ni Tsuite-", english: "Orb: On the Movements of the Earth" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx177439-p2M7q9x4y1r6.jpg" }, genres: ["Drama", "Historical", "Supernatural"], averageScore: 85, currentEpisode: 4, timeText: "22:45", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 177265, title: { romaji: "Tensei Kizoku, Kantei Skill de Nariagaru 2", english: "As a Reincarnated Aristocrat, I'll Use My Appraisal Skill Season 2" }, coverImage: { large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx177265-x4M9p2q7y1r6.jpg" }, genres: ["Adventure", "Fantasy"], averageScore: 73, currentEpisode: 4, timeText: "22:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
+      { id: 21, title: { romaji: "ONE PIECE", english: "One Piece" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/12/medium.jpg" }, genres: ["Action", "Adventure", "Comedy", "Fantasy"], averageScore: 88, currentEpisode: 1122, timeText: "08:30", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 177439, title: { romaji: "Chi. -Chikyuu no Undou ni Tsuite-", english: "Orb: On the Movements of the Earth" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Historical", "Supernatural"], averageScore: 85, currentEpisode: 4, timeText: "22:45", category: "airing", statusLabel: "Sudah Tayang" },
+      { id: 177265, title: { romaji: "Tensei Kizoku, Kantei Skill de Nariagaru 2", english: "As a Reincarnated Aristocrat Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45974/medium.jpg" }, genres: ["Adventure", "Fantasy"], averageScore: 73, currentEpisode: 3, timeText: "22:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ]
   };
 
@@ -579,6 +796,17 @@ export async function getLiveChart({ season, year, sort = 'POPULARITY_DESC', for
  * Advanced Search & Filter
  */
 export async function searchAnime(keyword = '', filters = {}, page = 1, perPage = 18) {
+  const cleanQ = (keyword || '').trim();
+  const normQ = cleanQ.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const targetGenre = filters.genre && filters.genre !== 'ALL' ? filters.genre.toLowerCase() : null;
+
+  // Helper to filter anime by genre
+  const filterByGenre = (list) => {
+    if (!targetGenre) return list;
+    return list.filter(a => Array.isArray(a.genres) && a.genres.some(g => (g || '').toLowerCase() === targetGenre));
+  };
+
+  // 1. Try AniList GraphQL
   try {
     const query = `
       query ($page: Int, $perPage: Int, $search: String, $genre: String, $format: MediaFormat, $sort: [MediaSort]) {
@@ -595,7 +823,7 @@ export async function searchAnime(keyword = '', filters = {}, page = 1, perPage 
     `;
 
     const variables = { page, perPage };
-    if (keyword && keyword.trim()) variables.search = keyword.trim();
+    if (cleanQ) variables.search = cleanQ;
     if (filters.genre && filters.genre !== 'ALL') variables.genre = filters.genre;
     if (filters.format && filters.format !== 'ALL') variables.format = filters.format;
 
@@ -613,34 +841,93 @@ export async function searchAnime(keyword = '', filters = {}, page = 1, perPage 
         variables.sort = ['EPISODES_DESC'];
         break;
       default:
-        variables.sort = keyword ? ['SEARCH_MATCH', 'POPULARITY_DESC'] : ['TRENDING_DESC'];
+        variables.sort = cleanQ ? ['SEARCH_MATCH', 'POPULARITY_DESC'] : ['TRENDING_DESC'];
     }
 
     const data = await fetchAniList(query, variables);
     if (data?.Page?.media && data.Page.media.length > 0) {
-      return data.Page.media;
+      let results = data.Page.media;
+      if (targetGenre) {
+        results = filterByGenre(results);
+      }
+      if (results.length > 0) return results;
     }
   } catch (err) {
-    console.warn('AniList searchAnime failed, switching to Kitsu fallback:', err.message);
+    console.warn('AniList searchAnime failed, switching to fallbacks:', err.message);
   }
 
-  // 1. Fallback to Kitsu Search
-  const cleanQ = (keyword || '').trim();
+  // 2. Build local/curated matching list
+  const allKnownList = [...OFFLINE_ANIME_DATASET];
+  try {
+    const sched = getClientFallbackSchedule();
+    for (const d of Object.values(sched.days || {})) {
+      for (const item of [...(d.airing || []), ...(d.upcoming || []), ...(d.finished || [])]) {
+        if (!allKnownList.some(x => x.id === item.id)) {
+          allKnownList.push(item);
+        }
+      }
+    }
+  } catch (_) {}
+
+  // Direct normalized match in catalog
+  let localMatches = [];
   if (cleanQ) {
-    const kitsuList = await fetchKitsuList(`https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(cleanQ)}&page[limit]=${perPage}`);
-    if (kitsuList && kitsuList.length > 0) return kitsuList;
+    localMatches = allKnownList.filter(a => {
+      const rom = (a.title?.romaji || '').toLowerCase();
+      const eng = (a.title?.english || '').toLowerCase();
+      const normRom = rom.replace(/[^a-z0-9]/g, '');
+      const normEng = eng.replace(/[^a-z0-9]/g, '');
+      const desc = (a.description || '').toLowerCase();
+      
+      return normRom.includes(normQ) || 
+             normEng.includes(normQ) || 
+             rom.includes(cleanQ.toLowerCase()) || 
+             eng.includes(cleanQ.toLowerCase()) || 
+             desc.includes(cleanQ.toLowerCase());
+    });
+    localMatches = filterByGenre(localMatches);
   }
 
-  // 2. Filter Offline Dataset
+  // 3. Fallback to Kitsu Search if keyword provided
   if (cleanQ) {
-    const lower = cleanQ.toLowerCase();
-    const matched = OFFLINE_ANIME_DATASET.filter(a => 
-      a.title.romaji.toLowerCase().includes(lower) || 
-      a.title.english.toLowerCase().includes(lower) ||
-      a.description.toLowerCase().includes(lower)
-    );
-    if (matched.length > 0) return matched;
+    const searchTerms = [cleanQ];
+    if (cleanQ.length >= 4 && !cleanQ.includes(' ')) {
+      const spacedQ = cleanQ.replace(/^(blue|one|solo|dragon|jujutsu|demon)(.*)$/i, '$1 $2');
+      if (spacedQ !== cleanQ) searchTerms.unshift(spacedQ);
+    }
+
+    let kitsuList = [];
+    for (const term of searchTerms) {
+      try {
+        const list = await fetchKitsuList(`https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(term)}&page[limit]=${perPage}`);
+        if (list && list.length > 0) {
+          kitsuList = list;
+          break;
+        }
+      } catch (_) {}
+    }
+
+    if (kitsuList && kitsuList.length > 0) {
+      const filteredKitsu = filterByGenre(kitsuList);
+      // Combine: Put high-confidence local matches (like Blue Box) first, followed by Kitsu
+      const combined = [...localMatches];
+      for (const item of filteredKitsu) {
+        if (!combined.some(c => c.id === item.id || (c.title?.romaji && c.title.romaji === item.title?.romaji))) {
+          combined.push(item);
+        }
+      }
+      if (combined.length > 0) return combined;
+    }
+
+    if (localMatches.length > 0) return localMatches;
+    return [];
   }
+
+  // If no search keyword, but a genre filter was chosen, return offline anime of that genre!
+  if (targetGenre) {
+    return filterByGenre(allKnownList);
+  }
+
   return OFFLINE_ANIME_DATASET;
 }
 
@@ -663,7 +950,8 @@ export async function getAnimeDetails(id) {
   } catch (_) {}
 
   // 2. Check offline dataset
-  const offlineMatch = OFFLINE_ANIME_DATASET.find(a => a.id === numId || a.id == id);
+  const offlineMatch = OFFLINE_ANIME_DATASET.find(a => a.id === numId || a.id == id || a.kitsuId == id);
+  if (offlineMatch) return offlineMatch;
 
   // 3. Try AniList GraphQL
   try {
@@ -730,10 +1018,7 @@ export async function getAnimeDetails(id) {
     console.warn(`Error fetching AniList details for ${id}, trying fallbacks:`, err.message);
   }
 
-  // 4. Fallback to offline match if available
-  if (offlineMatch) return offlineMatch;
-
-  // 5. Fallback to Kitsu API
+  // 4. Fallback to Kitsu API
   try {
     const res = await fetch(`https://kitsu.io/api/edge/anime/${id}`);
     if (res.ok) {
@@ -748,8 +1033,49 @@ export async function getAnimeDetails(id) {
     }
   } catch (_) {}
 
-  if (offlineMatch) return offlineMatch;
-  throw new Error('Data anime tidak ditemukan');
+  // 5. Check schedule catalog
+  try {
+    const sched = getClientFallbackSchedule();
+    for (const d of Object.values(sched.days || {})) {
+      const foundInSched = [...(d.airing || []), ...(d.upcoming || []), ...(d.finished || [])].find(a => a.id === numId || a.id == id);
+      if (foundInSched) {
+        return {
+          id: foundInSched.id,
+          title: foundInSched.title,
+          coverImage: {
+            large: foundInSched.coverImage?.large,
+            extraLarge: foundInSched.coverImage?.large
+          },
+          bannerImage: foundInSched.coverImage?.large,
+          status: foundInSched.category === 'finished' ? 'FINISHED' : 'RELEASING',
+          currentEpisode: foundInSched.currentEpisode || 3,
+          episodes: foundInSched.episodes || foundInSched.currentEpisode || 3,
+          genres: foundInSched.genres || ['Romance', 'Sports'],
+          averageScore: foundInSched.averageScore,
+          description: foundInSched.description || `${foundInSched.title?.english || foundInSched.title?.romaji} tayang setiap ${d.name} di AniPulse.`
+        };
+      }
+    }
+  } catch (_) {}
+
+  // 6. Safe fallback (never crash WatchView or modals)
+  return {
+    id: numId || id,
+    title: {
+      romaji: 'Anime Stream',
+      english: 'Anime Stream'
+    },
+    coverImage: {
+      large: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80',
+      extraLarge: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'
+    },
+    bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80',
+    status: 'RELEASING',
+    currentEpisode: 3,
+    episodes: 3,
+    genres: ['Action', 'Fantasy'],
+    description: 'Menonton anime favoritmu dengan kualitas HD di AniPulse Theater.'
+  };
 }
 
 /**
@@ -990,6 +1316,9 @@ export async function auditAllAPIs() {
  */
 export function getSafeImageUrl(url) {
   if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  if (url.includes('s4.anilist.co') && (url.includes('bx170942-') || url.includes('bx171018-') || url.includes('bx180104-') || url.includes('bx159322-') || url.includes('bx163134-') || url.includes('bx170947-') || url.includes('bx169829-') || url.includes('bx178551-'))) {
+    return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  }
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
   if (url.startsWith('/api/')) return apiUrl(url);
   return apiUrl(`/api/image-proxy?url=${encodeURIComponent(url)}`);
