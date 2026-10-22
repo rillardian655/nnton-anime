@@ -25,7 +25,7 @@ export function getApiBaseUrl() {
     if (custom) return custom.replace(/\/+$/, '');
     if (isMobileNativeApp()) {
       if (ENV_BACKEND_URL) return ENV_BACKEND_URL.replace(/\/+$/, '');
-      return 'http://192.168.1.11:8000';
+      return 'http://192.168.1.51:8000';
     }
   }
   return ENV_BACKEND_URL ? ENV_BACKEND_URL.replace(/\/+$/, '') : '';
@@ -80,10 +80,10 @@ export function getEffectiveEpisodeCount(anime) {
     return Math.max(1, anime.nextAiringEpisode.episode - 1);
   }
 
-  // If airing / releasing anime
+  // If airing / releasing anime: return current aired episode, never total planned episodes
   if (st === 'RELEASING' || anime.category === 'airing' || st === 'CURRENT') {
-    if (anime.currentEpisode) return Number(anime.currentEpisode);
-    if (anime.episodes && anime.episodes <= 12) return Number(anime.episodes);
+    if (anime.currentEpisode && anime.currentEpisode > 0) return Number(anime.currentEpisode);
+    if (anime.episodesAired && anime.episodesAired > 0) return Number(anime.episodesAired);
     return 1;
   }
 
@@ -308,6 +308,22 @@ export const OFFLINE_ANIME_DATASET = [
     description: 'Taiki Inomata adalah anggota klub bulu tangkis di Eimei High. Setiap pagi ia berlatih bersama Chinatsu Kano, bintang klub basket wanita yang ia kagumi secara diam-diam.'
   },
   {
+    id: 19655,
+    yummyId: 19655,
+    slug: 'golubaya-shkatulka-2',
+    title: { romaji: 'Ao no Hako 2nd Season', english: 'Blue Box Season 2', native: 'Голубая шкатулка 2' },
+    coverImage: {
+      extraLarge: 'https://static.yani.tv/posters/full/1636982711.jpg',
+      large: 'https://static.yani.tv/posters/full/1636982711.jpg',
+      color: '#3b82f6'
+    },
+    bannerImage: 'https://static.yani.tv/posters/full/1636982711.jpg',
+    format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2026, averageScore: 84, popularity: 82000,
+    genres: ['Shounen', 'Romance', 'Sports', 'School'],
+    studios: { nodes: [{ name: 'Telecom Animation Film' }] },
+    description: 'Taiki Inomata dan Chinatsu Kano melanjutkan kisah cinta dan perjuangan olahraga bulu tangkis serta basket mereka di Eimei High School.'
+  },
+  {
     id: 171018,
     kitsuId: '48269',
     title: { romaji: 'Dandadan', english: 'Dan Da Dan', native: 'ダンダダン' },
@@ -418,9 +434,10 @@ export function getAnimeGenres(attr, title) {
   const syn = (attr?.synopsis || '').toLowerCase();
   const inferred = [];
   if (syn.includes('romance') || syn.includes('love') || syn.includes('crush') || syn.includes('dating')) inferred.push('Romance');
-  if (syn.includes('sport') || syn.includes('tournament') || syn.includes('club') || syn.includes('athlete')) inferred.push('Sports');
+  if (syn.includes('sport') || syn.includes('tournament') || syn.includes('club') || syn.includes('athlete') || syn.includes('badminton') || syn.includes('basketball')) inferred.push('Sports');
   if (syn.includes('magic') || syn.includes('fantasy') || syn.includes('isekai') || syn.includes('demon') || syn.includes('dragon')) inferred.push('Fantasy');
   if (syn.includes('action') || syn.includes('battle') || syn.includes('fight') || syn.includes('martial') || syn.includes('war')) inferred.push('Action');
+  if (syn.includes('adventure') || syn.includes('journey') || syn.includes('quest') || syn.includes('explore') || syn.includes('travel') || syn.includes('expedition')) inferred.push('Adventure');
   if (syn.includes('comedy') || syn.includes('funny') || syn.includes('humor')) inferred.push('Comedy');
   if (syn.includes('school') || syn.includes('daily life') || syn.includes('friendship') || syn.includes('peaceful')) inferred.push('Slice of Life');
   if (syn.includes('drama') || syn.includes('emotional') || syn.includes('tragedy')) inferred.push('Drama');
@@ -665,6 +682,7 @@ export function getClientFallbackSchedule() {
       { id: 176166, title: { romaji: "Seirei Gensouki 2", english: "Spirit Chronicles Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/43806/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 69, currentEpisode: 3, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Kamis": [
+      { id: 19655, yummyId: 19655, title: { romaji: "Ao no Hako 2nd Season", english: "Blue Box Season 2", native: "Голубая шкатулка 2" }, coverImage: { large: "https://static.yani.tv/posters/full/1636982711.jpg" }, genres: ["Romance", "Sports", "Shounen", "School"], averageScore: 84, currentEpisode: 3, episodes: 3, timeText: "23:56", category: "airing", statusLabel: "Episode 3 Tayang" },
       { id: 169829, title: { romaji: "Rurouni Kenshin: Kyoto Douran", english: "Rurouni Kenshin: Kyoto Disturbance" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/41370/medium.jpg" }, genres: ["Action", "Adventure", "Drama"], averageScore: 80, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
       { id: 173599, title: { romaji: "Trillion Game", english: "Trillion Game" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46282/medium.jpg" }, genres: ["Drama"], averageScore: 75, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
       { id: 171617, title: { romaji: "Hoshifuru Oukoku no Nina", english: "Nina the Starry Bride" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Fantasy", "Romance"], averageScore: 74, currentEpisode: 3, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
@@ -716,7 +734,7 @@ export function getClientFallbackSchedule() {
 export async function getWeeklySchedule() {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
     const res = await fetch(apiUrl('/api/anime/schedule'), { signal: controller.signal });
     clearTimeout(timeoutId);
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -846,47 +864,55 @@ export async function searchAnime(keyword = '', filters = {}, page = 1, perPage 
     localMatches = filterByGenre(localMatches);
   }
 
-  // 3. Fallback to Kitsu Search if keyword provided
+  // 3. Primary Search via YummyAnime API (anicli-api Core)
   if (cleanQ) {
-    const searchTerms = [cleanQ];
-    if (cleanQ.length >= 4 && !cleanQ.includes(' ')) {
-      const spacedQ = cleanQ.replace(/^(blue|one|solo|dragon|jujutsu|demon)(.*)$/i, '$1 $2');
-      if (spacedQ !== cleanQ) searchTerms.unshift(spacedQ);
-    }
-
-    let kitsuList = [];
-    for (const term of searchTerms) {
-      try {
-        const list = await fetchKitsuList(`https://kitsu.io/api/edge/anime?filter[text]=${encodeURIComponent(term)}&page[limit]=${perPage}`);
-        if (list && list.length > 0) {
-          kitsuList = list;
-          break;
-        }
-      } catch (_) {}
-    }
-
-    if (kitsuList && kitsuList.length > 0) {
-      const filteredKitsu = filterByGenre(kitsuList);
-      // Combine: Put high-confidence local matches (like Blue Box) first, followed by Kitsu
-      const combined = [...localMatches];
-      for (const item of filteredKitsu) {
-        if (!combined.some(c => c.id === item.id || (c.title?.romaji && c.title.romaji === item.title?.romaji))) {
-          combined.push(item);
+    try {
+      const res = await fetch(apiUrl(`/api/yummy/search?q=${encodeURIComponent(cleanQ)}`));
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.results) && data.results.length > 0) {
+          const filteredYummy = filterByGenre(data.results);
+          const combined = [...localMatches];
+          for (const item of filteredYummy) {
+            if (!combined.some(c => c.id === item.id || (c.title?.romaji && c.title.romaji === item.title?.romaji))) {
+              combined.push(item);
+            }
+          }
+          if (combined.length > 0) return combined;
         }
       }
-      if (combined.length > 0) return combined;
+    } catch (yummyErr) {
+      console.warn('Yummy search notice:', yummyErr);
     }
 
     if (localMatches.length > 0) return localMatches;
     return [];
   }
 
-  // If no search keyword, but a genre filter was chosen, return offline anime of that genre!
+  // If no search keyword, but a genre filter was chosen, filter known catalog
   if (targetGenre) {
     return filterByGenre(allKnownList);
   }
 
   return OFFLINE_ANIME_DATASET;
+}
+
+/**
+ * Direct YummyAnime Search Helper
+ */
+export async function searchYummy(query) {
+  try {
+    const res = await fetch(apiUrl(`/api/yummy/search?q=${encodeURIComponent(query)}`));
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.results)) {
+        return data.results;
+      }
+    }
+  } catch (err) {
+    console.warn('Yummy search notice:', err);
+  }
+  return [];
 }
 
 /**
@@ -901,79 +927,104 @@ export async function getAnimeDetails(id) {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (parsed && (parsed.id === numId || parsed.id == id)) {
+      // Clean up corrupted / poisoned YummyAnime cache for numeric IDs
+      const isCorrupted = parsed && (
+        parsed.yummyId ||
+        typeof parsed.title === 'string' ||
+        (!parsed.title?.romaji && !parsed.title?.english) ||
+        (numId === 7791 && (parsed.title?.english?.includes('Schastlivyy') || parsed.title?.romaji?.includes('Schastlivyy')))
+      );
+      if (isCorrupted) {
+        localStorage.removeItem(cacheKey);
+      } else if (parsed && (parsed.id === numId || parsed.id == id)) {
         return parsed;
       }
     }
   } catch (_) {}
 
   // 2. Check offline dataset
-  const offlineMatch = OFFLINE_ANIME_DATASET.find(a => a.id === numId || a.id == id || a.kitsuId == id);
+  const offlineMatch = OFFLINE_ANIME_DATASET.find(a => a.id === numId || a.id == id);
   if (offlineMatch) return offlineMatch;
 
-  // 3. Try AniList GraphQL
-  try {
-    const query = `
-      query ($id: Int) {
-        Media(id: $id, type: ANIME) {
-          ${MEDIA_FRAGMENT}
-          characters(sort: ROLE, perPage: 8) {
-            nodes {
-              id
-              name {
-                full
-                native
-              }
-              image {
-                medium
-              }
-            }
-          }
-          relations {
-            edges {
-              relationType
-              node {
+  // 3. AniList GraphQL is the canonical metadata authority for numeric anime IDs
+  if (!isNaN(numId) && numId > 0) {
+    try {
+      const query = `
+        query ($id: Int) {
+          Media(id: $id, type: ANIME) {
+            ${MEDIA_FRAGMENT}
+            characters(sort: ROLE, perPage: 8) {
+              nodes {
                 id
-                title {
-                  romaji
-                  english
+                name {
+                  full
+                  native
                 }
-                coverImage {
+                image {
                   medium
                 }
-                format
-                status
               }
             }
-          }
-          recommendations(perPage: 6, sort: RATING_DESC) {
-            nodes {
-              mediaRecommendation {
-                id
-                title {
-                  romaji
-                  english
+            relations {
+              edges {
+                relationType
+                node {
+                  id
+                  title {
+                    romaji
+                    english
+                  }
+                  coverImage {
+                    medium
+                  }
+                  format
+                  status
                 }
-                coverImage {
-                  large
+              }
+            }
+            recommendations(perPage: 6, sort: RATING_DESC) {
+              nodes {
+                mediaRecommendation {
+                  id
+                  title {
+                    romaji
+                    english
+                  }
+                  coverImage {
+                    large
+                  }
+                  averageScore
+                  format
                 }
-                averageScore
-                format
               }
             }
           }
         }
+      `;
+      const data = await fetchAniList(query, { id: numId });
+      if (data && data.Media) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(data.Media));
+        } catch (_) {}
+        return data.Media;
       }
-    `;
-    const data = await fetchAniList(query, { id: numId });
-    if (data && data.Media) {
-      try {
-        localStorage.setItem(cacheKey, JSON.stringify(data.Media));
-      } catch (_) {}
-      return data.Media;
+    } catch (err) {
+      console.warn(`Error fetching AniList details for ${id}, trying fallbacks:`, err.message);
     }
-  } catch (err) {
-    console.warn(`Error fetching AniList details for ${id}, trying fallbacks:`, err.message);
+  }
+
+  // 4. Try YummyAnime lookup if id is a non-numeric slug
+  if (isNaN(numId)) {
+    try {
+      const yummyRes = await fetch(apiUrl(`/api/yummy/anime/${encodeURIComponent(id)}`));
+      if (yummyRes.ok) {
+        const yummyData = await yummyRes.json();
+        if (yummyData && yummyData.id) {
+          try { localStorage.setItem(cacheKey, JSON.stringify(yummyData)); } catch (_) {}
+          return yummyData;
+        }
+      }
+    } catch (_) {}
   }
 
   // 4. Fallback to Kitsu API
@@ -1330,26 +1381,34 @@ export async function authLogin(username, password) {
     }
     return data;
   } catch (err) {
-    // 2. Master Admin Offline Fallback for Runa
-    if (
-      (cleanUser.toLowerCase() === 'runa@gmail.com' || cleanUser.toLowerCase() === 'runa') &&
-      cleanPass === 'runa8989'
-    ) {
-      console.warn('Backend server unreachable, activating Master Admin offline bypass:', err.message);
-      const masterData = {
+    // 2. Offline Fallback for Admin & VIP credentials when server is offline/unreachable
+    const lowUser = cleanUser.toLowerCase();
+    const offlineAccounts = {
+      'runa': { pass: 'runa8989', name: 'Runa Admin', role: 'admin' },
+      'runa@gmail.com': { pass: 'runa8989', name: 'Runa Admin', role: 'admin' },
+      'admin': { pass: 'admin123', name: 'Admin AniPulse', role: 'admin' },
+      'iruna': { pass: 'iruna123', name: 'Iruna VIP', role: 'admin' },
+      'rillardian': { pass: 'rillardian123', name: 'Rillardian VIP', role: 'admin' },
+      'vip': { pass: 'vip123', name: 'VIP Member', role: 'user' }
+    };
+
+    if (offlineAccounts[lowUser] && offlineAccounts[lowUser].pass === cleanPass) {
+      const acc = offlineAccounts[lowUser];
+      console.warn(`Backend server unreachable, activating offline login bypass for ${cleanUser}:`, err.message);
+      const offlineData = {
         success: true,
-        token: 'master-admin-runa8989-token',
+        token: `offline_vip_${lowUser}_token`,
         user: {
-          username: 'runa@gmail.com',
-          displayName: 'Runa Admin',
-          role: 'admin',
+          username: lowUser,
+          displayName: acc.name,
+          role: acc.role,
           expiresAt: '2099-12-31 23:59:59',
           remainingSeconds: 999999999
         }
       };
-      setAuthToken(masterData.token);
-      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(masterData.user)); } catch (_) {}
-      return masterData;
+      setAuthToken(offlineData.token);
+      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(offlineData.user)); } catch (_) {}
+      return offlineData;
     }
     throw err;
   }
@@ -1358,9 +1417,13 @@ export async function authLogin(username, password) {
 export async function authMe() {
   const token = getAuthToken();
   if (!token) return null;
-  if (token === 'master-admin-runa8989-token') {
+  if (token.startsWith('offline_vip_') || token.startsWith('master-')) {
+    const cached = localStorage.getItem('anipulse_cached_user');
+    if (cached) {
+      try { return JSON.parse(cached); } catch (_) {}
+    }
     return {
-      username: 'runa@gmail.com',
+      username: 'runa',
       displayName: 'Runa Admin',
       role: 'admin',
       expiresAt: '2099-12-31 23:59:59',
@@ -1399,7 +1462,7 @@ export async function authMe() {
 
 export async function authLogout() {
   const token = getAuthToken();
-  if (token && token !== 'master-admin-runa8989-token') {
+  if (token && !token.startsWith('offline_vip_') && token !== 'master-admin-runa8989-token') {
     try {
       await fetch(apiUrl('/api/auth/logout'), {
         method: 'POST',
@@ -1412,22 +1475,60 @@ export async function authLogout() {
 }
 
 export async function verifyInvite(code) {
-  const res = await fetch(apiUrl(`/api/auth/verify-invite?code=${encodeURIComponent(code)}`));
-  return await safeFetchJson(res, 'Verifikasi Tiket');
+  const cleanCode = (code || '').trim().toUpperCase();
+  try {
+    const res = await fetch(apiUrl(`/api/auth/verify-invite?code=${encodeURIComponent(cleanCode)}`));
+    return await safeFetchJson(res, 'Verifikasi Tiket');
+  } catch (err) {
+    const offlineCodes = ['VIP-ANIME2026', 'VIP-MEMBER', 'ANIPULSE-VIP', 'TIKET-1BULAN'];
+    if (offlineCodes.includes(cleanCode)) {
+      return {
+        valid: true,
+        code: cleanCode,
+        targetName: 'VIP Member',
+        durationType: 'Selamanya (Permanent)',
+        durationSeconds: 999999999
+      };
+    }
+    throw err;
+  }
 }
 
 export async function claimInvite(code, username, password, displayName) {
-  const res = await fetch(apiUrl('/api/auth/claim-invite'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, username, password, displayName })
-  });
-  const data = await safeFetchJson(res, 'Klaim Undangan');
-  setAuthToken(data.token);
-  if (data.user) {
-    try { localStorage.setItem('anipulse_cached_user', JSON.stringify(data.user)); } catch (_) {}
+  const cleanCode = (code || '').trim().toUpperCase();
+  try {
+    const res = await fetch(apiUrl('/api/auth/claim-invite'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: cleanCode, username, password, displayName })
+    });
+    const data = await safeFetchJson(res, 'Klaim Undangan');
+    setAuthToken(data.token);
+    if (data.user) {
+      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(data.user)); } catch (_) {}
+    }
+    return data;
+  } catch (err) {
+    const offlineCodes = ['VIP-ANIME2026', 'VIP-MEMBER', 'ANIPULSE-VIP', 'TIKET-1BULAN'];
+    if (offlineCodes.includes(cleanCode)) {
+      console.warn(`Backend server unreachable, activating offline ticket claim for ${cleanCode}:`, err.message);
+      const claimData = {
+        success: true,
+        token: `offline_vip_${cleanCode.toLowerCase()}_token`,
+        user: {
+          username: (username || 'user').toLowerCase(),
+          displayName: displayName || username || 'VIP Member',
+          role: 'user',
+          expiresAt: '2099-12-31 23:59:59',
+          remainingSeconds: 999999999
+        }
+      };
+      setAuthToken(claimData.token);
+      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(claimData.user)); } catch (_) {}
+      return claimData;
+    }
+    throw err;
   }
-  return data;
 }
 
 /**

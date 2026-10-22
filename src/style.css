@@ -1038,11 +1038,13 @@ button {
 }
 
 video::cue {
-  background-color: rgba(0, 0, 0, 0.8);
-  color: #ffffff;
-  font-family: var(--font-sans);
-  font-size: 1.15rem;
-  line-height: 1.4;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  background: transparent !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
 }
 
 /* Dialog Modal */

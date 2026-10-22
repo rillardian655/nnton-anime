@@ -259,7 +259,8 @@ function handlePlayClick(ep = 1) {
   }
   emit('close');
   const title = encodeURIComponent(props.anime?.title?.english || props.anime?.title?.romaji || '');
-  router.push(`/watch?id=${props.anime?.id}&ep=${ep}&title=${title}`);
+  const slugQuery = props.anime?.slug ? `&slug=${encodeURIComponent(props.anime.slug)}` : '';
+  router.push(`/watch?id=${props.anime?.id}&ep=${ep}&title=${title}${slugQuery}`);
 }
 
 const originalSynopsis = ref('');

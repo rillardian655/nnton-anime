@@ -76,7 +76,7 @@
                   id="serverUrlInput" 
                   v-model="customBackendUrl" 
                   type="text" 
-                  placeholder="http://192.168.1.11:8000" 
+                  placeholder="http://192.168.1.51:8000" 
                   class="admin-input-text"
                 />
                 <button type="button" class="btn btn-primary btn-sm" @click="saveServerUrl">
@@ -90,7 +90,7 @@
                 {{ serverTestMessage }}
               </p>
               <p class="server-note">
-                IP Laptop saat ini: <code>http://192.168.1.11:8000</code>. Jika laptop berpindah Wi-Fi atau hotspot, cukup ubah IP di sini agar aplikasi HP dapat terus terhubung.
+                IP Laptop saat ini: <code>http://192.168.1.51:8000</code>. Jika laptop berpindah Wi-Fi atau hotspot, cukup ubah IP di sini agar aplikasi HP dapat terus terhubung.
               </p>
             </div>
           </div>
@@ -529,7 +529,7 @@ import {
 } from '../api.js';
 
 // Server Backend Configuration State
-const customBackendUrl = ref(localStorage.getItem('anipulse_backend_url') || getApiBaseUrl() || 'http://192.168.1.11:8000');
+const customBackendUrl = ref(localStorage.getItem('anipulse_backend_url') || getApiBaseUrl() || 'http://192.168.1.51:8000');
 const isTestingServer = ref(false);
 const serverTestMessage = ref('');
 const serverTestOk = ref(false);

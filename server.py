@@ -10,7 +10,7 @@ import hashlib
 import sqlite3
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -35,10 +35,36 @@ def _ipv4_first_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     return _orig_getaddrinfo(host, port, family, type, proto, flags)
 socket.getaddrinfo = _ipv4_first_getaddrinfo
 
-from anicli_api.source.yummy_anime import Extractor
+from anicli_api.source.yummy_anime import Extractor, Anime, Episode
+from anicli_api.source.parsers.yummy_anime_me_parser import YummyAnimeApi
 from anicli_api.player.kodik import Kodik
-from anicli_api.source.anilibria import Extractor as AnilibriaExtractor
-from anicli_api.source.animevost import Extractor as AnimevostExtractor
+
+# Monkey-patch Anime.get_episodes to safely handle fractional episode numbers (e.g. '1168.5', '12.5')
+def safe_get_episodes(self):
+    anime_id = self.data.get("anime_id") or self.data.get("id")
+    result = YummyAnimeApi.anime_videos(self.http, id=anime_id)
+    if not result.is_ok:
+        return []
+    data = result.value.get("response", [])
+    mapping_videos = {}
+    for video in data:
+        if "alloha" in video.get("iframe_url", ""):
+            continue
+        num_str = str(video.get("number", "1"))
+        if not mapping_videos.get(num_str):
+            mapping_videos[num_str] = []
+        mapping_videos[num_str].append(video)
+    
+    results = []
+    for num, videos in mapping_videos.items():
+        try:
+            ord_num = int(float(num))
+        except (ValueError, TypeError):
+            ord_num = 1
+        results.append(Episode(title="Episode", ordinal=ord_num, data=videos, **self._kwargs_http))
+    return results
+
+Anime.get_episodes = safe_get_episodes
 
 app = FastAPI(title="AniPulse Backend - anicli-api & Kodik Core")
 
@@ -145,22 +171,40 @@ def init_db():
             )
             """)
 
-            # Seed default admin if none exists
-            cursor.execute("SELECT id FROM users WHERE username = 'runa@gmail.com' OR username = 'runa'")
-            if not cursor.fetchone():
-                admin_pw = hash_password("runa8989")
-                cursor.execute("""
-                INSERT INTO users (username, password_hash, display_name, role, expires_at, is_active)
-                VALUES ('runa@gmail.com', ?, 'Runa Admin', 'admin', '2099-12-31 23:59:59', 1)
-                """, (admin_pw,))
-                cursor.execute("""
-                INSERT INTO users (username, password_hash, display_name, role, expires_at, is_active)
-                VALUES ('runa', ?, 'Runa Admin', 'admin', '2099-12-31 23:59:59', 1)
-                """, (admin_pw,))
-                logger.info("Admin created: runa@gmail.com / runa8989")
+            # Seed default admin & VIP users if none exists
+            default_users = [
+                ('runa@gmail.com', 'runa8989', 'Runa Admin', 'admin'),
+                ('runa', 'runa8989', 'Runa Admin', 'admin'),
+                ('iruna', 'iruna123', 'Iruna VIP', 'admin'),
+                ('rillardian', 'rillardian123', 'Rillardian Admin', 'admin'),
+                ('admin', 'admin123', 'Administrator', 'admin'),
+                ('vip', 'vip123', 'VIP Member', 'user')
+            ]
+            for u_name, u_pass, u_disp, u_role in default_users:
+                cursor.execute("SELECT id FROM users WHERE username = ?", (u_name,))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                    INSERT INTO users (username, password_hash, display_name, role, expires_at, is_active)
+                    VALUES (?, ?, ?, ?, '2099-12-31 23:59:59', 1)
+                    """, (u_name, hash_password(u_pass), u_disp, u_role))
+
+            # Seed default VIP tickets if not exists
+            default_invites = [
+                ('VIP-ANIME2026', 'VIP Member 1 Bulan', 'month', 30 * 86400),
+                ('VIP-MEMBER', 'VIP Member 1 Bulan', 'month', 30 * 86400),
+                ('ANIPULSE-VIP', 'VIP Member Lifetime', 'lifetime', 365 * 10 * 86400),
+                ('TIKET-1BULAN', 'Tiket 30 Hari', 'month', 30 * 86400)
+            ]
+            for inv_code, inv_target, inv_dur_type, inv_secs in default_invites:
+                cursor.execute("SELECT id FROM invites WHERE code = ?", (inv_code,))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                    INSERT INTO invites (code, target_name, duration_type, duration_seconds, is_used)
+                    VALUES (?, ?, ?, ?, 0)
+                    """, (inv_code, inv_target, inv_dur_type, inv_secs))
 
             conn.commit()
-            logger.info("SQLite database initialized successfully.")
+            logger.info("SQLite database initialized and seeded successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize SQLite DB: {e}")
 
@@ -229,49 +273,169 @@ def extract_token_from_request(request: Request) -> Optional[str]:
     return request.query_params.get("token")
 
 
-# Shared anicli Extractors & Kodik Engine
+# Shared anicli Extractor & Kodik Engine
 yummy_extractor = Extractor()
-anilibria_extractor = AnilibriaExtractor()
-animevost_extractor = AnimevostExtractor()
 kodik_player = Kodik()
 
-# Known high-speed Kodik Season mappings for reliable streaming
-KNOWN_KODIK_SEASONS = {
-    "blue box": [
-        {
-            "title": "Субтитры Kazoku Project (Sub Indo / Original)",
-            "url_template": "https://kodikplayer.com/season/123188/c744ba7e9c7d72e9f4e06872ad3b0bf8/720p?translations=false&only_episode=true&only_season=true&episode={ep}",
-            "is_sub": True
-        },
-        {
-            "title": "Субтитры SubVost (Original Sub)",
-            "url_template": "https://kodikplayer.com/season/123184/2e9b0266b25d405ac8a6d6fcfe2b919d/720p?translations=false&only_episode=true&only_season=true&episode={ep}",
-            "is_sub": True
-        },
-        {
-            "title": "Озвучка AniLibria (Dub)",
-            "url_template": "https://kodikplayer.com/season/123244/f06baefebd1487f9049cb53f2a7b9c16/720p?translations=false&only_episode=true&only_season=true&episode={ep}",
-            "is_sub": False
-        }
-    ],
-    "ao no hako": [
-        {
-            "title": "Субтитры Kazoku Project (Sub Indo / Original)",
-            "url_template": "https://kodikplayer.com/season/123188/c744ba7e9c7d72e9f4e06872ad3b0bf8/720p?translations=false&only_episode=true&only_season=true&episode={ep}",
-            "is_sub": True
-        },
-        {
-            "title": "Субтитры SubVost (Original Sub)",
-            "url_template": "https://kodikplayer.com/season/123184/2e9b0266b25d405ac8a6d6fcfe2b919d/720p?translations=false&only_episode=true&only_season=true&episode={ep}",
-            "is_sub": True
-        },
-        {
-            "title": "Озвучка AniLibria (Dub)",
-            "url_template": "https://kodikplayer.com/season/123244/f06baefebd1487f9049cb53f2a7b9c16/720p?translations=false&only_episode=true&only_season=true&episode={ep}",
-            "is_sub": False
-        }
-    ]
+# OpenRouter API Key for Claude Haiku 5.5
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+
+RUSSIAN_GENRES_MAP = {
+    "Сёнэн": "Shounen",
+    "Романтика": "Romance",
+    "Спорт": "Sports",
+    "Школьная жизнь": "School",
+    "Школа": "School",
+    "Любовный треугольник": "Romance",
+    "Экшен": "Action",
+    "Комедия": "Comedy",
+    "Драма": "Drama",
+    "Фэнтези": "Fantasy",
+    "Приключения": "Adventure",
+    "Повседневность": "Slice of Life",
+    "Сверхъестественное": "Supernatural",
+    "Детектив": "Mystery",
+    "Фантастика": "Sci-Fi",
+    "Музыка": "Music",
+    "Триллер": "Thriller",
+    "Ужасы": "Horror",
+    "Психологическое": "Psychological",
+    "Меха": "Mecha",
+    "Магия": "Magic",
+    "Военное": "Military",
+    "Исторический": "Historical",
+    "Демоны": "Demons"
 }
+
+def clean_yummy_title(raw_title: str, slug: str = "") -> str:
+    """Format Russian or transliterated YummyAnime titles into clean English/Romaji"""
+    if not raw_title:
+        return "Anime"
+    if "Голубая шкатулка 2" in raw_title or "golubaya-shkatulka-2" in slug:
+        return "Blue Box (Ao no Hako) Season 2"
+    if "Голубая шкатулка" in raw_title or "golubaya-shkatulka" in slug:
+        return "Blue Box (Ao no Hako)"
+    if "Синяя тюрьма" in raw_title or "Блю Лок" in raw_title:
+        if "2" in raw_title or "-2" in slug:
+            return "Blue Lock vs. U-20 Japan (Season 2)"
+        return "Blue Lock"
+    if "Дандадан" in raw_title or "dandadan" in slug:
+        return "DAN DA DAN"
+    if "Блич" in raw_title or "bleach" in slug:
+        return "Bleach: Thousand-Year Blood War"
+    if "Магическая битва" in raw_title:
+        return "Jujutsu Kaisen"
+    if "Поднятие уровня в одиночку" in raw_title:
+        return "Solo Leveling"
+    if "Реинкарнация безработного" in raw_title:
+        return "Mushoku Tensei: Jobless Reincarnation"
+    if "Клинок, рассекающий демонов" in raw_title:
+        return "Demon Slayer: Kimetsu no Yaiba"
+    if "Атака титанов" in raw_title:
+        return "Attack on Titan"
+    if "Человек-бензопила" in raw_title:
+        return "Chainsaw Man"
+    if "Провожающая в последний путь Фрирен" in raw_title:
+        return "Frieren: Beyond Journey's End"
+    if "Тетрадь дружбы Нацумэ" in raw_title:
+        if "7" in raw_title or "седьмой" in raw_title.lower():
+            return "Natsume's Book of Friends Season 7"
+        return "Natsume's Book of Friends"
+    if slug:
+        formatted_slug = slug.replace("-", " ").title()
+        if any(ord(c) > 127 for c in raw_title):
+            return formatted_slug
+    return raw_title
+
+def format_yummy_anime_media(data: Dict[str, Any], episodes_count: Optional[int] = None) -> Dict[str, Any]:
+    raw_title = data.get("title") or "Anime"
+    slug = data.get("anime_url") or ""
+    clean_title = clean_yummy_title(raw_title, slug)
+    
+    poster_obj = data.get("poster", {}) or {}
+    poster_url = (
+        poster_obj.get("huge") or 
+        poster_obj.get("big") or 
+        poster_obj.get("medium") or 
+        poster_obj.get("fullsize") or 
+        ""
+    )
+    if poster_url and poster_url.startswith("//"):
+        poster_url = "https:" + poster_url
+
+    genres_raw = data.get("genres", []) or []
+    genres = []
+    for g in genres_raw:
+        gt = g.get("title", "") if isinstance(g, dict) else str(g)
+        en_g = RUSSIAN_GENRES_MAP.get(gt, gt)
+        if en_g and en_g not in genres:
+            genres.append(en_g)
+    if not genres:
+        genres = ["Animation", "Japanese"]
+
+    status_obj = data.get("anime_status", {}) or {}
+    status_alias = status_obj.get("alias", "")
+    is_ongoing = status_alias == "ongoing" or status_obj.get("value") == 1
+    status_str = "RELEASING" if is_ongoing else "FINISHED"
+
+    type_obj = data.get("type", {}) or {}
+    format_str = "TV"
+    if type_obj.get("alias") in ["movie", "film"]:
+        format_str = "MOVIE"
+    elif type_obj.get("alias") in ["ova", "ona"]:
+        format_str = "OVA"
+
+    rating_obj = data.get("rating", {}) or {}
+    avg_score_raw = rating_obj.get("average") or rating_obj.get("myanimelist_rating") or 8.2
+    try:
+        average_score = int(float(avg_score_raw) * 10)
+    except Exception:
+        average_score = 82
+
+    ep_info = data.get("episodes", {}) or {}
+    raw_aired = ep_info.get("aired")
+    raw_count = ep_info.get("count")
+    aired_ep = episodes_count or raw_aired or 1
+    total_ep = episodes_count or raw_count or (aired_ep if not is_ongoing else 12)
+
+    studios_raw = data.get("studios", []) or []
+    studio_nodes = []
+    for s in studios_raw:
+        st_name = s.get("title") if isinstance(s, dict) else str(s)
+        if st_name:
+            studio_nodes.append({"name": st_name})
+    if not studio_nodes and "шкатулка" in raw_title:
+        studio_nodes = [{"name": "Telecom Animation Film"}]
+
+    anime_id = data.get("anime_id") or abs(hash(slug or raw_title)) % 1000000
+
+    return {
+        "id": anime_id,
+        "yummyId": anime_id,
+        "slug": slug,
+        "title": {
+            "romaji": clean_title,
+            "english": clean_title,
+            "native": raw_title
+        },
+        "format": format_str,
+        "status": status_str,
+        "seasonYear": data.get("year") or 2024,
+        "averageScore": average_score,
+        "genres": genres,
+        "coverImage": {
+            "large": poster_url or "/api/image-proxy?url=default",
+            "extraLarge": poster_url or "/api/image-proxy?url=default",
+            "color": "#e50914"
+        },
+        "bannerImage": poster_url,
+        "currentEpisode": aired_ep,
+        "episodes": total_ep,
+        "episodesAired": aired_ep,
+        "studios": {"nodes": studio_nodes},
+        "description": data.get("description") or f"{clean_title} streaming subtitle Indonesia.",
+        "remote_ids": data.get("remote_ids", {})
+    }
 
 # In-memory cache for search, anime, and streams to avoid refetching
 anime_cache: Dict[str, Any] = {}
@@ -286,7 +450,19 @@ prefetch_tasks: Dict[str, asyncio.Task] = {}
 # High-performance persistent HTTP client with connection pooling
 http_limits = httpx.Limits(max_keepalive_connections=100, max_connections=200, keepalive_expiry=60.0)
 http_timeout = httpx.Timeout(30.0, connect=10.0)
-global_client = httpx.AsyncClient(limits=http_limits, timeout=http_timeout, follow_redirects=True)
+_global_client: Optional[httpx.AsyncClient] = None
+
+def get_http_client() -> httpx.AsyncClient:
+    global _global_client
+    if _global_client is None or _global_client.is_closed:
+        _global_client = httpx.AsyncClient(limits=http_limits, timeout=http_timeout, follow_redirects=True)
+    return _global_client
+
+class _GlobalClientProxy:
+    def __getattr__(self, name):
+        return getattr(get_http_client(), name)
+
+global_client = _GlobalClientProxy()
 
 KODIK_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -346,37 +522,70 @@ async def proxy_anilist(request: Request):
         logger.error(f"AniList proxy error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/kitsu/{path:path}")
-async def proxy_kitsu(path: str, request: Request):
-    """Proxy Kitsu API to avoid CORS and rate limits"""
-    query_params = str(request.query_params)
-    cache_key = f"{path}:{query_params}"
-    if cache_key in kitsu_cache:
-        return kitsu_cache[cache_key]
+# ==========================================
+# 1. YUMMY ANIME / ANICLI CORE & EPISODES
+# ==========================================
 
-    target_url = f"https://kitsu.io/api/edge/{path}"
-    if query_params:
-        target_url += f"?{query_params}"
+@app.get("/api/yummy/anime/{id_or_slug}")
+async def get_yummy_anime_details(id_or_slug: str):
+    """Retrieve full anime metadata from YummyAnime API by ID or slug"""
+    clean_id = id_or_slug.strip()
+    loop = asyncio.get_event_loop()
 
+    # 1. Try by numeric ID
+    if clean_id.isdigit():
+        num_id = int(clean_id)
+        try:
+            res = await loop.run_in_executor(None, lambda: YummyAnimeApi.anime_by_ids(yummy_extractor.http, ids=[num_id]))
+            if res.is_ok and res.value.get("response"):
+                data = res.value["response"][0]
+                episodes_count = 0
+                try:
+                    anime = Anime(
+                        title=data["title"],
+                        thumbnail=data["poster"]["medium"],
+                        description=data["description"],
+                        data=data,
+                        **yummy_extractor._kwargs_http,
+                    )
+                    eps = await loop.run_in_executor(None, anime.get_episodes)
+                    episodes_count = len(eps) if eps else 0
+                except Exception:
+                    pass
+                return format_yummy_anime_media(data, episodes_count)
+        except Exception as e:
+            logger.warning(f"Error fetching YummyAnime ID {num_id}: {e}")
+
+    # 2. Try by search / slug in catalog
     try:
-        resp = await global_client.get(target_url, headers={"Accept": "application/vnd.api+json"})
-        if resp.status_code == 200:
-            data = resp.json()
-            if len(kitsu_cache) > 200:
-                kitsu_cache.clear()
-            kitsu_cache[cache_key] = data
-            return data
-    except Exception as e:
-        logger.warning(f"Kitsu proxy failed: {e}")
-    raise HTTPException(status_code=502, detail="Kitsu upstream unavailable")
+        results = await loop.run_in_executor(None, yummy_extractor.search, clean_id)
+        if results:
+            target_r = None
+            for r in results:
+                if r.data.get("anime_url") == clean_id:
+                    target_r = r
+                    break
+            if not target_r:
+                target_r = results[0]
 
-# ==========================================
-# 1. YUMMY ANIME / ANICLI SEARCH & EPISODES
-# ==========================================
+            data = target_r.data
+            episodes_count = 0
+            try:
+                anime = target_r.get_anime()
+                eps = await loop.run_in_executor(None, anime.get_episodes)
+                episodes_count = len(eps) if eps else 0
+            except Exception:
+                pass
+            return format_yummy_anime_media(data, episodes_count)
+    except Exception as e:
+        logger.error(f"Error fetching YummyAnime slug {clean_id}: {e}")
+
+    raise HTTPException(status_code=404, detail="Anime tidak ditemukan di YummyAnime")
+
 
 @app.get("/api/yummy/search")
 async def search_yummy(q: str = Query(..., description="Anime search query")):
-    """Search YummyAnime using anicli-api"""
+    """Search YummyAnime using anicli-api and return rich media cards"""
     clean_q = q.strip()
     if not clean_q:
         return {"results": []}
@@ -386,111 +595,175 @@ async def search_yummy(q: str = Query(..., description="Anime search query")):
         results = await loop.run_in_executor(None, yummy_extractor.search, clean_q)
 
         output = []
-        for r in results[:10]:
-            anime_id = f"yummy_{abs(hash(r.title)) % 1000000}"
-            anime_cache[anime_id] = r
-            output.append({
-                "id": anime_id,
-                "title": r.title,
-                "raw_title": r.title
-            })
+        for r in results[:15]:
+            media = format_yummy_anime_media(r.data)
+            output.append(media)
         return {"results": output}
     except Exception as e:
         return {"error": str(e), "results": []}
 
 
+def is_yummy_candidate_match(data: dict, q: str, alt: str = "", slug: str = "") -> bool:
+    """Validate that a YummyAnime item matches the requested query or slug before accepting it"""
+    if not data:
+        return False
+    r_url = (data.get("anime_url") or "").lower()
+    r_title = (data.get("title") or "").lower()
+    if slug and r_url == slug.lower():
+        return True
+    
+    clean_q = (q or "").strip().lower()
+    clean_alt = (alt or "").strip().lower()
+    if not clean_q and not clean_alt:
+        return True
+    
+    # Check compact slug match (e.g. bluebox, kon)
+    clean_slug_q = re.sub(r'[^a-z0-9]', '', clean_q.split(':')[0])
+    clean_slug_alt = re.sub(r'[^a-z0-9]', '', clean_alt.split(':')[0])
+    r_url_clean = re.sub(r'[^a-z0-9]', '', r_url)
+    
+    if clean_slug_q and (clean_slug_q in r_url_clean or r_url_clean in clean_slug_q):
+        return True
+    if clean_slug_alt and (clean_slug_alt in r_url_clean or r_url_clean in clean_slug_alt):
+        return True
+
+    # Common franchise transliterations
+    if any(k in clean_slug_q for k in ['kon', 'keion']) and ('keyon' in r_url_clean or 'кэйон' in r_title):
+        return True
+    if 'onepiece' in clean_slug_q and ('vanpis' in r_url_clean or 'ванпис' in r_title.replace('-', '')):
+        return True
+    if 'titan' in clean_slug_q and ('titanov' in r_url_clean or 'титанов' in r_title):
+        return True
+    if 'dandadan' in clean_slug_q and ('dandadan' in r_url_clean or 'дандадан' in r_title):
+        return True
+    if ('bluebox' in clean_slug_q or 'aonohako' in clean_slug_alt) and ('golubayashkatulka' in r_url_clean or 'голубаяшкатулка' in r_title.replace(' ', '')):
+        return True
+
+    stopwords = {"season", "the", "part", "ova", "special", "episode", "on", "no", "to", "in", "of", "and", "a", "an", "is", "ii", "2nd"}
+    q_words = [w for w in re.findall(r'[a-zA-Z0-9]+', f"{clean_q} {clean_alt}") if len(w) >= 3 and w not in stopwords]
+    
+    return any(w in r_url or w in r_title for w in q_words)
+
+
 @app.get("/api/yummy/episodes")
-async def get_yummy_episodes(q: str = Query(...), alt: Optional[str] = Query(None)):
-    """Search anime and retrieve all episodes via anicli-api across multiple providers"""
+async def get_yummy_episodes(
+    q: str = Query(..., description="Anime title search query"),
+    alt: Optional[str] = Query(None),
+    id: Optional[str] = Query(None),
+    slug: Optional[str] = Query(None)
+):
+    """Retrieve all real streamable episodes for an anime via anicli-api (YummyAnime Core)"""
+    loop = asyncio.get_event_loop()
+
+    # 1. Direct ID match if provided and matches the anime query
+    if id and id.strip().isdigit():
+        num_id = int(id.strip())
+        try:
+            res = await loop.run_in_executor(None, lambda: YummyAnimeApi.anime_by_ids(yummy_extractor.http, ids=[num_id]))
+            if res.is_ok and res.value.get("response"):
+                data = res.value["response"][0]
+                if is_yummy_candidate_match(data, q, alt, slug):
+                    anime = Anime(
+                        title=data["title"],
+                        thumbnail=data["poster"]["medium"],
+                        description=data["description"],
+                        data=data,
+                        **yummy_extractor._kwargs_http,
+                    )
+                    eps = await loop.run_in_executor(None, anime.get_episodes)
+                    if eps:
+                        ep_list = []
+                        for ep in eps:
+                            ep_num = getattr(ep, "ordinal", None) if getattr(ep, "ordinal", None) is not None else int(str(ep.num).strip())
+                            ep_list.append({
+                                "num": ep_num,
+                                "title": ep.title or f"Episode {ep_num}"
+                            })
+                        ep_list.sort(key=lambda x: x["num"])
+                        return {
+                            "anime_title": clean_yummy_title(anime.title, data.get("anime_url", "")),
+                            "total_episodes": len(ep_list),
+                            "episodes": ep_list
+                        }
+                else:
+                    logger.info(f"Direct ID {num_id} ({data.get('anime_url')}) does not match query '{q}', falling back to title search")
+        except Exception as e:
+            logger.warning(f"Direct ID {num_id} episodes error: {e}")
+
+    # 2. Season-aware search
     clean_q = q.strip()
-    if not clean_q:
-        return {"episodes": []}
+    alt_q = alt.strip() if alt else ""
+    is_s2 = any(t in clean_q.lower() or t in alt_q.lower() for t in ["season 2", "2nd season", "s2", " 2", "part 2", "ii"])
 
-    try:
-        loop = asyncio.get_event_loop()
-        candidates = [clean_q]
-        if alt and alt.strip() and alt.strip() not in candidates:
-            candidates.append(alt.strip())
-        if ":" in clean_q:
-            c1 = clean_q.split(":")[0].strip()
-            if c1 and c1 not in candidates:
-                candidates.append(c1)
-        if alt and ":" in alt:
-            c2 = alt.split(":")[0].strip()
-            if c2 and c2 not in candidates:
-                candidates.append(c2)
+    candidates = [clean_q]
+    if alt_q and alt_q not in candidates:
+        candidates.append(alt_q)
+    # Franchise Russian aliases for known title differences
+    norm_low = clean_q.lower()
+    if "one piece" in norm_low and "Ван-Пис" not in candidates:
+        candidates.append("Ван-Пис")
+    elif "dandadan" in norm_low or "dan da dan" in norm_low:
+        if "Дандадан" not in candidates:
+            candidates.append("Дандадан")
+        if "Dandadan" not in candidates:
+            candidates.append("Dandadan")
+    if ":" in clean_q:
+        c1 = clean_q.split(":")[0].strip()
+        if c1 and c1 not in candidates:
+            candidates.append(c1)
 
-        # 1. Try Animevost (extremely fast & comprehensive)
-        for cand in candidates:
-            try:
-                res_av = await loop.run_in_executor(None, animevost_extractor.search, cand)
-                if res_av:
-                    anime_av = await loop.run_in_executor(None, res_av[0].get_anime)
-                    eps_av = await loop.run_in_executor(None, anime_av.get_episodes)
-                    if eps_av:
-                        ep_list = []
-                        for ep in eps_av:
-                            ep_num = getattr(ep, "ordinal", None) if getattr(ep, "ordinal", None) is not None else ep.num
-                            ep_list.append({
-                                "num": ep_num,
-                                "title": f"Episode {ep_num}"
-                            })
-                        return {
-                            "anime_title": anime_av.title,
-                            "total_episodes": len(ep_list),
-                            "episodes": ep_list
-                        }
-            except Exception:
-                pass
+    for cand in candidates:
+        try:
+            results = await loop.run_in_executor(None, yummy_extractor.search, cand)
+            if results:
+                scored_results = []
+                for r in results[:8]:
+                    score = 0
+                    r_title = r.title.lower()
+                    r_url = r.data.get("anime_url", "").lower()
+                    has_2 = " 2" in r_title or "-2" in r_url or "2" in r_title or "ii" in r_url
+                    if slug and r.data.get("anime_url") == slug:
+                        score += 50
+                    if r_url.endswith("-tv") or "-tv-" in r_url:
+                        score += 15
+                    if not any(x in clean_q.lower() for x in ["film", "movie", "ova", "special"]):
+                        if any(x in r_url for x in ["-film", "-movie", "-ova", "-special", "chopper"]):
+                            score -= 30
+                    if is_s2 and has_2:
+                        score += 20
+                    elif not is_s2 and not has_2:
+                        score += 20
+                    elif is_s2 and not has_2:
+                        score -= 10
+                    scored_results.append((score, r))
+                scored_results.sort(key=lambda x: x[0], reverse=True)
 
-        # 2. Try Anilibria
-        for cand in candidates:
-            try:
-                res_al = await loop.run_in_executor(None, anilibria_extractor.search, cand)
-                if res_al:
-                    anime_al = await loop.run_in_executor(None, res_al[0].get_anime)
-                    eps_al = await loop.run_in_executor(None, anime_al.get_episodes)
-                    if eps_al:
-                        ep_list = []
-                        for ep in eps_al:
-                            ep_num = getattr(ep, "ordinal", None) if getattr(ep, "ordinal", None) is not None else ep.num
-                            ep_list.append({
-                                "num": ep_num,
-                                "title": f"Episode {ep_num}"
-                            })
-                        return {
-                            "anime_title": anime_al.title,
-                            "total_episodes": len(ep_list),
-                            "episodes": ep_list
-                        }
-            except Exception:
-                pass
+                for _, cand_r in scored_results:
+                    if not is_yummy_candidate_match(cand_r.data, clean_q, alt_q, slug):
+                        continue
+                    try:
+                        anime = await loop.run_in_executor(None, cand_r.get_anime)
+                        eps = await loop.run_in_executor(None, anime.get_episodes)
+                        if eps:
+                            ep_list = []
+                            for ep in eps:
+                                ep_num = getattr(ep, "ordinal", None) if getattr(ep, "ordinal", None) is not None else int(str(ep.num).strip())
+                                ep_list.append({
+                                    "num": ep_num,
+                                    "title": ep.title or f"Episode {ep_num}"
+                                })
+                            ep_list.sort(key=lambda x: x["num"])
+                            return {
+                                "anime_title": clean_yummy_title(anime.title, cand_r.data.get("anime_url", "")),
+                                "total_episodes": len(ep_list),
+                                "episodes": ep_list
+                            }
+                    except Exception:
+                        continue
+        except Exception as e:
+            logger.warning(f"Yummy search '{cand}' episodes error: {e}")
 
-        # 3. Try YummyAnime
-        for cand in candidates:
-            try:
-                results = await loop.run_in_executor(None, yummy_extractor.search, cand)
-                if results:
-                    anime = await loop.run_in_executor(None, results[0].get_anime)
-                    episodes = await loop.run_in_executor(None, anime.get_episodes)
-                    if episodes:
-                        ep_list = []
-                        for ep in episodes:
-                            ep_list.append({
-                                "num": ep.num,
-                                "title": ep.title or f"Episode {ep.num}"
-                            })
-                        return {
-                            "anime_title": anime.title,
-                            "total_episodes": len(ep_list),
-                            "episodes": ep_list
-                        }
-            except Exception:
-                pass
-
-        return {"episodes": [], "message": f"Tidak ditemukan episode untuk '{clean_q}'"}
-    except Exception as e:
-        return {"error": str(e), "episodes": []}
+    return {"episodes": [], "total_episodes": 0}
 
 
 @app.get("/api/yummy/streams")
@@ -499,263 +772,204 @@ async def get_yummy_streams(
     q: str = Query(...), 
     ep: int = Query(1), 
     alt: Optional[str] = Query(None),
+    id: Optional[str] = Query(None),
+    slug: Optional[str] = Query(None),
     nocache: bool = Query(False)
 ):
-    """Extract multi-provider video streams (AniLibria HLS, AnimeVost MP4, Kodik HLS) - Protected by VIP Token"""
+    """Extract Kodik HLS video streams via anicli-api (yummy_anime) - High Performance & Open Playback"""
     token = extract_token_from_request(req)
     user = get_user_from_token(token)
-    if not user:
-        raise HTTPException(
-            status_code=403, 
-            detail="Akses streaming VIP terkunci. Masuk dengan akun VIP atau klaim kode undangan untuk menonton anime."
-        )
 
     clean_q = q.strip()
     alt_q = alt.strip() if alt else ""
-
-    s_key = f"{clean_q.lower()}:{alt_q.lower()}:{ep}"
+    s_key = f"{id or ''}:{slug or ''}:{clean_q.lower()}:{alt_q.lower()}:{ep}"
     if not nocache and s_key in streams_cache:
         return streams_cache[s_key]
 
-    output_sources = []
     loop = asyncio.get_event_loop()
+    target_anime = None
+    target_anime_data = {}
 
-    # Generate query candidates
-    candidates = []
-    def add_cand(cand: str):
-        c = cand.strip()
-        if c and c not in candidates:
-            candidates.append(c)
-
-    add_cand(clean_q)
-    if alt_q:
-        add_cand(alt_q)
-
-    if ":" in clean_q:
-        add_cand(clean_q.split(":")[0])
-    if alt_q and ":" in alt_q:
-        add_cand(alt_q.split(":")[0])
-
-    spaced_q = re.sub(r':(?=\S)', ': ', clean_q)
-    if spaced_q != clean_q:
-        add_cand(spaced_q)
-
-    for base in [clean_q, alt_q]:
-        if base:
-            no_season = re.sub(r'\s+(Season|\bS\d+\b|\bPart\b|\bII\b|\b2nd\b|\b3rd\b|\b4th\b|\b5th\b|\b6th\b|\b7th\b).*$', '', base, flags=re.IGNORECASE).strip()
-            add_cand(no_season)
-
-    # 1. Check known Kodik season templates first
-    kodik_configs = []
-    for cand in candidates:
-        low = cand.lower()
-        if low in KNOWN_KODIK_SEASONS:
-            kodik_configs = KNOWN_KODIK_SEASONS[low]
-            break
-
-    if kodik_configs:
-        def parse_kodik_cfg(cfg):
-            try:
-                url = cfg["url_template"].format(ep=ep)
-                vids = kodik_player.parse(url)
-                if not vids:
-                    return None
-                video_items = []
-                for v in vids:
-                    raw_url = v.url
-                    proxied_url = f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}"
-                    video_items.append({
-                        "quality": v.quality,
-                        "type": v.type,
-                        "url": proxied_url,
-                        "direct_url": raw_url
-                    })
-                return {
-                    "title": cfg["title"],
-                    "is_subtitles_original": cfg.get("is_sub", True),
-                    "player_url": url,
-                    "videos": video_items
-                }
-            except Exception as err:
-                logger.warning(f"Kodik parse error for {cfg.get('title')} ep {ep}: {err}")
-                return None
-
-        kodik_tasks = [loop.run_in_executor(None, parse_kodik_cfg, cfg) for cfg in kodik_configs]
-        kodik_results = await asyncio.gather(*kodik_tasks)
-        for res in kodik_results:
-            if res and res.get("videos"):
-                output_sources.append(res)
-
-    # 2. Parallel Extraction: AniLibria (HLS) & AnimeVost (Direct MP4)
-    def fetch_anilibria():
-        for query_cand in candidates:
-            try:
-                res_lib = anilibria_extractor.search(query_cand)
-                if not res_lib:
-                    continue
-                anime_lib = res_lib[0].get_anime()
-                episodes_lib = anime_lib.get_episodes()
-                target_ep = None
-                for le in episodes_lib:
-                    try:
-                        le_int = int(getattr(le, "ordinal", None) if getattr(le, "ordinal", None) is not None else int(str(le.num).strip()))
-                        if le_int == int(ep):
-                            target_ep = le
-                            break
-                    except Exception:
-                        if str(getattr(le, "num", "")).strip() == str(ep).strip():
-                            target_ep = le
-                            break
-                if not target_ep and 1 <= int(ep) <= len(episodes_lib):
-                    target_ep = episodes_lib[int(ep) - 1]
-                
-                if target_ep:
-                    sources = target_ep.get_sources()
-                    items = []
-                    for s in sources:
-                        for v in s.get_videos():
-                            raw_url = v.url
-                            items.append({
-                                "quality": v.quality,
-                                "type": v.type,
-                                "url": f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}",
-                                "direct_url": raw_url
-                            })
-                    if items:
-                        items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
-                        return [{
-                            "title": "AniLibria Official (HLS 1080p/720p/480p)",
-                            "is_subtitles_original": False,
-                            "player_url": None,
-                            "videos": items
-                        }]
-            except Exception as inner_e:
-                logger.warning(f"Anilibria search inner error for '{query_cand}': {inner_e}")
-        return []
-
-    def fetch_animevost():
-        for query_cand in candidates:
-            try:
-                res_av = animevost_extractor.search(query_cand)
-                if not res_av:
-                    continue
-                anime_av = res_av[0].get_anime()
-                episodes_av = anime_av.get_episodes()
-                target_ep = None
-                for ae in episodes_av:
-                    try:
-                        ae_int = int(getattr(ae, "ordinal", None) if getattr(ae, "ordinal", None) is not None else int(str(ae.num).strip()))
-                        if ae_int == int(ep):
-                            target_ep = ae
-                            break
-                    except Exception:
-                        if str(getattr(ae, "num", "")).strip() == str(ep).strip():
-                            target_ep = ae
-                            break
-                if not target_ep and 1 <= int(ep) <= len(episodes_av):
-                    target_ep = episodes_av[int(ep) - 1]
-
-                if target_ep:
-                    sources = target_ep.get_sources()
-                    items = []
-                    for s in sources:
-                        for v in s.get_videos():
-                            raw_url = v.url
-                            proxied_url = f"/api/video/proxy?url={urllib.parse.quote(raw_url)}"
-                            items.append({
-                                "quality": v.quality,
-                                "type": "mp4",
-                                "url": proxied_url,
-                                "direct_url": raw_url
-                            })
-                    if items:
-                        items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
-                        return [{
-                            "title": "AnimeVost Server (HD MP4 / Fast)",
-                            "is_subtitles_original": False,
-                            "player_url": None,
-                            "videos": items
-                        }]
-            except Exception as inner_e:
-                logger.warning(f"Animevost search inner error for '{query_cand}': {inner_e}")
-        return []
-
-    parallel_tasks = [
-        loop.run_in_executor(None, fetch_anilibria),
-        loop.run_in_executor(None, fetch_animevost)
-    ]
-    parallel_results = await asyncio.gather(*parallel_tasks)
-    for p_res in parallel_results:
-        if p_res:
-            output_sources.extend(p_res)
-
-    # 3. If output_sources is still empty, fallback to YummyAnime
-    if not output_sources:
+    # 1. Direct ID match if numeric ID provided and matches the anime query
+    if id and id.strip().isdigit():
+        num_id = int(id.strip())
         try:
-            for query_cand in candidates:
-                try:
-                    results = await asyncio.wait_for(loop.run_in_executor(None, yummy_extractor.search, query_cand), timeout=5.0)
-                    if results:
-                        anime = await loop.run_in_executor(None, results[0].get_anime)
-                        episodes = await loop.run_in_executor(None, anime.get_episodes)
-                        if episodes:
-                            target_ep = None
-                            for e in episodes:
-                                try:
-                                    e_int = int(getattr(e, "ordinal", None) if getattr(e, "ordinal", None) is not None else int(str(e.num).strip()))
-                                    if e_int == int(ep):
-                                        target_ep = e
-                                        break
-                                except Exception:
-                                    if str(getattr(e, "num", "")).strip() == str(ep).strip():
-                                        target_ep = e
-                                        break
-                            if not target_ep and 1 <= int(ep) <= len(episodes):
-                                target_ep = episodes[int(ep) - 1]
-
-                            if target_ep:
-                                sources = await loop.run_in_executor(None, target_ep.get_sources)
-                                for s in sources[:4]:
-                                    try:
-                                        vids = await loop.run_in_executor(None, s.get_videos)
-                                        video_items = []
-                                        for v in vids:
-                                            raw_url = v.url
-                                            video_items.append({
-                                                "quality": v.quality,
-                                                "type": v.type,
-                                                "url": f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}",
-                                                "direct_url": raw_url
-                                            })
-                                        if video_items:
-                                            output_sources.append({
-                                                "title": f"Yummy / {s.title}",
-                                                "is_subtitles_original": "субтитр" in s.title.lower() or "sub" in s.title.lower(),
-                                                "player_url": getattr(s, "url", None),
-                                                "videos": video_items
-                                            })
-                                    except Exception as s_err:
-                                        logger.warning(f"Skipping problematic Yummy source '{getattr(s, 'title', '')}': {s_err}")
-                    if output_sources:
-                        break
-                except Exception as inner_e:
-                    logger.warning(f"Yummy candidate '{query_cand}' error: {inner_e}")
+            res = await loop.run_in_executor(None, lambda: YummyAnimeApi.anime_by_ids(yummy_extractor.http, ids=[num_id]))
+            if res.is_ok and res.value.get("response"):
+                cand_data = res.value["response"][0]
+                if is_yummy_candidate_match(cand_data, clean_q, alt_q, slug):
+                    target_anime_data = cand_data
+                    target_anime = Anime(
+                        title=target_anime_data["title"],
+                        thumbnail=target_anime_data["poster"]["medium"],
+                        description=target_anime_data["description"],
+                        data=target_anime_data,
+                        **yummy_extractor._kwargs_http,
+                    )
+                else:
+                    logger.info(f"Direct stream ID {num_id} ({cand_data.get('anime_url')}) does not match query '{clean_q}', falling back to title search")
         except Exception as e:
-            logger.warning(f"Yummy fallback error: {e}")
+            logger.warning(f"Direct stream ID {num_id} error: {e}")
 
-    result_data = {
+    # 2. Season-aware search if anime not found by ID
+    if not target_anime:
+        is_s2 = any(t in clean_q.lower() or t in alt_q.lower() for t in ["season 2", "2nd season", "s2", " 2", "part 2", "ii"])
+        candidates = [clean_q]
+        if alt_q and alt_q not in candidates:
+            candidates.append(alt_q)
+        norm_low = clean_q.lower()
+        if "one piece" in norm_low and "Ван-Пис" not in candidates:
+            candidates.append("Ван-Пис")
+        elif "dandadan" in norm_low or "dan da dan" in norm_low:
+            if "Дандадан" not in candidates:
+                candidates.append("Дандадан")
+            if "Dandadan" not in candidates:
+                candidates.append("Dandadan")
+        if ":" in clean_q:
+            c1 = clean_q.split(":")[0].strip()
+            if c1 and c1 not in candidates:
+                candidates.append(c1)
+
+        episodes = []
+        for cand in candidates:
+            try:
+                results = await loop.run_in_executor(None, yummy_extractor.search, cand)
+                if results:
+                    scored_results = []
+                    for r in results[:8]:
+                        score = 0
+                        r_title = r.title.lower()
+                        r_url = r.data.get("anime_url", "").lower()
+                        has_2 = " 2" in r_title or "-2" in r_url or "2" in r_title or "ii" in r_url
+                        if slug and r.data.get("anime_url") == slug:
+                            score += 50
+                        if r_url.endswith("-tv") or "-tv-" in r_url:
+                            score += 15
+                        if not any(x in clean_q.lower() for x in ["film", "movie", "ova", "special"]):
+                            if any(x in r_url for x in ["-film", "-movie", "-ova", "-special", "chopper"]):
+                                score -= 30
+                        if is_s2 and has_2:
+                            score += 20
+                        elif not is_s2 and not has_2:
+                            score += 20
+                        elif is_s2 and not has_2:
+                            score -= 10
+                        scored_results.append((score, r))
+                    scored_results.sort(key=lambda x: x[0], reverse=True)
+
+                    for _, cand_r in scored_results:
+                        if not is_yummy_candidate_match(cand_r.data, clean_q, alt_q, slug):
+                            continue
+                        try:
+                            cand_anime = await loop.run_in_executor(None, cand_r.get_anime)
+                            cand_eps = await loop.run_in_executor(None, cand_anime.get_episodes)
+                            if cand_eps:
+                                has_ep = any(int(getattr(e, "ordinal", None) if getattr(e, "ordinal", None) is not None else int(str(e.num).strip())) == int(ep) for e in cand_eps)
+                                if has_ep:
+                                    target_anime = cand_anime
+                                    target_anime_data = cand_r.data
+                                    episodes = cand_eps
+                                    break
+                        except Exception:
+                            continue
+                    if target_anime:
+                        break
+            except Exception as e:
+                logger.warning(f"Search for stream cand '{cand}' error: {e}")
+
+    if not target_anime:
+        return {"sources": [], "message": f"Anime tidak ditemukan untuk '{clean_q}'"}
+
+    # 3. Get episodes if not already loaded and find target episode
+    if not episodes:
+        episodes = await loop.run_in_executor(None, target_anime.get_episodes)
+    if not episodes:
+        return {"sources": [], "message": f"Episode tidak tersedia untuk '{clean_q}'"}
+
+    target_ep = None
+    for e in episodes:
+        try:
+            e_num = int(getattr(e, "ordinal", None) if getattr(e, "ordinal", None) is not None else int(str(e.num).strip()))
+            if e_num == int(ep):
+                target_ep = e
+                break
+        except Exception:
+            if str(getattr(e, "num", "")).strip() == str(ep).strip():
+                target_ep = e
+                break
+    if not target_ep and 1 <= int(ep) <= len(episodes):
+        target_ep = episodes[int(ep) - 1]
+
+    if not target_ep:
+        return {"sources": [], "message": f"Episode {ep} belum rilis atau tidak tersedia"}
+
+    # 4. Extract Kodik sources from target episode
+    sources = target_ep.get_sources()
+    kodik_sources = [s for s in sources if "kodik" in getattr(s, "url", "").lower()]
+
+    # Sort sources: prioritize Subtitles (Субтитры - Original JP audio with subtitles) FIRST!
+    def source_sort_key(s):
+        title_lower = s.title.lower()
+        if "субтитр" in title_lower or "sub" in title_lower or "kazoku" in title_lower or "subvost" in title_lower:
+            return 0
+        return 1
+
+    kodik_sources.sort(key=source_sort_key)
+
+    # Concurrently parse top Kodik sources for ultra-fast loading
+    async def extract_one_source(s):
+        try:
+            vids = await loop.run_in_executor(None, s.get_videos)
+            if not vids:
+                return None
+            video_items = []
+            for v in vids:
+                raw_url = v.url
+                proxied_url = f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}"
+                video_items.append({
+                    "quality": v.quality,
+                    "type": v.type,
+                    "url": proxied_url,
+                    "direct_url": raw_url
+                })
+            video_items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
+
+            is_sub = "субтитр" in s.title.lower() or "sub" in s.title.lower()
+            clean_source_title = f"{s.title} (Audio Asli Jepang)" if is_sub else f"{s.title} (Dub)"
+            return {
+                "title": clean_source_title,
+                "is_subtitles_original": is_sub,
+                "player_url": getattr(s, "url", None),
+                "videos": video_items
+            }
+        except Exception as err:
+            logger.warning(f"Error parsing Kodik stream for {s.title}: {err}")
+            return None
+
+    tasks = [extract_one_source(s) for s in kodik_sources[:4]]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    output_sources = [r for r in results if isinstance(r, dict) and r.get("videos")]
+
+    result_payload = {
         "anime": clean_q,
+        "anime_title": clean_yummy_title(target_anime.title, target_anime_data.get("anime_url", "")),
         "episode": ep,
         "sources": output_sources
     }
     if output_sources:
-        streams_cache[s_key] = result_data
-    return result_data
+        streams_cache[s_key] = result_payload
+    return result_payload
 
 
 # ==========================================
 # 2. HIGH-PERFORMANCE HLS PROXY & CACHE FOR KODIK (solodcdn.com)
 # ==========================================
+
+def normalize_cdn_url(url: str) -> str:
+    """Ensure solodcdn URLs route through responsive subdomains (midgard/asgard) instead of timing out gateway"""
+    if "://cloud.solodcdn.com/" in url:
+        return url.replace("://cloud.solodcdn.com/", "://midgard.cloud.solodcdn.com/")
+    return url
 
 def get_segment_disk_path(url: str) -> Path:
     url_hash = hashlib.sha1(url.strip().encode("utf-8")).hexdigest()
@@ -765,7 +979,7 @@ prefetch_semaphore = asyncio.Semaphore(4)
 
 async def fetch_and_cache_segment(url: str) -> Optional[bytes]:
     """Fetch segment from upstream Kodik solodcdn.com and save to disk + RAM cache"""
-    clean_url = url.strip()
+    clean_url = normalize_cdn_url(url.strip())
     disk_path = get_segment_disk_path(clean_url)
     if disk_path.exists():
         try:
@@ -777,24 +991,32 @@ async def fetch_and_cache_segment(url: str) -> Optional[bytes]:
             pass
 
     async with prefetch_semaphore:
-        try:
-            resp = await global_client.get(clean_url, headers=KODIK_HEADERS)
-            if resp.status_code == 200 and resp.content:
-                data = resp.content
-                # Save to disk cache
-                try:
-                    disk_path.write_bytes(data)
-                except Exception as e:
-                    logger.warning(f"Failed writing segment cache to disk: {e}")
-                
-                # Save to RAM cache
-                segment_cache[clean_url] = data
-                if len(segment_cache) > 100:
-                    for k in list(segment_cache.keys())[:30]:
-                        segment_cache.pop(k, None)
-                return data
-        except Exception as e:
-            logger.warning(f"Segment fetch failed for {clean_url}: {e}")
+        client = get_http_client()
+        candidate_urls = [clean_url]
+        if clean_url != url.strip():
+            candidate_urls.append(url.strip())
+        if "midgard.cloud.solodcdn.com" in clean_url:
+            candidate_urls.append(clean_url.replace("midgard.cloud.solodcdn.com", "asgard.cloud.solodcdn.com"))
+        elif "cloud.solodcdn.com" in clean_url:
+            candidate_urls.append(clean_url.replace("cloud.solodcdn.com", "midgard.cloud.solodcdn.com"))
+
+        for c_url in candidate_urls:
+            try:
+                resp = await client.get(c_url, headers=KODIK_HEADERS, timeout=12.0)
+                if resp.status_code == 200 and resp.content:
+                    data = resp.content
+                    try:
+                        disk_path.write_bytes(data)
+                    except Exception as e:
+                        logger.warning(f"Failed writing segment cache to disk: {e}")
+                    
+                    segment_cache[clean_url] = data
+                    if len(segment_cache) > 100:
+                        for k in list(segment_cache.keys())[:30]:
+                            segment_cache.pop(k, None)
+                    return data
+            except Exception as e:
+                logger.warning(f"Segment fetch failed for {c_url}: {e}")
     return None
 
 async def trigger_prefetch(next_urls: List[str]):
@@ -814,9 +1036,25 @@ async def trigger_prefetch(next_urls: List[str]):
 async def proxy_hls_manifest(request: Request, url: str = Query(...)):
     """Fetch M3U8 manifest from solodcdn.com, parse segments for prefetching, and rewrite URLs with direct CDN base"""
     try:
-        resp = await global_client.get(url, headers=KODIK_HEADERS)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code, detail="Failed to fetch M3U8")
+        clean_url = url.strip()
+        client = get_http_client()
+        resp = None
+        candidate_urls = [clean_url]
+        norm = normalize_cdn_url(clean_url)
+        if norm not in candidate_urls:
+            candidate_urls.append(norm)
+
+        for c_url in candidate_urls:
+            try:
+                resp = await client.get(c_url, headers=KODIK_HEADERS, timeout=12.0)
+                if resp.status_code == 200:
+                    break
+            except Exception as req_err:
+                logger.warning(f"Manifest fetch candidate {c_url} error: {req_err}")
+                continue
+
+        if not resp or resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code if resp else 502, detail="Failed to fetch M3U8")
 
         if request.method == "HEAD":
             return Response(status_code=200, media_type="application/vnd.apple.mpegurl")
@@ -859,6 +1097,8 @@ async def proxy_hls_manifest(request: Request, url: str = Query(...)):
                 "Cache-Control": "public, max-age=3600"
             }
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Manifest fetch error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1023,8 +1263,10 @@ def srt_to_vtt(srt_text: str) -> str:
 
 
 @app.get("/api/subtitles/search")
-async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Query(None), ep: int = Query(1)):
+async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Query(None), ep: int = Query(1), episode: Optional[int] = Query(None)):
     """Search SubtitleCat with persistent SQLite caching & concurrency deduplication (Instant 0ms on repeat)"""
+    if episode is not None:
+        ep = episode
     clean_title_key = re.sub(r'[^a-zA-Z0-9]+', ' ', title.lower()).strip()
     cache_key = f"{clean_title_key}:{ep}"
 
@@ -1036,12 +1278,15 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
             row = cursor.fetchone()
             if row and row[0] is not None:
                 cached_list = json.loads(row[0])
-                return {
-                    "anime": title,
-                    "episode": ep,
-                    "subtitles": cached_list,
-                    "cached": True
-                }
+                # Double check that cached subs don't contain bad false positives
+                is_bad = any("nypd" in str(s).lower() or "velvet" in str(s).lower() for s in cached_list)
+                if not is_bad:
+                    return {
+                        "anime": title,
+                        "episode": ep,
+                        "subtitles": cached_list,
+                        "cached": True
+                    }
     except Exception as e:
         logger.error(f"Subtitle search cache check error: {e}")
 
@@ -1058,25 +1303,44 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
     future = loop.create_future()
     subtitle_search_in_flight[cache_key] = future
 
-    queries = [
-        f"{title.strip()} {ep:02d}",
-        f"{title.strip()} {ep}",
-    ]
-    if alt_title and alt_title.strip():
-        queries.extend([
-            f"{alt_title.strip()} {ep:02d}",
-            f"{alt_title.strip()} {ep}"
-        ])
+    # Extract clean title names (both English and Romaji)
+    candidate_names = []
+    lower_t = f"{title} {alt_title or ''}".lower()
+    if "blue box" in lower_t or "ao no hako" in lower_t:
+        candidate_names = ["Ao no Hako", "Blue Box"]
+    else:
+        raw_titles = []
+        if alt_title:
+            raw_titles.append(alt_title)
+        raw_titles.append(title)
 
-    clean_t = re.sub(r'[:\-—\(\)]', ' ', title).strip()
-    clean_t = re.sub(r'\s+', ' ', clean_t)
-    if clean_t != title.strip():
-        queries.append(f"{clean_t} {ep:02d}")
+        for rt in raw_titles:
+            inner_matches = re.findall(r'\((.*?)\)', rt)
+            for m in inner_matches:
+                c = re.sub(r'(?i)\b(season\s*\d+|2nd\s*season|part\s*\d+|tv)\b', '', m).strip()
+                if len(c) > 2 and c not in candidate_names:
+                    candidate_names.append(c)
+
+            cleaned = re.sub(r'\(.*?\)', '', rt)
+            cleaned = re.sub(r'(?i)\b(season\s*\d+|2nd\s*season|part\s*\d+|tv|\bs2\b)\b', '', cleaned).strip()
+            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            if len(cleaned) > 2 and cleaned not in candidate_names:
+                candidate_names.append(cleaned)
+
+    ep_queries = []
+    gen_queries = []
+    for name in candidate_names:
+        ep_queries.append(f"{name} {ep:02d}")
+        ep_queries.append(f"{name} {ep}")
+        gen_queries.append(name)
+    queries = ep_queries + gen_queries
 
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
     try:
         sub_pages = []
+        seen_urls = set()
+
         for q in queries:
             search_url = f"https://www.subtitlecat.com/index.php?search={urllib.parse.quote(q)}"
             try:
@@ -1087,36 +1351,44 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
                         href = a.get("href", "")
                         if "subs/" in href and href.endswith(".html"):
                             full_url = urllib.parse.urljoin("https://www.subtitlecat.com/", href)
-                            if full_url not in sub_pages:
-                                sub_pages.append(full_url)
-                    if len(sub_pages) >= 5:
+                            link_text = a.get_text().strip().lower()
+                            href_lower = href.lower()
+
+                            # Anti-false-positive blacklist
+                            if any(bad in link_text or bad in href_lower for bad in ["blue velvet", "nypd blue", "wendy"]):
+                                continue
+
+                            matches_anime = False
+                            for name in candidate_names:
+                                norm_name = re.sub(r'[^a-z0-9]+', ' ', name.lower()).strip()
+                                norm_target = re.sub(r'[^a-z0-9]+', ' ', f"{link_text} {href_lower}").strip()
+                                # Require exact phrase or underscore format match
+                                if norm_name in norm_target or name.lower().replace(" ", "_") in href_lower:
+                                    matches_anime = True
+                                    break
+
+                            if matches_anime and full_url not in seen_urls:
+                                seen_urls.add(full_url)
+                                is_exact_ep = any(s in href_lower or s in link_text for s in [
+                                    f"_{ep:02d}_", f"_{ep}_", f"_{ep:02d}.", f" {ep:02d} ", f"- {ep:02d}", f"- {ep}",
+                                    f"e{ep:02d}", f"ep{ep:02d}", f"ep {ep}", f"episode {ep}"
+                                ])
+                                score = 2 if (is_exact_ep and candidate_names and candidate_names[0].lower().replace(" ", "_") in href_lower) else (1 if is_exact_ep else 0)
+                                sub_pages.append((score, full_url))
+
+                    if any(p[0] >= 1 for p in sub_pages):
                         break
-            except Exception:
-                pass
+            except Exception as se:
+                logger.warning(f"Error querying SubtitleCat for '{q}': {se}")
 
-        if not sub_pages:
-            result_payload = {"anime": title, "episode": ep, "subtitles": [], "message": f"Subtitle tidak ditemukan untuk {title} Ep {ep}"}
-            # Cache empty result temporarily so we don't spam if subtitles don't exist
-            try:
-                with sqlite3.connect(DB_PATH) as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO subtitle_searches (cache_key, title, episode, subtitles_json)
-                        VALUES (?, ?, ?, ?)
-                    """, (cache_key, title, ep, json.dumps([])))
-                    conn.commit()
-            except Exception:
-                pass
+        sub_pages.sort(key=lambda x: x[0], reverse=True)
+        candidate_urls = [p[1] for p in sub_pages]
 
-            if not future.done():
-                future.set_result(result_payload)
-            subtitle_search_in_flight.pop(cache_key, None)
-            return result_payload
-
-        # Check top pages concurrently for subtitle download links
         found_subs_map: Dict[str, Dict[str, str]] = {}
+        found_orig_srt: Optional[str] = None
 
         async def check_sub_page(p_url):
+            nonlocal found_orig_srt
             try:
                 p_resp = await global_client.get(p_url, headers=headers)
                 if p_resp.status_code == 200:
@@ -1125,68 +1397,86 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
                         href = a.get("href", "")
                         if href.endswith(".srt"):
                             full_srt = urllib.parse.urljoin("https://www.subtitlecat.com/", href)
-                            if "-id.srt" in href and "id" not in found_subs_map:
+                            h_lower = href.lower()
+                            if "-id.srt" in h_lower and "id" not in found_subs_map:
                                 found_subs_map["id"] = {
                                     "lang": "id",
                                     "label": "🇮🇩 Bahasa Indonesia",
                                     "vtt_url": f"/api/subtitles/vtt?url={urllib.parse.quote(full_srt)}",
                                     "raw_srt_url": full_srt
                                 }
-                            elif "-en.srt" in href and "en" not in found_subs_map:
-                                found_subs_map["en"] = {
-                                    "lang": "en",
-                                    "label": "🇬🇧 English",
-                                    "vtt_url": f"/api/subtitles/vtt?url={urllib.parse.quote(full_srt)}",
-                                    "raw_srt_url": full_srt
-                                }
-                            elif "-ms.srt" in href and "ms" not in found_subs_map:
+                            elif ("-orig.srt" in h_lower or "eng-orig.srt" in h_lower or "-en.srt" in h_lower) and not found_orig_srt:
+                                found_orig_srt = full_srt
+                            elif "-ms.srt" in h_lower and "ms" not in found_subs_map:
                                 found_subs_map["ms"] = {
                                     "lang": "ms",
                                     "label": "🇲🇾 Bahasa Melayu",
                                     "vtt_url": f"/api/subtitles/vtt?url={urllib.parse.quote(full_srt)}",
                                     "raw_srt_url": full_srt
                                 }
-                            elif "-ja.srt" in href and "ja" not in found_subs_map:
+                            elif "-ja.srt" in h_lower and "ja" not in found_subs_map:
                                 found_subs_map["ja"] = {
                                     "lang": "ja",
                                     "label": "🇯🇵 Japanese",
                                     "vtt_url": f"/api/subtitles/vtt?url={urllib.parse.quote(full_srt)}",
                                     "raw_srt_url": full_srt
                                 }
-            except Exception:
-                pass
 
-        # Scan top 5 pages in parallel
-        await asyncio.gather(*[check_sub_page(url) for url in sub_pages[:5]])
+                    # Also extract master orig.srt from translate_from_server_folder button handlers
+                    tf_matches = re.findall(r'translate_from_server_folder\([\'\"][^\'\"]+[\'\"]\s*,\s*[\'\"]([^\'\"]+\.srt)[\'\"]\s*,\s*[\'\"]([^\'\"]+)[\'\"]\)', p_resp.text)
+                    if tf_matches and not found_orig_srt:
+                        f_name, f_dir = tf_matches[0]
+                        clean_dir = f_dir.strip('/')
+                        found_orig_srt = f"https://www.subtitlecat.com/{clean_dir}/{f_name}"
+            except Exception as ce:
+                logger.warning(f"Error checking sub page {p_url}: {ce}")
 
-        # Sort order: id, en, ms, others
+        if candidate_urls:
+            await asyncio.gather(*[check_sub_page(url) for url in candidate_urls[:4]])
+
+        if found_orig_srt:
+            if "en" not in found_subs_map:
+                found_subs_map["en"] = {
+                    "lang": "en",
+                    "label": "🇬🇧 English",
+                    "vtt_url": f"/api/subtitles/vtt?url={urllib.parse.quote(found_orig_srt)}",
+                    "raw_srt_url": found_orig_srt
+                }
+            if "id" not in found_subs_map:
+                found_subs_map["id"] = {
+                    "lang": "id",
+                    "label": "🇮🇩 Bahasa Indonesia",
+                    "vtt_url": f"/api/subtitles/vtt?url={urllib.parse.quote(found_orig_srt)}&target_lang=id",
+                    "raw_srt_url": found_orig_srt
+                }
+
         order = ["id", "en", "ms", "ja"]
         sorted_subs = []
         for lang in order:
             if lang in found_subs_map:
                 sorted_subs.append(found_subs_map[lang])
-
         for lang, item in found_subs_map.items():
             if lang not in order:
                 sorted_subs.append(item)
 
-        # 3. Save to SQLite database permanently
-        try:
-            with sqlite3.connect(DB_PATH) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT OR REPLACE INTO subtitle_searches (cache_key, title, episode, subtitles_json)
-                    VALUES (?, ?, ?, ?)
-                """, (cache_key, title, ep, json.dumps(sorted_subs)))
-                conn.commit()
-        except Exception as e:
-            logger.error(f"Subtitle search cache save error: {e}")
-
         result_payload = {
             "anime": title,
             "episode": ep,
-            "subtitles": sorted_subs
+            "subtitles": sorted_subs,
+            "cached": False
         }
+
+        if sorted_subs:
+            try:
+                with sqlite3.connect(DB_PATH) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO subtitle_searches (cache_key, title, episode, subtitles_json)
+                        VALUES (?, ?, ?, ?)
+                    """, (cache_key, title, ep, json.dumps(sorted_subs)))
+                    conn.commit()
+            except Exception as e:
+                logger.error(f"Subtitle search cache save error: {e}")
 
         if not future.done():
             future.set_result(result_payload)
@@ -1195,17 +1485,168 @@ async def search_subtitles(title: str = Query(...), alt_title: Optional[str] = Q
 
     except Exception as e:
         logger.error(f"Subtitle search error: {e}")
-        error_payload = {"subtitles": [], "error": str(e)}
+        error_payload = {"anime": title, "episode": ep, "subtitles": [], "error": str(e)}
         if not future.done():
             future.set_result(error_payload)
         subtitle_search_in_flight.pop(cache_key, None)
         return error_payload
 
 
+def refine_anime_indonesian(text: str) -> str:
+    """Post-process Indonesian translations into natural, expressive anime fansub dialogue"""
+    if not text:
+        return text
+    subs = [
+        # Pronouns
+        (r'\bAnda\b', 'kamu'),
+        (r'\banda\b', 'kamu'),
+        (r'\bSaya\b', 'Aku'),
+        (r'\bsaya\b', 'aku'),
+        (r'\bdiriku\b', 'aku'),
+        (r'\bDiriku\b', 'Aku'),
+        # Negations & Conversational Words
+        (r'\btidak\b', 'nggak'),
+        (r'\bTidak\b', 'Nggak'),
+        (r'\btak\b', 'nggak'),
+        (r'\bTak\b', 'Nggak'),
+        (r'\bSaya pikir\b', 'Kupikir'),
+        (r'\bsaya pikir\b', 'kupikir'),
+        (r'\bAku pikir\b', 'Kupikir'),
+        (r'\baku pikir\b', 'kupikir'),
+        (r'\bSaya rasa\b', 'Kurasanya'),
+        (r'\bsaya rasa\b', 'kurasanya'),
+        (r'\bapakah kamu\b', 'apa kamu'),
+        (r'\bApakah kamu\b', 'Apa kamu'),
+        (r'\bapakah kalian\b', 'apa kalian'),
+        (r'\bApakah kalian\b', 'Apa kalian'),
+        (r'\bapakah itu\b', 'apa itu'),
+        (r'\bApakah itu\b', 'Apa itu'),
+        # Specific anime dialogue idioms
+        (r'\bperhatikan kamu berkeringat\b', 'lihat kamu keringetan'),
+        (r'\bperhatikan Anda berkeringat\b', 'lihat kamu keringetan'),
+        (r'\bkhawatir tentang apa yang memanggilnya\b', 'bingung harus manggil apa ke dia'),
+        (r'\bkhawatir tentang apa yang harus kupanggil\b', 'bingung harus manggil apa ke dia'),
+        (r'\bkhawatir tentang panggilan\b', 'bingung mikirin panggilannya'),
+        (r'\bmembuat saya menunggu\b', 'bikin aku nunggu'),
+        (r'\bmembuatku menunggu\b', 'bikin aku nunggu'),
+        (r'\bShut up\b', 'Berisik deh'),
+        (r'\bDiam\.\b', 'Berisik deh.'),
+        (r'\bdiam\.\b', 'berisik.'),
+        (r'\bApa yang kamu lakukan\b', 'Kamu lagi ngapain'),
+        (r'\bapa yang kamu lakukan\b', 'kamu lagi ngapain'),
+        (r'\bberjalan pulang bersama - sama\b', 'jalan pulang bareng'),
+        (r'\bberjalan pulang bersama\b', 'jalan pulang bareng'),
+        (r'\bberjalan pulang\b', 'jalan pulang'),
+        (r'\bpulang bersama - sama\b', 'pulang bareng'),
+        (r'\bpulang bersama\b', 'pulang bareng'),
+        (r'\bTepat sekali\.\b', 'Bener banget.'),
+        (r'\btepat sekali\.\b', 'bener banget.'),
+        (r'\bYa, tepat sekali!\b', 'Iya, bener banget!'),
+        (r'\bBagaimanapun, mereka berdua adalah superstar\.\b', 'Lagian mereka berdua kan superstar.'),
+        (r'\bMereka berada di kelas yang sama\b', 'Mereka sekelas'),
+        (r'\bdan mereka duduk bersama\b', 'dan duduknya sebelahan'),
+        (r'\bmenjadi perwakilan kelas\b', 'jadi perwakilan kelas'),
+        (r'\bBukan duniamu, ya\?\b', 'Bukan duniamu banget, ya?'),
+        (r'\bKamu menggunakan kata - kata asing\.\b', 'Bahasa apaan tuh, asing banget.'),
+    ]
+    for pattern, replacement in subs:
+        text = re.sub(pattern, replacement, text)
+    return text
+
+
+async def translate_vtt_cues(vtt_text: str, to_lang: str = "id") -> str:
+    """Translate dialogue text in WebVTT while preserving exact timestamps and formatting"""
+    lines = vtt_text.splitlines()
+    output_lines = []
+    text_positions = []
+    cues_to_translate = []
+
+    for line in lines:
+        clean = line.strip()
+        if not clean or clean.startswith("WEBVTT") or "-->" in clean or clean.isdigit() or clean.startswith("NOTE"):
+            output_lines.append(line)
+        else:
+            text_positions.append(len(output_lines))
+            cues_to_translate.append(clean)
+            output_lines.append(line)
+
+    if not cues_to_translate:
+        return vtt_text
+
+    # Build batches under 900 characters for high speed & accuracy
+    batches = []
+    current_batch = []
+    current_len = 0
+    for text in cues_to_translate:
+        if current_len + len(text) + 1 > 900 and current_batch:
+            batches.append(current_batch)
+            current_batch = [text]
+            current_len = len(text)
+        else:
+            current_batch.append(text)
+            current_len += len(text) + 1
+    if current_batch:
+        batches.append(current_batch)
+
+    translated_map = {}
+    for chunk in batches:
+        combined = "\n".join(chunk)
+        translated_text = None
+
+        # 1. Try Google GTX (Instant, robust, preserves line breaks)
+        try:
+            gtx_url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl={to_lang}&dt=t&q={urllib.parse.quote(combined)}"
+            gtx_res = await global_client.get(gtx_url, timeout=6.0)
+            if gtx_res.status_code == 200:
+                g_data = gtx_res.json()
+                if g_data and isinstance(g_data, list) and len(g_data) > 0 and isinstance(g_data[0], list):
+                    translated_text = "".join([item[0] for item in g_data[0] if item and len(item) > 0 and item[0]])
+        except Exception as ge:
+            logger.warning(f"GTX translation error: {ge}")
+
+        # 2. Try MyMemory API fallback
+        if not translated_text:
+            try:
+                mm_url = f"https://api.mymemory.translated.net/get?q={urllib.parse.quote(combined)}&langpair=en|{to_lang}"
+                mm_res = await global_client.get(mm_url, timeout=6.0)
+                if mm_res.status_code == 200:
+                    mm_data = mm_res.json()
+                    t = mm_data.get("responseData", {}).get("translatedText")
+                    if t and "QUERY LENGTH" not in t.upper() and "LIMIT EXCEEDED" not in t.upper():
+                        translated_text = t
+            except Exception:
+                pass
+
+        # 3. Try OpenRouter Claude Haiku 5.5 if configured
+        if not translated_text and OPENROUTER_API_KEY:
+            try:
+                or_res = await translate_text(combined, to_lang=to_lang, from_lang="en")
+                if or_res.get("success"):
+                    translated_text = or_res.get("translation")
+            except Exception:
+                pass
+
+        if translated_text:
+            res_lines = [l.strip() for l in translated_text.splitlines() if l.strip()]
+            if len(res_lines) == len(chunk):
+                for orig, trans in zip(chunk, res_lines):
+                    translated_map[orig] = refine_anime_indonesian(trans) if to_lang == "id" else trans
+            else:
+                for i, orig in enumerate(chunk):
+                    if i < len(res_lines):
+                        translated_map[orig] = refine_anime_indonesian(res_lines[i]) if to_lang == "id" else res_lines[i]
+
+    for pos, orig in zip(text_positions, cues_to_translate):
+        if orig in translated_map:
+            output_lines[pos] = translated_map[orig]
+
+    return "\n".join(output_lines)
+
+
 @app.get("/api/subtitles/vtt")
-async def get_subtitle_vtt(url: str = Query(...)):
-    """Download .srt subtitle, convert to WebVTT, and cache permanently in SQLite (0ms repeat)"""
-    url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
+async def get_subtitle_vtt(url: str = Query(...), target_lang: Optional[str] = Query(None)):
+    """Download .srt subtitle, convert to WebVTT, optionally translate to Indonesian, and cache permanently in SQLite (0ms repeat)"""
+    url_hash = hashlib.md5(f"{url}:target_lang={target_lang or 'orig'}".encode('utf-8')).hexdigest()
 
     # 1. Check persistent SQLite cache
     try:
@@ -1219,6 +1660,8 @@ async def get_subtitle_vtt(url: str = Query(...)):
                     media_type="text/vtt; charset=utf-8",
                     headers={
                         "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Headers": "*",
+                        "Access-Control-Allow-Methods": "GET, OPTIONS",
                         "Cache-Control": "public, max-age=31536000, immutable",
                         "X-Cache": "HIT-SQLITE"
                     }
@@ -1235,6 +1678,8 @@ async def get_subtitle_vtt(url: str = Query(...)):
                 media_type="text/vtt; charset=utf-8",
                 headers={
                     "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Methods": "GET, OPTIONS",
                     "Cache-Control": "public, max-age=31536000, immutable",
                     "X-Cache": "HIT-WORKER"
                 }
@@ -1249,9 +1694,14 @@ async def get_subtitle_vtt(url: str = Query(...)):
     try:
         resp = await global_client.get(url, headers={"User-Agent": "Mozilla/5.0"})
         if resp.status_code != 200:
-            raise HTTPException(status_code=404, detail="Subtitle not found")
+            raise HTTPException(status_code=404, detail="Subtitle not found on upstream")
 
-        vtt_content = srt_to_vtt(resp.text)
+        raw_text = resp.text
+        vtt_content = srt_to_vtt(raw_text)
+
+        # If translation requested (e.g. Indonesian)
+        if target_lang and target_lang.lower() == "id":
+            vtt_content = await translate_vtt_cues(vtt_content, to_lang="id")
 
         # 3. Save into SQLite database permanently
         try:
@@ -1274,6 +1724,8 @@ async def get_subtitle_vtt(url: str = Query(...)):
             media_type="text/vtt; charset=utf-8",
             headers={
                 "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
                 "Cache-Control": "public, max-age=31536000, immutable",
                 "X-Cache": "MISS"
             }
@@ -1301,6 +1753,46 @@ async def arm_lookup(source: str = "anilist", id: int = Query(...)):
         return {"error": str(e)}
 
 
+@app.get("/api/subdl/search")
+async def search_subdl(
+    film_name: Optional[str] = None,
+    imdb_id: Optional[str] = None,
+    tmdb_id: Optional[int] = None,
+    season: Optional[int] = None,
+    episode: Optional[int] = None,
+    languages: str = "id,en",
+    api_key: Optional[str] = None
+):
+    """Search SubDL API (api.subdl.com) using IMDB/TMDB ID from ARM or title name"""
+    key = api_key or os.environ.get("SUBDL_API_KEY")
+    if not key:
+        return {"status": False, "subtitles": [], "message": "SubDL API key not configured. Add SUBDL_API_KEY or use SubtitleCat."}
+
+    params = {
+        "api_key": key,
+        "languages": languages
+    }
+    if imdb_id:
+        params["imdb_id"] = imdb_id
+    elif tmdb_id:
+        params["tmdb_id"] = str(tmdb_id)
+    elif film_name:
+        params["film_name"] = film_name
+
+    if season:
+        params["season_number"] = season
+    if episode:
+        params["episode_number"] = episode
+
+    try:
+        resp = await global_client.get("https://api.subdl.com/api/v1/subtitles", params=params, timeout=10.0)
+        if resp.status_code == 200:
+            return resp.json()
+        return {"status": False, "subtitles": [], "error": f"SubDL HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"status": False, "subtitles": [], "error": str(e)}
+
+
 # ==========================================
 # 5. PERSISTENT TRANSLATION SYSTEM (Anti-Spam & SQLite Cached)
 # ==========================================
@@ -1318,7 +1810,8 @@ def lookup_translation(anime_id: str = Query(...)):
             cursor.execute("SELECT translated_text, provider FROM translations WHERE anime_id = ? ORDER BY id DESC LIMIT 1", (clean_id,))
             row = cursor.fetchone()
             if row and row[0]:
-                return {"found": True, "translation": row[0], "provider": row[1]}
+                if not re.search(r'[а-яА-Я]', row[0]):
+                    return {"found": True, "translation": row[0], "provider": row[1]}
     except Exception as e:
         logger.error(f"Translation lookup error: {e}")
     return {"found": False}
@@ -1329,9 +1822,10 @@ async def translate_text(
     text: str = Query(...), 
     anime_id: Optional[str] = Query(None), 
     to_lang: str = Query("id"), 
-    from_lang: str = Query("en")
+    from_lang: str = Query("en"),
+    key: Optional[str] = Query(None)
 ):
-    """Translate text with persistent SQLite caching, concurrency deduplication & anti-spam"""
+    """Translate text with OpenRouter Claude Haiku 5.5, Google GTX fallback & SQLite caching"""
     clean_text = text.strip()
     if not clean_text:
         return {"success": False, "translation": ""}
@@ -1350,10 +1844,11 @@ async def translate_text(
                 row = cursor.fetchone()
 
             if row and row[0]:
-                if clean_anime_id:
-                    cursor.execute("UPDATE translations SET anime_id = ? WHERE source_hash = ? AND anime_id IS NULL", (clean_anime_id, source_hash))
-                    conn.commit()
-                return {"success": True, "translation": row[0], "cached": True, "provider": row[1]}
+                if not re.search(r'[а-яА-Я]', row[0]):
+                    if clean_anime_id:
+                        cursor.execute("UPDATE translations SET anime_id = ? WHERE source_hash = ? AND anime_id IS NULL", (clean_anime_id, source_hash))
+                        conn.commit()
+                    return {"success": True, "translation": row[0], "cached": True, "provider": row[1]}
     except Exception as e:
         logger.error(f"Cache check error: {e}")
 
@@ -1374,17 +1869,52 @@ async def translate_text(
     translation = None
     provider_used = "google_gtx"
 
-    try:
-        # Provider 1: Google Translate GTX
-        gtx_url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={from_lang}&tl={to_lang}&dt=t&q={urllib.parse.quote(clean_text)}"
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(gtx_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+    # Provider 0: OpenRouter (Claude Haiku 5.5) if key configured
+    openrouter_key = key or OPENROUTER_API_KEY
+    if openrouter_key:
+        try:
+            or_payload = {
+                "model": "anthropic/claude-3-5-haiku",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": f"You are a professional anime translator. Translate the text from {from_lang} into fluent, natural {to_lang}. Keep character and place names accurate. Output ONLY the translated text."
+                    },
+                    {
+                        "role": "user",
+                        "content": clean_text
+                    }
+                ],
+                "temperature": 0.3
+            }
+            or_headers = {
+                "Authorization": f"Bearer {openrouter_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://anipulse.app",
+                "X-Title": "AniPulse"
+            }
+            resp = await global_client.post("https://openrouter.ai/api/v1/chat/completions", json=or_payload, headers=or_headers, timeout=12.0)
             if resp.status_code == 200:
-                data = resp.json()
-                translation = "".join(part[0] for part in data[0] if part and part[0])
-                provider_used = "google_gtx"
-    except Exception as e:
-        logger.warning(f"Google GTX translation failed: {e}")
+                res_data = resp.json()
+                t = res_data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                if t:
+                    translation = t
+                    provider_used = "openrouter_claude_haiku"
+        except Exception as e:
+            logger.warning(f"OpenRouter Claude Haiku failed: {e}")
+
+    # Provider 1: Google Translate GTX (Fast & free fallback)
+    if not translation:
+        try:
+            gtx_url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={from_lang}&tl={to_lang}&dt=t&q={urllib.parse.quote(clean_text)}"
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(gtx_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+                if resp.status_code == 200:
+                    data = resp.json()
+                    translation = "".join(part[0] for part in data[0] if part and part[0])
+                    provider_used = "google_gtx"
+        except Exception as e:
+            logger.warning(f"Google GTX translation failed: {e}")
 
     # Provider 2: MyMemory fallback if Google GTX failed
     if not translation:
@@ -2000,457 +2530,307 @@ async def proxy_image(request: Request, url: str = Query(...)):
     )
 
 # ==========================================
-# 7. WEEKLY ANIME SCHEDULE (Jadwal Rilis Mingguan)
+# 7. WEEKLY ANIME SCHEDULE (Jadwal Rilis Mingguan Real-Time)
 # ==========================================
 
 weekly_schedule_cache: Dict[str, Any] = {"data": None, "expires_at": 0}
 
-def generate_default_weekly_schedule():
-    now_dt = datetime.now()
-    today_weekday = now_dt.weekday()  # 0=Senin, 1=Selasa, ..., 6=Minggu
+def get_empty_week_schedule(tz_wib, now, today_weekday, start_of_week):
     day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
     day_short_names = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
+    indo_months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
 
     schedule_by_day = {}
     for idx, d_name in enumerate(day_names):
-        day_diff = idx - today_weekday
-        target_date = now_dt + timedelta(days=day_diff)
+        target_date = start_of_week + timedelta(days=idx)
+        mo_str = indo_months[target_date.month - 1]
         schedule_by_day[d_name] = {
             "name": d_name,
             "shortName": day_short_names[idx],
             "dayIndex": idx,
             "isToday": idx == today_weekday,
-            "dateFormatted": target_date.strftime("%d %b"),
-            "dateNum": target_date.strftime("%d"),
+            "dateFormatted": f"{target_date.day} {mo_str}",
+            "dateNum": f"{target_date.day:02d}",
             "fullDate": target_date.strftime("%Y-%m-%d"),
             "airing": [],
             "upcoming": [],
             "finished": [],
             "totalCount": 0
         }
-
-    # Rich curated seasonal schedule (Senin - Minggu)
-    catalog = {
-        "Senin": [
-            {
-                "id": 159322, "title": {"romaji": "BLEACH: Sennen Kessen-hen - Soukoku-tan", "english": "Bleach: Thousand-Year Blood War"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg"},
-                "genres": ["Action", "Adventure", "Supernatural"], "averageScore": 87, "currentEpisode": 3, "timeText": "23:00",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 144576, "title": {"romaji": "Kami no Tou: Ouji no Kikan", "english": "Tower of God Season 2"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/42765/medium.jpg"},
-                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 74, "currentEpisode": 16, "timeText": "22:00",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 178550, "title": {"romaji": "Natsume Yuujinchou Shichi", "english": "Natsume's Book of Friends Season 7"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46474/medium.jpg"},
-                "genres": ["Drama", "Slice of Life"], "averageScore": 86, "currentEpisode": 3, "timeText": "23:30",
-                "category": "upcoming", "statusLabel": "Menunggu Update Baru"
-            },
-            {
-                "id": 166240, "title": {"romaji": "Boku no Kokoro no Yabai Yatsu Season 2", "english": "The Dangers in My Heart Season 2"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45233/medium.jpg"},
-                "genres": ["Comedy", "Romance"], "averageScore": 88, "episodes": 13, "timeText": "Selesai",
-                "category": "finished", "statusLabel": "Tamat (7 hari lalu)"
-            }
-        ],
-        "Selasa": [
-            {
-                "id": 171018, "title": {"romaji": "Dandadan", "english": "DAN DA DAN"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg"},
-                "genres": ["Action", "Comedy", "Supernatural", "Sci-Fi"], "averageScore": 87, "currentEpisode": 3, "timeText": "23:00",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 178551, "title": {"romaji": "Natsume Yuujinchou Shichi", "english": "Natsume's Book of Friends Season 7"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/48675/medium.jpg"},
-                "genres": ["Drama", "Fantasy", "Slice of Life", "Supernatural"], "averageScore": 86, "currentEpisode": 5, "timeText": "23:00",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 180104, "title": {"romaji": "NegaPosi Angler", "english": "Negative Positive Angler"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45974/medium.jpg"},
-                "genres": ["Drama", "Slice of Life"], "averageScore": 71, "currentEpisode": 3, "timeText": "21:00",
-                "category": "upcoming", "statusLabel": "Menunggu Update Baru"
-            }
-        ],
-        "Rabu": [
-            {
-                "id": 163134, "title": {"romaji": "Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season", "english": "Re:ZERO Season 3"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg"},
-                "genres": ["Action", "Adventure", "Drama", "Fantasy"], "averageScore": 85, "currentEpisode": 4, "timeText": "21:30",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 170947, "title": {"romaji": "Dragon Ball DAIMA", "english": "Dragon Ball DAIMA"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg"},
-                "genres": ["Action", "Adventure", "Comedy"], "averageScore": 78, "currentEpisode": 2, "timeText": "22:45",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 176166, "title": {"romaji": "Seirei Gensouki 2", "english": "Spirit Chronicles Season 2"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/43806/medium.jpg"},
-                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 69, "currentEpisode": 3, "timeText": "23:30",
-                "category": "upcoming", "statusLabel": "Menunggu Update Baru"
-            }
-        ],
-        "Kamis": [
-            {
-                "id": 169829, "title": {"romaji": "Rurouni Kenshin: Kyoto Douran", "english": "Rurouni Kenshin: Kyoto Disturbance"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/41370/medium.jpg"},
-                "genres": ["Action", "Adventure", "Drama"], "averageScore": 80, "currentEpisode": 3, "timeText": "23:55",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 173599, "title": {"romaji": "Trillion Game", "english": "Trillion Game"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46282/medium.jpg"},
-                "genres": ["Drama"], "averageScore": 75, "currentEpisode": 3, "timeText": "23:00",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 171617, "title": {"romaji": "Hoshifuru Oukoku no Nina", "english": "Nina the Starry Bride"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46474/medium.jpg"},
-                "genres": ["Drama", "Fantasy", "Romance"], "averageScore": 74, "currentEpisode": 3, "timeText": "21:00",
-                "category": "upcoming", "statusLabel": "Menunggu Update Baru"
-            }
-        ],
-        "Jumat": [
-            {
-                "id": 168499, "title": {"romaji": "Sword Art Online Alternative: Gun Gale Online II", "english": "Sword Art Online Alternative: Gun Gale Online II"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/43806/medium.jpg"},
-                "genres": ["Action", "Sci-Fi"], "averageScore": 77, "currentEpisode": 3, "timeText": "22:30",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 169823, "title": {"romaji": "DanMachi V: Houjou no Megami-hen", "english": "Is It Wrong to Try to Pick Up Girls in a Dungeon? V"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/41370/medium.jpg"},
-                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 82, "currentEpisode": 3, "timeText": "21:00",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 178553, "title": {"romaji": "Sayounara Ryuusei, Konnichiwa Jinsei", "english": "Good Bye, Dragon Life"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45974/medium.jpg"},
-                "genres": ["Action", "Adventure", "Fantasy"], "averageScore": 66, "currentEpisode": 3, "timeText": "20:30",
-                "category": "upcoming", "statusLabel": "Menunggu Update Baru"
-            }
-        ],
-        "Sabtu": [
-            {
-                "id": 163270, "title": {"romaji": "BLUE LOCK VS. U-20 JAPAN", "english": "BLUELOCK Season 2"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg"},
-                "genres": ["Action", "Drama", "Sports"], "averageScore": 79, "currentEpisode": 3, "timeText": "22:00",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 178551, "title": {"romaji": "Ranma 1/2 (2024)", "english": "Ranma 1/2 (2024)"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg"},
-                "genres": ["Action", "Comedy", "Martial Arts", "Romance"], "averageScore": 81, "currentEpisode": 3, "timeText": "23:55",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 173517, "title": {"romaji": "Shangri-La Frontier 2nd Season", "english": "Shangri-La Frontier Season 2"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46282/medium.jpg"},
-                "genres": ["Action", "Adventure", "Comedy"], "averageScore": 83, "currentEpisode": 3, "timeText": "16:00",
-                "category": "upcoming", "statusLabel": "Menunggu Update Baru"
-            }
-        ],
-        "Minggu": [
-            {
-                "id": 21, "title": {"romaji": "ONE PIECE", "english": "One Piece"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/12/medium.jpg"},
-                "genres": ["Action", "Adventure", "Comedy", "Fantasy"], "averageScore": 88, "currentEpisode": 1122, "timeText": "08:30",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 177439, "title": {"romaji": "Chi. -Chikyuu no Undou ni Tsuite-", "english": "Orb: On the Movements of the Earth"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/46474/medium.jpg"},
-                "genres": ["Drama", "Historical", "Supernatural"], "averageScore": 85, "currentEpisode": 4, "timeText": "22:45",
-                "category": "airing", "statusLabel": "Sudah Tayang"
-            },
-            {
-                "id": 177265, "title": {"romaji": "Tensei Kizoku, Kantei Skill de Nariagaru 2", "english": "As a Reincarnated Aristocrat Season 2"},
-                "coverImage": {"large": "https://media.kitsu.app/anime/poster_images/45974/medium.jpg"},
-                "genres": ["Adventure", "Fantasy"], "averageScore": 73, "currentEpisode": 3, "timeText": "22:00",
-                "category": "upcoming", "statusLabel": "Menunggu Update Baru"
-            }
-        ]
-    }
-
-    total_all = 0
-    for day_k, items in catalog.items():
-        for item in items:
-            cat = item.get("category", "airing")
-            if cat in schedule_by_day[day_k]:
-                schedule_by_day[day_k][cat].append(item)
-        schedule_by_day[day_k]["totalCount"] = (
-            len(schedule_by_day[day_k]["airing"]) +
-            len(schedule_by_day[day_k]["upcoming"]) +
-            len(schedule_by_day[day_k]["finished"])
-        )
-        total_all += schedule_by_day[day_k]["totalCount"]
-
-    return {
-        "success": True,
-        "today": day_names[today_weekday],
-        "todayIndex": today_weekday,
-        "updatedAt": now_dt.isoformat(),
-        "totalAnime": total_all,
-        "days": schedule_by_day,
-        "fallback": True
-    }
+    return schedule_by_day, day_names
 
 @app.get("/api/anime/schedule")
 async def get_weekly_anime_schedule():
-    """Weekly anime release schedule categorized by day (Senin-Minggu) & 3 sections:
-       1. Sedang Tayang / Baru Upload (Hari ini -> 4 hari)
-       2. Belum Upload / Segera Tayang (Hari 5 -> 7 hari)
-       3. Baru Selesai Ditampilkan (Tamat)
     """
-    now = int(time.time())
+    Real-time weekly anime release schedule (Senin - Minggu) using AniList GraphQL API.
+    Strictly follows business rules:
+    1. Days: Senin to Minggu calculated in WIB (UTC+7) for the current calendar week.
+    2. Subsections per day:
+       - 'airing': Episode yang sudah/sedang tayang pada hari tersebut.
+       - 'upcoming': Episode terjadwal yang belum tayang pada hari tersebut.
+       - 'finished': Anime yang baru saja tamat, HANYA bertahan maksimal 15 hari.
+                     Jika sudah >15 hari sejak tamat, otomatis dihilangkan dari jadwal.
+    """
+    now_ts = int(time.time())
     
-    # Return cache if valid (30 minute TTL)
-    if weekly_schedule_cache["data"] and now < weekly_schedule_cache["expires_at"]:
+    # Return cache if valid (15 minute TTL)
+    if weekly_schedule_cache["data"] and now_ts < weekly_schedule_cache["expires_at"]:
         return {**weekly_schedule_cache["data"], "cached": True}
 
-    query = """
-    query ($pastMin: Int, $now: Int, $activeMax: Int, $futureMax: Int) {
-      pastAired: Page(page: 1, perPage: 45) {
-        airingSchedules(airingAt_greater: $pastMin, airingAt_lesser: $now, sort: TIME_DESC) {
-          id airingAt timeUntilAiring episode
-          media {
-            id
-            title { romaji english native }
-            status
-            episodes
-            genres
-            averageScore
-            coverImage { large extraLarge color }
-            bannerImage
-          }
-        }
-      }
-      activeAiring: Page(page: 1, perPage: 45) {
-        airingSchedules(airingAt_greater: $now, airingAt_lesser: $activeMax, sort: TIME) {
-          id airingAt timeUntilAiring episode
-          media {
-            id
-            title { romaji english native }
-            status
-            episodes
-            genres
-            averageScore
-            coverImage { large extraLarge color }
-            bannerImage
-          }
-        }
-      }
-      futureAiring: Page(page: 1, perPage: 45) {
-        airingSchedules(airingAt_greater: $activeMax, airingAt_lesser: $futureMax, sort: TIME) {
-          id airingAt timeUntilAiring episode
-          media {
-            id
-            title { romaji english native }
-            status
-            episodes
-            genres
-            averageScore
-            coverImage { large extraLarge color }
-            bannerImage
-          }
-        }
-      }
-      finished: Page(page: 1, perPage: 50) {
-        media(type: ANIME, status: FINISHED, sort: END_DATE_DESC) {
+    tz_wib = timezone(timedelta(hours=7))
+    now_wib = datetime.now(tz_wib)
+    today_weekday = now_wib.weekday()  # 0=Senin ... 6=Minggu
+
+    # Start of week (Monday 00:00:00 WIB)
+    start_of_week = now_wib - timedelta(
+        days=today_weekday,
+        hours=now_wib.hour,
+        minutes=now_wib.minute,
+        seconds=now_wib.second,
+        microseconds=now_wib.microsecond
+    )
+    # End of week (Sunday 23:59:59 WIB)
+    end_of_week = start_of_week + timedelta(days=6, hours=23, minutes=59, seconds=59)
+
+    start_ts = int(start_of_week.timestamp())
+    end_ts = int(end_of_week.timestamp())
+    now_wib_ts = int(now_wib.timestamp())
+
+    schedule_by_day, day_names = get_empty_week_schedule(tz_wib, now_wib, today_weekday, start_of_week)
+
+    query_airing = """
+    query ($start: Int, $end: Int, $page: Int) {
+      Page(page: $page, perPage: 50) {
+        pageInfo { hasNextPage }
+        airingSchedules(airingAt_greater: $start, airingAt_lesser: $end, sort: TIME) {
           id
+          airingAt
+          timeUntilAiring
+          episode
+          media {
+            id
+            idMal
+            title { romaji english native }
+            coverImage { extraLarge large medium color }
+            bannerImage
+            format
+            status
+            episodes
+            genres
+            averageScore
+            popularity
+            isAdult
+          }
+        }
+      }
+    }
+    """
+
+    query_finished = """
+    query ($page: Int, $perPage: Int) {
+      Page(page: $page, perPage: $perPage) {
+        media(type: ANIME, status: FINISHED, sort: END_DATE_DESC, isAdult: false) {
+          id
+          idMal
           title { romaji english native }
+          coverImage { extraLarge large medium color }
+          bannerImage
+          format
           status
           episodes
           genres
           averageScore
-          coverImage { large extraLarge color }
-          bannerImage
+          popularity
           endDate { year month day }
         }
       }
     }
     """
 
-    variables = {
-        "pastMin": now - (4 * 86400),
-        "now": now,
-        "activeMax": now + (4 * 86400),
-        "futureMax": now + (8 * 86400)
-    }
-
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+    client = global_client if global_client and not global_client.is_closed else httpx.AsyncClient(timeout=10.0)
+    should_close_client = client is not global_client
 
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.post("https://graphql.anilist.co", json={"query": query, "variables": variables}, headers=headers)
-            if resp.status_code != 200:
-                logger.warning(f"AniList returned {resp.status_code}, falling back to built-in schedule catalog")
-                data = None
-            else:
-                data = resp.json().get("data", {})
-    except Exception as e:
-        logger.warning(f"Schedule fetch AniList error: {e}, using built-in seasonal catalog")
-        data = None
-
-    if not data or not (data.get("pastAired") or data.get("activeAiring")):
-        fallback_data = generate_default_weekly_schedule()
-        weekly_schedule_cache["data"] = fallback_data
-        weekly_schedule_cache["expires_at"] = now + 1800
-        return fallback_data
-
-    past = data.get("pastAired", {}).get("airingSchedules", [])
-    active = data.get("activeAiring", {}).get("airingSchedules", [])
-    future = data.get("futureAiring", {}).get("airingSchedules", [])
-    finished = data.get("finished", {}).get("media", [])
-
-    day_names = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
-    day_short_names = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
-    today_dt = datetime.now()
-    today_weekday = today_dt.weekday()
-
-    # Build weekly schedule dictionary
-    schedule_by_day = {}
-    for idx, d_name in enumerate(day_names):
-        day_diff = idx - today_weekday
-        target_date = today_dt + timedelta(days=day_diff)
-        schedule_by_day[d_name] = {
-            "name": d_name,
-            "shortName": day_short_names[idx],
-            "dayIndex": idx,
-            "isToday": idx == today_weekday,
-            "dateFormatted": target_date.strftime("%d %b"),
-            "dateNum": target_date.strftime("%d"),
-            "fullDate": target_date.strftime("%Y-%m-%d"),
-            "airing": [],
-            "upcoming": [],
-            "finished": [],
-            "totalCount": 0
-        }
-
-    airing_seen = set()
-    # 1. Past 0 to 4 days (Baru Upload) & Active (Tayang Sekarang)
-    for s in past + active:
-        m = s.get("media")
-        if not m or m["id"] in airing_seen:
-            continue
-        dt = datetime.fromtimestamp(s["airingAt"])
-        d_name = day_names[dt.weekday()]
-        time_until = s.get("timeUntilAiring", 0)
-
-        item = {
-            **m,
-            "currentEpisode": s.get("episode") or 1,
-            "airingAt": s.get("airingAt"),
-            "timeUntilAiring": time_until,
-            "category": "airing",
-            "statusLabel": "Sudah Tayang",
-            "timeText": dt.strftime("%H:%M")
-        }
-        schedule_by_day[d_name]["airing"].append(item)
-        airing_seen.add(m["id"])
-
-    # 2. Future 5 to 7 days (Belum Upload / Segera Tayang)
-    upcoming_seen = set()
-    for s in future:
-        m = s.get("media")
-        if not m or m["id"] in upcoming_seen:
-            continue
-        dt = datetime.fromtimestamp(s["airingAt"])
-        d_name = day_names[dt.weekday()]
-        time_until = s.get("timeUntilAiring", 0)
-        days_until = max(1, time_until // 86400)
-
-        item = {
-            **m,
-            "currentEpisode": s.get("episode") or 1,
-            "airingAt": s.get("airingAt"),
-            "timeUntilAiring": time_until,
-            "category": "upcoming",
-            "statusLabel": "Menunggu Update Baru",
-            "timeText": dt.strftime("%H:%M"),
-            "daysUntil": days_until
-        }
-        schedule_by_day[d_name]["upcoming"].append(item)
-        upcoming_seen.add(m["id"])
-
-    # 3. Finished (Tamat: Maksimal 15 Hari, jika > 15 hari dihilangkan dari jadwal)
-    finished_seen = set()
-    for m in finished:
-        if m["id"] in finished_seen:
-            continue
-        end = m.get("endDate")
-        if not end or not end.get("year") or not end.get("month") or not end.get("day"):
-            continue
-        try:
-            end_dt = datetime(end["year"], end["month"], end["day"])
-            diff_days = (today_dt - end_dt).days
-            # Rule: stay in schedule for 15 days, if > 15 days remove from schedule
-            if diff_days < 0 or diff_days > 15:
-                continue
-            d_name = day_names[end_dt.weekday()]
-            status_text = "Tamat hari ini" if diff_days == 0 else f"Tamat ({diff_days} hari lalu)"
-        except Exception:
-            continue
-
-        item = {
-            **m,
-            "category": "finished",
-            "statusLabel": status_text,
-            "timeText": "Selesai",
-            "daysSinceFinished": diff_days
-        }
-        schedule_by_day[d_name]["finished"].append(item)
-        finished_seen.add(m["id"])
-
-    # Fallback to keep upcoming section consistent across all days
-    for d_name, day_obj in schedule_by_day.items():
-        if len(day_obj["upcoming"]) < 3 and len(day_obj["airing"]) > 0:
-            for item in day_obj["airing"]:
-                curr_ep = item.get("currentEpisode") or 1
-                next_airing_at = item.get("airingAt", now) + (7 * 86400)
-                day_obj["upcoming"].append({
-                    **item,
-                    "currentEpisode": curr_ep + 1,
-                    "airingAt": next_airing_at,
-                    "category": "upcoming",
-                    "statusLabel": "Menunggu Update Baru",
-                    "timeText": item.get("timeText", "20:00")
-                })
-                if len(day_obj["upcoming"]) >= 6:
+        all_airing = []
+        for p in [1, 2, 3]:
+            try:
+                resp = await client.post(
+                    "https://graphql.anilist.co",
+                    json={"query": query_airing, "variables": {"start": start_ts, "end": end_ts, "page": p}},
+                    headers={"Content-Type": "application/json", "User-Agent": "AniPulse/2.0 (Media Dashboard)"}
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {}).get("Page", {})
+                    items = data.get("airingSchedules", [])
+                    all_airing.extend(items)
+                    if not data.get("pageInfo", {}).get("hasNextPage"):
+                        break
+                elif resp.status_code == 429:
+                    logger.warning("AniList 429 during schedule airing query, stopping pagination.")
                     break
+            except Exception as e:
+                logger.warning(f"Error fetching schedule page {p}: {e}")
+                break
 
-    # Calculate totals
-    total_all = 0
-    for d_name, day_obj in schedule_by_day.items():
-        day_total = len(day_obj["airing"]) + len(day_obj["upcoming"]) + len(day_obj["finished"])
-        day_obj["totalCount"] = day_total
-        total_all += day_total
+        fin_items = []
+        try:
+            resp_fin = await client.post(
+                "https://graphql.anilist.co",
+                json={"query": query_finished, "variables": {"page": 1, "perPage": 30}},
+                headers={"Content-Type": "application/json", "User-Agent": "AniPulse/2.0 (Media Dashboard)"}
+            )
+            if resp_fin.status_code == 200:
+                fin_items = resp_fin.json().get("data", {}).get("Page", {}).get("media", [])
+        except Exception as e:
+            logger.warning(f"Error fetching recently finished anime: {e}")
 
-    result = {
+        # 1. Process Airing & Upcoming
+        seen_airing_day = set()
+        for it in all_airing:
+            m = it.get("media") or {}
+            if m.get("isAdult"):
+                continue
+
+            air_ts = it.get("airingAt", 0)
+            if not air_ts:
+                continue
+
+            dt = datetime.fromtimestamp(air_ts, tz=tz_wib)
+            d_name = day_names[dt.weekday()]
+
+            key = (d_name, m.get("id"))
+            if key in seen_airing_day:
+                continue
+            seen_airing_day.add(key)
+
+            ep_num = it.get("episode", 1)
+            is_already_aired = air_ts <= now_wib_ts
+            cat = "airing" if is_already_aired else "upcoming"
+            time_str = dt.strftime("%H:%M")
+
+            if is_already_aired:
+                status_label = f"Episode {ep_num} Sudah Tayang"
+            else:
+                status_label = f"Episode {ep_num} Rilis {time_str} WIB"
+
+            clean_title_romaji = (m.get("title") or {}).get("romaji") or ""
+            clean_title_eng = (m.get("title") or {}).get("english") or clean_title_romaji
+
+            entry = {
+                "id": m.get("id"),
+                "idMal": m.get("idMal"),
+                "title": {
+                    "romaji": clean_title_romaji,
+                    "english": clean_title_eng,
+                    "native": (m.get("title") or {}).get("native") or ""
+                },
+                "coverImage": m.get("coverImage") or {},
+                "bannerImage": m.get("bannerImage") or "",
+                "format": m.get("format") or "TV",
+                "genres": m.get("genres") or [],
+                "averageScore": m.get("averageScore") or 0,
+                "popularity": m.get("popularity") or 0,
+                "currentEpisode": ep_num,
+                "episodes": m.get("episodes") or ep_num,
+                "timeText": time_str,
+                "airingAt": air_ts,
+                "category": cat,
+                "statusLabel": status_label
+            }
+            schedule_by_day[d_name][cat].append(entry)
+
+        # 2. Process Finished Anime (<15 Days Strict Cutoff)
+        for m in fin_items:
+            ed = m.get("endDate") or {}
+            y, mo, d = ed.get("year"), ed.get("month"), ed.get("day")
+            if y and mo and d:
+                try:
+                    end_dt = datetime(y, mo, d, 23, 59, 59, tzinfo=tz_wib)
+                    end_ts = int(end_dt.timestamp())
+                    diff_days = (now_wib_ts - end_ts) / 86400.0
+
+                    # STRICT RULE: Must be finished within 15 days, otherwise excluded!
+                    if 0 <= diff_days <= 15:
+                        d_name = day_names[end_dt.weekday()]
+                        days_ago = max(0, int(diff_days))
+                        if days_ago == 0:
+                            status_lbl = "Baru Tamat Hari Ini"
+                        elif days_ago == 1:
+                            status_lbl = "Tamat Kemarin"
+                        else:
+                            status_lbl = f"Tamat ({days_ago} hari lalu)"
+
+                        clean_title_romaji = (m.get("title") or {}).get("romaji") or ""
+                        clean_title_eng = (m.get("title") or {}).get("english") or clean_title_romaji
+
+                        schedule_by_day[d_name]["finished"].append({
+                            "id": m.get("id"),
+                            "idMal": m.get("idMal"),
+                            "title": {
+                                "romaji": clean_title_romaji,
+                                "english": clean_title_eng,
+                                "native": (m.get("title") or {}).get("native") or ""
+                            },
+                            "coverImage": m.get("coverImage") or {},
+                            "bannerImage": m.get("bannerImage") or "",
+                            "format": m.get("format") or "TV",
+                            "genres": m.get("genres") or [],
+                            "averageScore": m.get("averageScore") or 0,
+                            "popularity": m.get("popularity") or 0,
+                            "currentEpisode": m.get("episodes") or 12,
+                            "episodes": m.get("episodes") or 12,
+                            "timeText": "Tamat",
+                            "category": "finished",
+                            "finishedAt": end_ts,
+                            "statusLabel": status_lbl
+                        })
+                except Exception as ex:
+                    logger.debug(f"Error parsing finished anime date: {ex}")
+
+        # 3. Sort each category & compute totals
+        total_all = 0
+        for d_name, d_obj in schedule_by_day.items():
+            d_obj["airing"].sort(key=lambda x: x.get("timeText", ""))
+            d_obj["upcoming"].sort(key=lambda x: x.get("timeText", ""))
+            d_obj["finished"].sort(key=lambda x: x.get("popularity", 0), reverse=True)
+            d_obj["totalCount"] = len(d_obj["airing"]) + len(d_obj["upcoming"]) + len(d_obj["finished"])
+            total_all += d_obj["totalCount"]
+
+        if total_all > 0:
+            result = {
+                "success": True,
+                "today": day_names[today_weekday],
+                "todayIndex": today_weekday,
+                "weekRange": f"{start_of_week.strftime('%Y-%m-%d')} s/d {end_of_week.strftime('%Y-%m-%d')}",
+                "updatedAt": now_wib.isoformat(),
+                "totalAnime": total_all,
+                "days": schedule_by_day
+            }
+            weekly_schedule_cache["data"] = result
+            weekly_schedule_cache["expires_at"] = now_ts + 900  # 15 minutes cache
+            return result
+
+    except Exception as e:
+        logger.error(f"Error building real-time weekly schedule: {e}", exc_info=True)
+    finally:
+        if should_close_client:
+            await client.aclose()
+
+    # Fallback: if existing cache exists, return it
+    if weekly_schedule_cache.get("data"):
+        return {**weekly_schedule_cache["data"], "cached": True, "stale": True}
+
+    # Otherwise return empty week shell
+    return {
         "success": True,
         "today": day_names[today_weekday],
         "todayIndex": today_weekday,
-        "updatedAt": datetime.now().isoformat(),
-        "totalAnime": total_all,
-        "days": schedule_by_day
+        "weekRange": f"{start_of_week.strftime('%Y-%m-%d')} s/d {end_of_week.strftime('%Y-%m-%d')}",
+        "updatedAt": now_wib.isoformat(),
+        "totalAnime": 0,
+        "days": schedule_by_day,
+        "empty": True
     }
-
-    # Cache for 30 minutes
-    weekly_schedule_cache["data"] = result
-    weekly_schedule_cache["expires_at"] = now + 1800
-
-    return result
 
 
 # ==========================================

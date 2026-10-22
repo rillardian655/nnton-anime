@@ -19,29 +19,33 @@
         </div>
       </div>
 
-      <!-- Top Clean Title (Matching Foto 2 & 3) -->
+      <!-- Top Clean Title -->
       <div class="schedule-header-bar">
         <h1 class="schedule-title-main">Jadwal Tayang</h1>
+        <p v-if="scheduleData?.weekRange" class="schedule-period-sub">
+          Minggu Ini: {{ scheduleData.weekRange }} (WIB)
+        </p>
       </div>
 
-      <!-- Top 7-Days Bar (Matching Foto 2) -->
+      <!-- Top 7-Days Bar (Senin - Minggu) -->
       <nav class="days-strip-container">
         <div class="days-strip-row">
           <button 
             v-for="d in daysList" 
             :key="d.name"
             class="day-strip-btn"
-            :class="{ 'is-active': activeDayKey === d.name }"
+            :class="{ 'is-active': activeDayKey === d.name, 'is-today': d.isToday }"
             @click="activeDayKey = d.name"
           >
             <span class="day-short-label">{{ d.shortName }}</span>
             <span class="day-date-number">{{ d.dateNum }}</span>
+            <span v-if="d.isToday" class="today-sub-dot" title="Hari Ini"></span>
             <span v-if="activeDayKey === d.name" class="active-dot-indicator"></span>
           </button>
         </div>
       </nav>
 
-      <!-- Category Filter Pills (Minimalist, No Emojis, Matching Foto 2 & 3) -->
+      <!-- Category Filter Pills (Minimalist, 3 Bagian Utama) -->
       <div class="filter-segmented-bar">
         <div class="filter-segmented-row">
           <button 
@@ -57,7 +61,7 @@
             :class="{ active: activeFilter === 'airing' }"
             @click="activeFilter = 'airing'"
           >
-            Sudah Tayang ({{ currentDayData?.airing?.length || 0 }})
+            Sedang Tayang ({{ currentDayData?.airing?.length || 0 }})
           </button>
 
           <button 
@@ -81,7 +85,7 @@
       <!-- Loading State -->
       <div v-if="loading" class="schedule-state-box">
         <span class="clean-spinner"></span>
-        <p class="state-msg">Memuat jadwal tayang...</p>
+        <p class="state-msg">Memuat jadwal tayang real-time...</p>
       </div>
 
       <!-- Error State -->
@@ -90,93 +94,277 @@
         <button class="btn btn-secondary btn-sm" @click="loadSchedule">Coba Lagi</button>
       </div>
 
-      <!-- Anime Timeline List (Matching Foto 2 & 3) -->
+      <!-- Anime Timeline List (3 Bagian per Hari) -->
       <div v-else class="timeline-list-wrap">
-        <div v-if="displayAnimeList.length > 0" class="timeline-items-col">
-          <div 
-            v-for="anime in displayAnimeList" 
-            :key="anime.category + '-' + anime.id"
-            class="timeline-card"
-            @click="handleCardClick(anime)"
-          >
-            <!-- Left Side Accent Border -->
-            <div 
-              class="card-edge-strip" 
-              :class="{
-                'edge-airing': anime.category === 'airing',
-                'edge-upcoming': anime.category === 'upcoming',
-                'edge-finished': anime.category === 'finished'
-              }"
-            ></div>
-
-            <!-- Time Column -->
-            <div class="card-time-block">
-              <span class="time-main-text">{{ anime.timeText || '00:00' }}</span>
+        <!-- ALL TAB: Display the 3 distinct subsections with clean headers -->
+        <template v-if="activeFilter === 'all'">
+          <!-- Section 1: Sedang Tayang / Baru Upload -->
+          <section v-if="currentDayData?.airing?.length > 0" class="schedule-section-group">
+            <div class="section-subheading-wrap">
+              <span class="section-subheading-pill pill-airing">
+                Sedang Tayang / Baru Upload ({{ currentDayData.airing.length }})
+              </span>
+              <span class="section-line-divider"></span>
             </div>
-
-            <!-- Poster Thumbnail -->
-            <div class="card-thumb-block">
-              <img 
-                :src="getSafeImageUrl(anime.coverImage?.large || anime.coverImage?.extraLarge)" 
-                :alt="anime.title?.english || anime.title?.romaji" 
-                loading="lazy" 
-                @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
-              />
-            </div>
-
-            <!-- Details Block -->
-            <div class="card-body-block">
-              <h2 class="anime-title-heading" :title="anime.title?.english || anime.title?.romaji">
-                {{ anime.title?.english || anime.title?.romaji }}
-              </h2>
-
-              <div class="anime-episode-line">
-                <span v-if="anime.category === 'finished'">Tamat • {{ anime.episodes || 'Selesai' }} Episode</span>
-                <span v-else>Episode {{ anime.currentEpisode || 1 }}</span>
-              </div>
-
-              <div class="anime-stats-line">
-                <span class="meta-score" v-if="anime.averageScore">
-                  ★ {{ (anime.averageScore / 10).toFixed(1) }}
-                </span>
-                <span class="meta-separator" v-if="anime.genres?.length">•</span>
-                <span class="meta-genre-text">{{ (anime.genres || []).slice(0, 2).join(', ') }}</span>
-              </div>
-
-              <!-- Status text with subtle dot -->
-              <div class="anime-status-line">
-                <span 
-                  class="status-dot" 
-                  :class="{
-                    'dot-gold': anime.category === 'airing',
-                    'dot-gray': anime.category === 'upcoming',
-                    'dot-blue': anime.category === 'finished'
-                  }"
-                ></span>
-                <span class="status-name-text">{{ anime.statusLabel }}</span>
-              </div>
-            </div>
-
-            <!-- Quick Action Icon -->
-            <div class="card-action-block">
-              <button 
-                type="button"
-                class="play-circle-btn" 
-                @click.stop="handlePlayClick(anime)"
-                title="Tonton Episode"
+            <div class="timeline-items-col">
+              <div 
+                v-for="anime in currentDayData.airing" 
+                :key="'airing-' + anime.id"
+                class="timeline-card"
+                @click="handleCardClick(anime)"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-              </button>
+                <div class="card-edge-strip edge-airing"></div>
+                <div class="card-time-block">
+                  <span class="time-main-text">{{ anime.timeText || '00:00' }}</span>
+                </div>
+                <div class="card-thumb-block">
+                  <img 
+                    :src="getSafeImageUrl(anime.coverImage?.large || anime.coverImage?.extraLarge)" 
+                    :alt="anime.title?.english || anime.title?.romaji" 
+                    loading="lazy" 
+                    @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
+                  />
+                </div>
+                <div class="card-body-block">
+                  <h2 class="anime-title-heading" :title="anime.title?.english || anime.title?.romaji">
+                    {{ anime.title?.english || anime.title?.romaji }}
+                  </h2>
+                  <div class="anime-episode-line">
+                    <span>Episode {{ anime.currentEpisode || 1 }}</span>
+                  </div>
+                  <div class="anime-stats-line">
+                    <span class="meta-score" v-if="anime.averageScore">
+                      ★ {{ (anime.averageScore / 10).toFixed(1) }}
+                    </span>
+                    <span class="meta-separator" v-if="anime.genres?.length">•</span>
+                    <span class="meta-genre-text">{{ (anime.genres || []).slice(0, 2).join(', ') }}</span>
+                  </div>
+                  <div class="anime-status-line">
+                    <span class="status-dot dot-gold"></span>
+                    <span class="status-name-text">{{ anime.statusLabel }}</span>
+                  </div>
+                </div>
+                <div class="card-action-block">
+                  <button 
+                    type="button"
+                    class="play-circle-btn" 
+                    @click.stop="handlePlayClick(anime)"
+                    title="Tonton Episode"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 2: Belum Upload / Menunggu Rilis -->
+          <section v-if="currentDayData?.upcoming?.length > 0" class="schedule-section-group">
+            <div class="section-subheading-wrap">
+              <span class="section-subheading-pill pill-upcoming">
+                Belum Upload / Menunggu Rilis ({{ currentDayData.upcoming.length }})
+              </span>
+              <span class="section-line-divider"></span>
+            </div>
+            <div class="timeline-items-col">
+              <div 
+                v-for="anime in currentDayData.upcoming" 
+                :key="'upcoming-' + anime.id"
+                class="timeline-card"
+                @click="handleCardClick(anime)"
+              >
+                <div class="card-edge-strip edge-upcoming"></div>
+                <div class="card-time-block">
+                  <span class="time-main-text">{{ anime.timeText || '00:00' }}</span>
+                </div>
+                <div class="card-thumb-block">
+                  <img 
+                    :src="getSafeImageUrl(anime.coverImage?.large || anime.coverImage?.extraLarge)" 
+                    :alt="anime.title?.english || anime.title?.romaji" 
+                    loading="lazy" 
+                    @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
+                  />
+                </div>
+                <div class="card-body-block">
+                  <h2 class="anime-title-heading" :title="anime.title?.english || anime.title?.romaji">
+                    {{ anime.title?.english || anime.title?.romaji }}
+                  </h2>
+                  <div class="anime-episode-line">
+                    <span>Episode {{ anime.currentEpisode || 1 }}</span>
+                  </div>
+                  <div class="anime-stats-line">
+                    <span class="meta-score" v-if="anime.averageScore">
+                      ★ {{ (anime.averageScore / 10).toFixed(1) }}
+                    </span>
+                    <span class="meta-separator" v-if="anime.genres?.length">•</span>
+                    <span class="meta-genre-text">{{ (anime.genres || []).slice(0, 2).join(', ') }}</span>
+                  </div>
+                  <div class="anime-status-line">
+                    <span class="status-dot dot-gray"></span>
+                    <span class="status-name-text">{{ anime.statusLabel }}</span>
+                  </div>
+                </div>
+                <div class="card-action-block">
+                  <button 
+                    type="button"
+                    class="play-circle-btn" 
+                    @click.stop="handlePlayClick(anime)"
+                    title="Tonton Episode"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 3: Baru Selesai / Tamat (<15 Hari) -->
+          <section v-if="currentDayData?.finished?.length > 0" class="schedule-section-group">
+            <div class="section-subheading-wrap">
+              <span class="section-subheading-pill pill-finished">
+                Baru Selesai / Tamat &lt;15 Hari ({{ currentDayData.finished.length }})
+              </span>
+              <span class="section-line-divider"></span>
+            </div>
+            <div class="timeline-items-col">
+              <div 
+                v-for="anime in currentDayData.finished" 
+                :key="'finished-' + anime.id"
+                class="timeline-card"
+                @click="handleCardClick(anime)"
+              >
+                <div class="card-edge-strip edge-finished"></div>
+                <div class="card-time-block">
+                  <span class="time-main-text text-blue-400">Tamat</span>
+                </div>
+                <div class="card-thumb-block">
+                  <img 
+                    :src="getSafeImageUrl(anime.coverImage?.large || anime.coverImage?.extraLarge)" 
+                    :alt="anime.title?.english || anime.title?.romaji" 
+                    loading="lazy" 
+                    @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
+                  />
+                </div>
+                <div class="card-body-block">
+                  <h2 class="anime-title-heading" :title="anime.title?.english || anime.title?.romaji">
+                    {{ anime.title?.english || anime.title?.romaji }}
+                  </h2>
+                  <div class="anime-episode-line">
+                    <span>Tamat • {{ anime.episodes || 'Selesai' }} Episode</span>
+                  </div>
+                  <div class="anime-stats-line">
+                    <span class="meta-score" v-if="anime.averageScore">
+                      ★ {{ (anime.averageScore / 10).toFixed(1) }}
+                    </span>
+                    <span class="meta-separator" v-if="anime.genres?.length">•</span>
+                    <span class="meta-genre-text">{{ (anime.genres || []).slice(0, 2).join(', ') }}</span>
+                  </div>
+                  <div class="anime-status-line">
+                    <span class="status-dot dot-blue"></span>
+                    <span class="status-name-text">{{ anime.statusLabel }}</span>
+                  </div>
+                </div>
+                <div class="card-action-block">
+                  <button 
+                    type="button"
+                    class="play-circle-btn" 
+                    @click.stop="handlePlayClick(anime)"
+                    title="Tonton Anime"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Empty on All -->
+          <div v-if="!currentDayData || currentDayData.totalCount === 0" class="schedule-empty-state">
+            <p>Tidak ada jadwal anime untuk hari {{ activeDayKey }}.</p>
+          </div>
+        </template>
+
+        <!-- FILTERED TAB: Display single filtered category list -->
+        <template v-else>
+          <div v-if="displayAnimeList.length > 0" class="timeline-items-col">
+            <div 
+              v-for="anime in displayAnimeList" 
+              :key="anime.category + '-' + anime.id"
+              class="timeline-card"
+              @click="handleCardClick(anime)"
+            >
+              <div 
+                class="card-edge-strip" 
+                :class="{
+                  'edge-airing': anime.category === 'airing',
+                  'edge-upcoming': anime.category === 'upcoming',
+                  'edge-finished': anime.category === 'finished'
+                }"
+              ></div>
+              <div class="card-time-block">
+                <span class="time-main-text" :class="{ 'text-blue-400': anime.category === 'finished' }">
+                  {{ anime.timeText || '00:00' }}
+                </span>
+              </div>
+              <div class="card-thumb-block">
+                <img 
+                  :src="getSafeImageUrl(anime.coverImage?.large || anime.coverImage?.extraLarge)" 
+                  :alt="anime.title?.english || anime.title?.romaji" 
+                  loading="lazy" 
+                  @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
+                />
+              </div>
+              <div class="card-body-block">
+                <h2 class="anime-title-heading" :title="anime.title?.english || anime.title?.romaji">
+                  {{ anime.title?.english || anime.title?.romaji }}
+                </h2>
+                <div class="anime-episode-line">
+                  <span v-if="anime.category === 'finished'">Tamat • {{ anime.episodes || 'Selesai' }} Episode</span>
+                  <span v-else>Episode {{ anime.currentEpisode || 1 }}</span>
+                </div>
+                <div class="anime-stats-line">
+                  <span class="meta-score" v-if="anime.averageScore">
+                    ★ {{ (anime.averageScore / 10).toFixed(1) }}
+                  </span>
+                  <span class="meta-separator" v-if="anime.genres?.length">•</span>
+                  <span class="meta-genre-text">{{ (anime.genres || []).slice(0, 2).join(', ') }}</span>
+                </div>
+                <div class="anime-status-line">
+                  <span 
+                    class="status-dot" 
+                    :class="{
+                      'dot-gold': anime.category === 'airing',
+                      'dot-gray': anime.category === 'upcoming',
+                      'dot-blue': anime.category === 'finished'
+                    }"
+                  ></span>
+                  <span class="status-name-text">{{ anime.statusLabel }}</span>
+                </div>
+              </div>
+              <div class="card-action-block">
+                <button 
+                  type="button"
+                  class="play-circle-btn" 
+                  @click.stop="handlePlayClick(anime)"
+                  title="Tonton Episode"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-
-        <!-- Empty State -->
-        <div v-else class="schedule-empty-state">
-          <p>Tidak ada jadwal anime untuk kategori ini pada hari {{ activeDayKey }}.</p>
-        </div>
+          <div v-else class="schedule-empty-state">
+            <p>Tidak ada jadwal anime untuk kategori ini pada hari {{ activeDayKey }}.</p>
+          </div>
+        </template>
       </div>
 
       <!-- Floating Bottom Day Switchers (Matching Foto 2) -->
@@ -217,7 +405,9 @@ const emit = defineEmits(['openAnimeModal']);
 const dayKeys = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 const dayShorts = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
-const activeDayKey = ref('Rabu');
+const indoDayMap = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const todayNameIndo = indoDayMap[new Date().getDay()];
+const activeDayKey = ref(todayNameIndo || 'Kamis');
 const activeFilter = ref('all');
 
 const scheduleData = ref(null);
@@ -335,6 +525,25 @@ onMounted(() => {
   letter-spacing: -0.2px;
 }
 
+.schedule-period-sub {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #94a3b8;
+  margin-top: 0.25rem;
+  letter-spacing: 0.2px;
+}
+
+.today-sub-dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+}
+
 /* ================= Day Strip Bar (Foto 2) ================= */
 .days-strip-container {
   margin-bottom: 1.25rem;
@@ -449,6 +658,59 @@ onMounted(() => {
 /* ================= Timeline List (Foto 2) ================= */
 .timeline-list-wrap {
   position: relative;
+}
+
+.schedule-section-group {
+  margin-bottom: 1.5rem;
+}
+
+.schedule-section-group:last-child {
+  margin-bottom: 0.5rem;
+}
+
+.section-subheading-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 1.15rem 0 0.65rem;
+}
+
+.schedule-section-group:first-child .section-subheading-wrap {
+  margin-top: 0.2rem;
+}
+
+.section-subheading-pill {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.pill-airing {
+  background: rgba(234, 179, 8, 0.12);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+}
+
+.pill-upcoming {
+  background: rgba(100, 116, 139, 0.12);
+  color: #cbd5e1;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.pill-finished {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.section-line-divider {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .timeline-items-col {
@@ -656,20 +918,14 @@ onMounted(() => {
   margin-bottom: 0.75rem;
 }
 
-/* ================= Floating Day Switchers (Foto 2) ================= */
+/* ================= Bottom Day Switchers ================= */
 .floating-day-nav {
-  position: fixed;
-  bottom: 4.8rem;
-  left: 0;
-  right: 0;
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 0 1.25rem;
+  margin-top: 2.25rem;
+  margin-bottom: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  pointer-events: none;
-  z-index: 30;
+  width: 100%;
 }
 
 .nav-jump-btn {

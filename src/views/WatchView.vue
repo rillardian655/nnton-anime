@@ -11,12 +11,19 @@
       </div>
 
       <!-- Video Player Viewport -->
-      <div class="theater-player-box" id="theaterBox">
+      <div 
+        class="theater-player-box" 
+        id="theaterBox"
+        :class="{ 'controls-active': isPlayerHovered }"
+        @mousemove="onPlayerMouseMove"
+        @mouseleave="onPlayerMouseLeave"
+      >
         <!-- Direct HLS / MP4 Player (Single Native Player - Kodik / AniLibria) -->
         <video 
           ref="videoRef" 
           class="native-hls-player" 
           controls 
+          crossorigin="anonymous"
           playsinline 
           webkit-playsinline
           x5-playsinline
@@ -29,6 +36,11 @@
           @pause="onVideoPause"
           @seeked="onVideoSeeked"
         ></video>
+
+        <!-- Direct Subtitle Timpa Overlay (Overwrites Russian hardsub with clean Indonesian fansub text) -->
+        <div v-if="currentSubtitleCueText" class="cinema-subtitle-overlay">
+          <span class="cinema-subtitle-box" v-html="currentSubtitleCueText"></span>
+        </div>
 
         <!-- VIP Locked Access Screen (Displayed when user is not logged in) -->
         <div v-if="!isAuthenticated" class="vip-locked-theater-overlay">
@@ -153,10 +165,11 @@
         </div>
       </div>
 
-      <!-- Versi (Server / Audio Dub) & Stream Settings Row (Matches Miru screenshot) -->
+      <!-- Versi (Server / Audio Dub) & Stream Settings Row -->
       <div class="theater-version-container">
-        <div class="version-item" v-if="currentSources.length > 0">
-          <label class="version-label">Audio / Sub</label>
+        <!-- Only show source dropdown if there are multiple alternative sources -->
+        <div class="version-item" v-if="currentSources.length > 1">
+          <label class="version-label">Server Video</label>
           <div class="version-select-box">
             <select 
               v-model="selectedSourceIndex" 
@@ -168,7 +181,7 @@
                 :key="idx" 
                 :value="idx"
               >
-                {{ src.title || (src.is_subtitles_original ? 'Sub Original (Kazoku / AniLibria)' : `Audio Track ${idx + 1}`) }}
+                {{ src.title || `Server ${idx + 1}` }}
               </option>
             </select>
             <div class="version-chevron">
@@ -213,6 +226,23 @@
             <div class="version-chevron">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
+          </div>
+        </div>
+
+        <!-- Subtitle Sync / Direct Timpa Calibration Control -->
+        <div class="version-item subtitle-sync-control" v-if="selectedSubIndex !== -1 && subtitlesList.length > 0">
+          <label class="version-label">
+            Sinkronisasi Timpa Teks
+            <span class="sync-offset-badge" :class="{ 'is-shifted': subtitleOffset !== 0 }">
+              {{ subtitleOffset > 0 ? '+' : '' }}{{ subtitleOffset.toFixed(1) }}s {{ subtitleOffset > 0 ? '(Maju)' : subtitleOffset < 0 ? '(Mundur)' : '(Pas Timpa)' }}
+            </span>
+          </label>
+          <div class="sub-sync-btn-group">
+            <button type="button" class="btn-sync-step btn-sync-faster" @click="adjustSubtitleOffset(0.5)" title="Munculkan subtitle 0.5 detik lebih awal">+0.5s Maju</button>
+            <button type="button" class="btn-sync-step" @click="adjustSubtitleOffset(0.2)" title="Munculkan subtitle 0.2 detik lebih awal">+0.2s</button>
+            <button type="button" class="btn-sync-step btn-sync-reset" @click="resetSubtitleOffset" title="Reset sinkronisasi ke pas timpa (0.0s)">0.0s Pas</button>
+            <button type="button" class="btn-sync-step" @click="adjustSubtitleOffset(-0.2)" title="Tunda subtitle 0.2 detik lebih mundur">-0.2s</button>
+            <button type="button" class="btn-sync-step btn-sync-slower" @click="adjustSubtitleOffset(-0.5)" title="Tunda subtitle 0.5 detik lebih mundur">-0.5s Mundur</button>
           </div>
         </div>
       </div>
@@ -297,7 +327,21 @@
         </div>
         
         <div class="watch-progress-badge" v-if="watchDuration > 0">
-          Posisi: <strong style="color: #fff; margin-left: 3px;">{{ formatTime(watchCurrentTime) }}</strong> / {{ formatTime(watchDuration) }} ({{ watchPercentage }}% <span v-if="bufferAheadSec > 0" class="buffer-text">• Buffer {{ bufferAheadSec }}s</span>)
+          Posisi: <strong style="color: #fff; margin-left: 3px;">{{ formatTime(watchCurrentTime) }}</strong> / {{ formatTime(watchDuration) }} ({{ watchPercentage }}% <span class="buffer-text">• Cache Line: {{ bufferAheadSec }}s</span>)
+        </div>
+      </div>
+
+      <!-- Real-time Cache Line Visual Bar -->
+      <div class="cache-line-container" v-if="watchDuration > 0">
+        <div class="cache-line-track">
+          <div class="cache-line-playhead" :style="{ width: watchPercentage + '%' }"></div>
+          <div class="cache-line-buffer" :style="{ left: watchPercentage + '%', width: Math.min(100 - watchPercentage, Math.round((bufferAheadSec / watchDuration) * 100)) + '%' }"></div>
+        </div>
+        <div class="cache-line-labels">
+          <span class="cache-label-left">Stream Cache Line (Kodik solodcdn.com HLS Proxy)</span>
+          <span class="cache-label-right" :style="{ color: bufferAheadSec >= 10 ? '#10b981' : '#f59e0b' }">
+            {{ bufferAheadSec >= 10 ? 'Buffer Stabil (+ ' + bufferAheadSec + 's tersimpan di RAM)' : (bufferAheadSec > 0 ? 'Sedang memuat buffer (' + bufferAheadSec + 's)' : 'Memuat data HLS...') }}
+          </span>
         </div>
       </div>
 
@@ -517,6 +561,39 @@ const availableVideos = ref([]);
 const subtitlesList = ref([]);
 const selectedSubIndex = ref(-1);
 const isSearchingSubtitles = ref(false);
+const activeSubtitleCues = ref([]);
+const currentSubtitleCueText = ref('');
+const subtitleOffset = ref(0.0); // Default 0.0s (exact audio sync), calibrated via effectiveTime = cur + offset
+let rafSubId = null;
+
+const autoMaskRussian = ref(true);
+try {
+  const savedMask = localStorage.getItem('anipulse_auto_mask_russian');
+  if (savedMask !== null) {
+    autoMaskRussian.value = savedMask === 'true';
+  }
+} catch (e) {}
+
+function toggleMaskRussian(val) {
+  autoMaskRussian.value = val;
+  try {
+    localStorage.setItem('anipulse_auto_mask_russian', String(val));
+  } catch (e) {}
+}
+
+const isPlayerHovered = ref(false);
+let playerHoverTimer = null;
+function onPlayerMouseMove() {
+  isPlayerHovered.value = true;
+  clearTimeout(playerHoverTimer);
+  playerHoverTimer = setTimeout(() => {
+    isPlayerHovered.value = false;
+  }, 2500);
+}
+function onPlayerMouseLeave() {
+  isPlayerHovered.value = false;
+  clearTimeout(playerHoverTimer);
+}
 
 const isLoadingStream = ref(true);
 const loadingMessage = ref('Menghubungkan ke stream video Kodik...');
@@ -613,8 +690,17 @@ function computeEpisodeCount(details) {
 async function fetchYummyEpisodes(details) {
   const searchTerm = details.title?.english || details.title?.romaji;
   const altTerm = details.title?.romaji || '';
+  const yummyId = details.yummyId || '';
+  const slug = details.slug || '';
   try {
-    const res = await fetch(apiUrl(`/api/yummy/episodes?q=${encodeURIComponent(searchTerm)}&alt=${encodeURIComponent(altTerm)}`));
+    const qs = new URLSearchParams({
+      q: searchTerm,
+      alt: altTerm
+    });
+    if (yummyId) qs.set('id', String(yummyId));
+    if (slug) qs.set('slug', slug);
+
+    const res = await fetch(apiUrl(`/api/yummy/episodes?${qs.toString()}`));
     const data = await res.json();
     if (data.episodes && data.episodes.length > 0) {
       let validEps = data.episodes.map(e => ({
@@ -624,13 +710,8 @@ async function fetchYummyEpisodes(details) {
 
       if (validEps.length > 0) {
         validEps.sort((a, b) => a.num - b.num);
-        if (isAiringStatus(details) && totalEpisodes.value > 0) {
-          validEps = validEps.filter(e => e.num <= totalEpisodes.value);
-        }
-        if (validEps.length > 0) {
-          episodesList.value = validEps;
-          totalEpisodes.value = validEps.length;
-        }
+        episodesList.value = validEps;
+        totalEpisodes.value = validEps.length;
       }
     }
   } catch (err) {
@@ -643,6 +724,7 @@ async function initWatch() {
   const animeId = route.query.id;
   const ep = Number(route.query.ep) || 1;
   currentEpisode.value = ep;
+  subtitleOffset.value = loadSavedSubtitleOffset(ep);
 
   if (!animeId) {
     router.push('/');
@@ -739,9 +821,18 @@ async function loadEpisodeStream(ep) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
+    const streamQs = new URLSearchParams({
+      q: title,
+      alt: altTitle,
+      ep: String(ep)
+    });
+    if (anime.value?.yummyId) streamQs.set('id', String(anime.value.yummyId));
+    if (anime.value?.slug) streamQs.set('slug', anime.value.slug);
+    if (token) streamQs.set('token', token);
+
     let res = null;
     try {
-      res = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(title)}&alt=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
+      res = await fetch(apiUrl(`/api/yummy/streams?${streamQs.toString()}`), {
         headers: authHeaders,
         signal: controller.signal
       });
@@ -883,7 +974,7 @@ function playSelectedSource() {
   streamStatusText.value = `Memutar: ${source.title} (${video.quality}p HLS)`;
   const directHlsUrl = video.direct_url || '';
   const proxyHlsUrl = video.url ? apiUrl(video.url) : '';
-  let currentHlsUrl = directHlsUrl || proxyHlsUrl;
+  let currentHlsUrl = proxyHlsUrl || directHlsUrl;
 
   if (Hls.isSupported()) {
     hlsInstance = new Hls({
@@ -974,11 +1065,15 @@ function startManualPlayback() {
 function onVideoPlay() {
   isLoadingStream.value = false;
   showPlayOverlay.value = false;
+  cancelAnimationFrame(rafSubId);
+  rafSubId = requestAnimationFrame(syncSubtitleLoop);
 }
 
 function onVideoPlaying() {
   isLoadingStream.value = false;
   showPlayOverlay.value = false;
+  cancelAnimationFrame(rafSubId);
+  rafSubId = requestAnimationFrame(syncSubtitleLoop);
 }
 
 function onVideoCanPlay() {
@@ -1013,6 +1108,9 @@ function switchEpisode(epNum) {
   showResumeBanner.value = false;
   hasAutoSkippedThisEp.value = false;
 
+  // Load saved offset for new episode or default to 0.0s (exact audio sync)
+  subtitleOffset.value = loadSavedSubtitleOffset(epNum);
+
   // Keep chunk tab in sync
   if (totalEpisodes.value > 25) {
     const idx = Math.floor((epNum - 1) / 25);
@@ -1032,15 +1130,81 @@ function switchEpisode(epNum) {
   loadEpisodeStream(epNum);
 }
 
+// ---------------- Subtitle Synchronization (60 FPS & Directional Calibration) ----------------
+function loadSavedSubtitleOffset(epNum) {
+  try {
+    // Clean up old inaccurate +2.1s offset from previous versions
+    const oldKey = `anipulse_sub_offset_${epNum}`;
+    const oldVal = localStorage.getItem(oldKey);
+    if (oldVal !== null) {
+      const parsedOld = parseFloat(oldVal);
+      if (Math.abs(parsedOld - 2.1) < 0.05) {
+        localStorage.removeItem(oldKey);
+      }
+    }
+    const saved = localStorage.getItem(`anipulse_sub_offset_v3_${epNum}`);
+    if (saved !== null) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return 0.0;
+}
+
+function updateCurrentCue() {
+  const videoEl = videoRef.value;
+  if (!videoEl || activeSubtitleCues.value.length === 0) {
+    currentSubtitleCueText.value = '';
+    return;
+  }
+  const cur = videoEl.currentTime || 0;
+  // Hardsub timing calibration: Russian fansubs in Kodik streams appear ~0.45s earlier than web rip SRTs
+  const streamLead = 0.45;
+  const effectiveTime = cur + subtitleOffset.value + streamLead;
+  // Hold cue (+0.45s) to match full duration of Russian hardsub on screen and prevent early disappearing
+  const cue = activeSubtitleCues.value.find(c => effectiveTime >= c.start && effectiveTime <= (c.end + 0.45));
+  currentSubtitleCueText.value = cue ? cue.text : '';
+}
+
+function syncSubtitleLoop() {
+  const videoEl = videoRef.value;
+  if (videoEl && !videoEl.paused) {
+    updateCurrentCue();
+    rafSubId = requestAnimationFrame(syncSubtitleLoop);
+  }
+}
+
+function adjustSubtitleOffset(delta) {
+  subtitleOffset.value = Math.round((subtitleOffset.value + delta) * 10) / 10;
+  try {
+    localStorage.setItem(`anipulse_sub_offset_v3_${currentEpisode.value}`, subtitleOffset.value.toString());
+  } catch (e) {}
+  updateCurrentCue();
+}
+
+function resetSubtitleOffset() {
+  subtitleOffset.value = 0.0;
+  try {
+    localStorage.setItem(`anipulse_sub_offset_v3_${currentEpisode.value}`, '0.0');
+    localStorage.removeItem(`anipulse_sub_offset_${currentEpisode.value}`);
+  } catch (e) {}
+  updateCurrentCue();
+}
+
 // ---------------- Video Event Handlers ----------------
 function onTimeUpdate() {
   const videoEl = videoRef.value;
-  if (!videoEl || !videoEl.duration || videoEl.duration <= 0) return;
+  if (!videoEl) return;
 
-  const cur = videoEl.currentTime;
-  const dur = videoEl.duration;
+  const cur = videoEl.currentTime || 0;
+  const dur = (videoEl.duration && !isNaN(videoEl.duration) && isFinite(videoEl.duration)) ? videoEl.duration : 0;
   watchCurrentTime.value = cur;
-  watchDuration.value = dur;
+  if (dur > 0) watchDuration.value = dur;
+
+  // Real-time cue update (supplemented by 60 FPS requestAnimationFrame loop during playback)
+  updateCurrentCue();
 
   // Auto-skip opening if enabled and during intro (1s - 6s)
   if (autoSkipOp.value && !hasAutoSkippedThisEp.value && cur >= 1 && cur <= 6) {
@@ -1069,6 +1233,7 @@ function onTimeUpdate() {
 }
 
 function onVideoPause() {
+  cancelAnimationFrame(rafSubId);
   const videoEl = videoRef.value;
   if (anime.value && videoEl && videoEl.duration > 0 && videoEl.currentTime > 2) {
     updateWatchProgress(anime.value.id, currentEpisode.value, videoEl.currentTime, videoEl.duration);
@@ -1076,6 +1241,7 @@ function onVideoPause() {
 }
 
 function onVideoSeeked() {
+  updateCurrentCue();
   const videoEl = videoRef.value;
   if (anime.value && videoEl && videoEl.duration > 0) {
     updateWatchProgress(anime.value.id, currentEpisode.value, videoEl.currentTime, videoEl.duration);
@@ -1152,7 +1318,57 @@ function switchSubtitle(idx) {
   }
 }
 
-function applySubtitleTrack(sub) {
+function parseVttToCues(vttText) {
+  if (!vttText) return [];
+  const lines = vttText.split(/\r?\n/);
+  const cues = [];
+  let i = 0;
+
+  function parseTimestamp(ts) {
+    if (!ts) return 0;
+    const parts = ts.trim().split(':');
+    if (parts.length === 3) {
+      return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+    } else if (parts.length === 2) {
+      return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+    }
+    return 0;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (line.includes('-->')) {
+      const [startStr, endStr] = line.split('-->');
+      const start = parseTimestamp(startStr.trim().split(' ')[0]);
+      const end = parseTimestamp(endStr.trim().split(' ')[0]);
+      i++;
+      const textLines = [];
+      while (i < lines.length && lines[i].trim() !== '') {
+        const tLine = lines[i].trim();
+        // Skip cue metadata or formatting tags if any
+        if (!tLine.startsWith('NOTE') && !tLine.startsWith('STYLE')) {
+          textLines.push(tLine.replace(/<[^>]+>/g, ''));
+        }
+        i++;
+      }
+      if (textLines.length > 0 && end > start) {
+        cues.push({
+          start,
+          end,
+          text: textLines.join('<br>')
+        });
+      }
+    } else {
+      i++;
+    }
+  }
+  return cues;
+}
+
+async function applySubtitleTrack(sub) {
+  activeSubtitleCues.value = [];
+  currentSubtitleCueText.value = '';
+
   const videoEl = videoRef.value;
   if (!videoEl) return;
 
@@ -1161,28 +1377,44 @@ function applySubtitleTrack(sub) {
 
   if (!sub) return;
 
-  const track = document.createElement('track');
-  track.kind = 'subtitles';
-  track.label = sub.label;
-  track.srclang = sub.lang;
-  track.src = apiUrl(sub.vtt_url);
-  track.default = true;
-
-  const enableTrackMode = () => {
-    if (track.track) {
-      track.track.mode = 'showing';
-    }
-    if (videoEl.textTracks && videoEl.textTracks.length > 0) {
-      for (let i = 0; i < videoEl.textTracks.length; i++) {
-        videoEl.textTracks[i].mode = 'showing';
+    // 1. Fetch & parse VTT for the high-contrast cinema overlay
+    try {
+      const res = await fetch(apiUrl(sub.vtt_url));
+      if (res.ok) {
+        const vtt = await res.text();
+        activeSubtitleCues.value = parseVttToCues(vtt);
       }
+    } catch (err) {
+      console.warn('Failed to parse subtitle overlay cues:', err);
     }
-  };
 
-  track.addEventListener('load', enableTrackMode);
-  videoEl.appendChild(track);
-  enableTrackMode();
-}
+    // 2. Append native track with mode='hidden' to prevent double subtitles
+    try {
+      const track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.label = sub.label;
+      track.srclang = sub.lang;
+      track.src = apiUrl(sub.vtt_url);
+      track.default = false;
+
+      const syncTrackMode = () => {
+        // If custom Cinema Subtitle Overlay has cues, keep native track hidden to avoid double subtitles
+        const desiredMode = (activeSubtitleCues.value && activeSubtitleCues.value.length > 0) ? 'hidden' : 'showing';
+        if (track.track) track.track.mode = desiredMode;
+        if (videoEl.textTracks) {
+          for (let i = 0; i < videoEl.textTracks.length; i++) {
+            videoEl.textTracks[i].mode = desiredMode;
+          }
+        }
+      };
+
+      track.addEventListener('load', syncTrackMode);
+      videoEl.appendChild(track);
+      syncTrackMode();
+    } catch (e) {
+      // ignore
+    }
+  }
 
 // ---------------- ARM & Kusonime & Translation ----------------
 async function fetchArmMapping(id) {
@@ -1328,6 +1560,9 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
   clearTimeout(safetyTimer);
+  if (rafSubId) {
+    cancelAnimationFrame(rafSubId);
+  }
   if (hlsInstance) {
     hlsInstance.destroy();
     hlsInstance = null;
@@ -1398,17 +1633,16 @@ onUnmounted(() => {
   display: block;
 }
 
+/* Suppress native browser cue to prevent double subtitles */
 .native-hls-player::cue,
 video::cue {
-  background-color: rgba(10, 12, 18, 0.85);
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 1.12rem;
-  font-weight: 600;
-  line-height: 1.4;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 1);
-  padding: 0.2rem 0.6rem;
-  border-radius: 4px;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  background: transparent !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
 }
 
 /* Floating Skip Opening Button */
@@ -1816,6 +2050,67 @@ video::cue {
   align-items: center;
 }
 
+/* Subtitle Sync Offset Controls */
+.sync-offset-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: #2a2e3d;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.sync-offset-badge.is-shifted {
+  background: rgba(255, 77, 46, 0.2);
+  color: #ff4d2e;
+  border: 1px solid rgba(255, 77, 46, 0.4);
+}
+
+.sub-sync-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #18181c;
+  border: 1px solid #2a2e3d;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.btn-sync-step {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.45rem 0.2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.btn-sync-step:hover {
+  background: #2a2e3d;
+  color: #fff;
+}
+
+.btn-sync-reset {
+  color: #ff4d2e;
+  font-size: 0.75rem;
+}
+
+.btn-sync-faster {
+  color: #34d399;
+}
+
+.btn-sync-slower {
+  color: #94a3b8;
+}
+
 /* Episode Picker Cards Grid (Miru buttons: 1, 2, 3...) */
 .theater-episodes-section {
   display: flex;
@@ -1965,6 +2260,65 @@ video::cue {
 
 .buffer-text {
   color: #10b981;
+}
+
+/* Cache Line Visual Bar */
+.cache-line-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: #0f121a;
+  border: 1px solid #1e2433;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  margin-top: 0.35rem;
+}
+
+.cache-line-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: #1e2438;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cache-line-playhead {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #ff4d2e;
+  border-radius: 999px;
+  transition: width 0.25s linear;
+  z-index: 2;
+}
+
+.cache-line-buffer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(16, 185, 129, 0.55);
+  border-radius: 999px;
+  transition: width 0.3s ease, left 0.25s linear;
+  z-index: 1;
+}
+
+.cache-line-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.cache-label-left {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.cache-label-right {
+  font-weight: 600;
 }
 
 /* Info Card */
@@ -2369,5 +2723,49 @@ video::cue {
     padding: 1rem;
     border-radius: 10px;
   }
+}
+
+/* Direct Fansub Subtitle Overlay (Timpa Subtitle Rusia) */
+.cinema-subtitle-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 25;
+  padding: 0 1rem;
+  text-align: center;
+  transition: bottom 0.2s ease;
+}
+
+.theater-player-box.controls-active .cinema-subtitle-overlay {
+  bottom: 54px;
+}
+
+.cinema-subtitle-box {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.92);
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: clamp(1.05rem, 2.2vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.35;
+  padding: 4px 14px;
+  border-radius: 6px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-shadow: 
+    -1.5px -1.5px 0 #000,  
+     1.5px -1.5px 0 #000,
+    -1.5px  1.5px 0 #000,
+     1.5px  1.5px 0 #000,
+     0 2px 6px rgba(0, 0, 0, 0.95);
+  letter-spacing: 0.025em;
+  max-width: 90%;
+  backdrop-filter: blur(4px);
+  box-sizing: border-box;
 }
 </style>

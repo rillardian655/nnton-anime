@@ -224,7 +224,7 @@
           <div v-if="showServerConfig" class="gate-server-box">
             <span class="server-box-lbl">Pengaturan IP Server Backend:</span>
             <div class="server-box-row">
-              <input v-model="customServerUrl" type="text" placeholder="http://192.168.1.11:8000" class="server-box-input" />
+              <input v-model="customServerUrl" type="text" placeholder="http://192.168.1.51:8000" class="server-box-input" />
               <button type="button" class="btn btn-primary btn-sm" @click="saveServerAddress">Simpan</button>
             </div>
             <span class="server-box-hint">Pastikan HP dan laptop terhubung ke Wi-Fi yang sama.</span>
@@ -254,7 +254,7 @@ const isLoading = ref(false);
 const errorMessage = ref('');
 const successMessage = ref('');
 const showServerConfig = ref(false);
-const customServerUrl = ref(localStorage.getItem('anipulse_backend_url') || getApiBaseUrl() || 'http://192.168.1.11:8000');
+const customServerUrl = ref(localStorage.getItem('anipulse_backend_url') || getApiBaseUrl() || 'http://192.168.1.51:8000');
 
 function saveServerAddress() {
   const url = customServerUrl.value.trim().replace(/\/+$/, '');

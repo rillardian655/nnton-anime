@@ -288,6 +288,8 @@ import {
   translateSynopsis, 
   searchKusonime, 
   getKusonimeDownloads,
+  getEffectiveEpisodeCount,
+  isAiringStatus,
   apiUrl 
 } from '../api.js';
 import { 
@@ -305,7 +307,9 @@ function handlePlayClick(ep = 1) {
     showLoginModal.value = true;
     return;
   }
-  router.push(`/watch?id=${anime.value?.id}&ep=${ep}`);
+  const title = encodeURIComponent(anime.value?.title?.english || anime.value?.title?.romaji || '');
+  const slugQuery = anime.value?.slug ? `&slug=${encodeURIComponent(anime.value.slug)}` : '';
+  router.push(`/watch?id=${anime.value?.id}&ep=${ep}&title=${title}${slugQuery}`);
 }
 
 const anime = ref(null);
@@ -360,22 +364,20 @@ function stripHtml(html) {
 }
 
 function computeEpisodeCount(details) {
-  let count = 1;
   airingNotice.value = '';
+  const isAiring = isAiringStatus(details);
+  const count = getEffectiveEpisodeCount(details);
 
-  if (details.status === 'RELEASING') {
+  if (isAiring) {
     if (details.nextAiringEpisode && details.nextAiringEpisode.episode) {
-      count = Math.max(1, details.nextAiringEpisode.episode - 1);
       const hours = Math.floor(details.nextAiringEpisode.timeUntilAiring / 3600);
       const days = Math.floor(hours / 24);
       const remHours = hours % 24;
       const timeStr = days > 0 ? `${days} hari ${remHours} jam` : `${hours} jam`;
       airingNotice.value = `Episode ${details.nextAiringEpisode.episode} rilis dalam ${timeStr}`;
-    } else if (details.episodes) {
-      count = details.episodes;
+    } else {
+      airingNotice.value = `Episode ${count + 1} tayang sesuai jadwal resmi`;
     }
-  } else {
-    count = details.episodes || 12;
   }
 
   totalEpisodes.value = count;
