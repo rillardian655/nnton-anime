@@ -14,26 +14,49 @@
       <div 
         class="theater-player-box" 
         id="theaterBox"
-        :class="{ 'controls-active': isPlayerHovered, 'is-theater-fullscreen': isTheaterFullscreen }"
+        :class="{ 
+          'controls-active': isPlayerHovered, 
+          'is-theater-fullscreen': isTheaterFullscreen,
+          'is-forced-landscape-css': isForcedLandscapeCss
+        }"
         @mousemove="onPlayerMouseMove"
         @mouseleave="onPlayerMouseLeave"
       >
-        <!-- Floating Cinema Fullscreen Control Button (Ensures Indonesian Subtitle stays visible) -->
-        <button 
-          v-if="isAuthenticated"
-          type="button" 
-          class="cinema-fullscreen-toggle-btn" 
-          @click.stop="toggleTheaterFullscreen"
-          :title="isTheaterFullscreen ? 'Keluar Layar Penuh (ESC)' : 'Layar Penuh (Sub Indo Aktif)'"
-        >
-          <svg v-if="!isTheaterFullscreen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-          </svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
-          </svg>
-          <span class="fs-label">{{ isTheaterFullscreen ? 'Keluar' : 'Layar Penuh' }}</span>
-        </button>
+        <!-- Floating Cinema Top Action Bar (Rotate & Fullscreen) -->
+        <div v-if="isAuthenticated" class="cinema-top-action-bar">
+          <!-- Manual Rotate Screen Button (Landscape Mereng Toggle) -->
+          <button 
+            v-if="isTheaterFullscreen"
+            type="button" 
+            class="cinema-action-btn cinema-rotate-btn" 
+            @click.stop="toggleOrientationMode"
+            :title="isForcedLandscapeCss ? 'Layar Tegak (Portrait)' : 'Putar Layar Penuh (Landscape Mereng)'"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+              <path d="M16 21h5v-5"/>
+            </svg>
+            <span class="fs-label">{{ isForcedLandscapeCss ? 'Tegak' : 'Putar Mereng' }}</span>
+          </button>
+
+          <!-- Cinema Fullscreen Toggle Button -->
+          <button 
+            type="button" 
+            class="cinema-action-btn cinema-fullscreen-toggle-btn" 
+            @click.stop="toggleTheaterFullscreen"
+            :title="isTheaterFullscreen ? 'Keluar Layar Penuh (ESC)' : 'Layar Penuh (Sub Indo Aktif)'"
+          >
+            <svg v-if="!isTheaterFullscreen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+            </svg>
+            <span class="fs-label">{{ isTheaterFullscreen ? 'Keluar' : 'Layar Penuh' }}</span>
+          </button>
+        </div>
         <!-- Embed Player (Cloud Direct Stream Fallback for Mobile Data / Remote) -->
         <iframe 
           v-if="isCurrentSourceEmbed"
@@ -518,6 +541,7 @@ import {
   isFavorite, 
   toggleFavorite 
 } from '../storage.js';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
 
 const route = useRoute();
 const router = useRouter();
@@ -638,8 +662,20 @@ function onPlayerMouseLeave() {
   clearTimeout(playerHoverTimer);
 }
 
-// ---------------- Cinema Fullscreen Controller ----------------
+// ---------------- Cinema Fullscreen & Screen Orientation Controller ----------------
 const isTheaterFullscreen = ref(false);
+const isForcedLandscapeCss = ref(false);
+
+async function toggleOrientationMode() {
+  if (isForcedLandscapeCss.value) {
+    isForcedLandscapeCss.value = false;
+  } else {
+    isForcedLandscapeCss.value = true;
+    try {
+      await ScreenOrientation.lock({ orientation: 'landscape' });
+    } catch (_) {}
+  }
+}
 
 async function toggleTheaterFullscreen() {
   const theater = document.getElementById('theaterBox');
@@ -658,13 +694,28 @@ async function toggleTheaterFullscreen() {
     } catch (err) {
       console.warn('Native requestFullscreen failed, active CSS full-screen fallback:', err);
     }
+
+    // 1. Force hardware screen orientation to Landscape (mereng)
     try {
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {});
+      await ScreenOrientation.lock({ orientation: 'landscape' });
+    } catch (e1) {
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape');
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fallback: if user device has system orientation lock on, apply CSS rotation
+    setTimeout(() => {
+      if (isTheaterFullscreen.value && window.innerHeight > window.innerWidth) {
+        isForcedLandscapeCss.value = true;
       }
-    } catch (_) {}
+    }, 280);
+
   } else {
     isTheaterFullscreen.value = false;
+    isForcedLandscapeCss.value = false;
     try {
       if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
         if (document.exitFullscreen) await document.exitFullscreen();
@@ -672,10 +723,14 @@ async function toggleTheaterFullscreen() {
       }
     } catch (_) {}
     try {
-      if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
-      }
-    } catch (_) {}
+      await ScreenOrientation.unlock();
+    } catch (e2) {
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+      } catch (_) {}
+    }
   }
 }
 
@@ -3057,39 +3112,62 @@ video::cue {
   box-sizing: border-box;
 }
 
-/* Floating Cinema Fullscreen Toggle Button */
-.cinema-fullscreen-toggle-btn {
+/* Floating Cinema Top Action Bar & Buttons */
+.cinema-top-action-bar {
   position: absolute;
   top: 14px;
   right: 14px;
-  z-index: 40;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cinema-action-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  background: rgba(15, 23, 42, 0.88);
-  border: 1.5px solid rgba(229, 9, 20, 0.7);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
   border-radius: 999px;
   color: #ffffff;
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(229, 9, 20, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0.92;
 }
 
+.cinema-action-btn:hover,
+.cinema-action-btn:active {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+.cinema-fullscreen-toggle-btn {
+  border-color: rgba(229, 9, 20, 0.7);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(229, 9, 20, 0.35);
+}
+
 .cinema-fullscreen-toggle-btn:hover,
 .cinema-fullscreen-toggle-btn:active {
-  opacity: 1;
   background: rgba(229, 9, 20, 0.95);
-  transform: scale(1.04);
   box-shadow: 0 6px 20px rgba(229, 9, 20, 0.55);
 }
 
-.cinema-fullscreen-toggle-btn .fs-label {
-  letter-spacing: 0.02em;
+.cinema-rotate-btn {
+  border-color: rgba(59, 130, 246, 0.7);
+  background: rgba(30, 58, 138, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
+.cinema-rotate-btn:hover,
+.cinema-rotate-btn:active {
+  background: rgba(37, 99, 235, 0.95);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.55);
 }
 
 /* Fullscreen Mode (Native Fullscreen & CSS Pseudo Fullscreen) */
@@ -3113,6 +3191,20 @@ video::cue {
   padding: 0 !important;
 }
 
+/* Forced Landscape CSS (Rotates video 90deg horizontally if device is portrait) */
+.theater-player-box.is-forced-landscape-css {
+  transform: rotate(90deg) !important;
+  transform-origin: center center !important;
+  width: 100vh !important;
+  height: 100vw !important;
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  margin-top: -50vw !important;
+  margin-left: -50vh !important;
+  z-index: 2147483647 !important;
+}
+
 #theaterBox:fullscreen .native-hls-player,
 .theater-player-box:fullscreen .native-hls-player,
 .theater-player-box.is-theater-fullscreen .native-hls-player {
@@ -3122,21 +3214,19 @@ video::cue {
   object-fit: contain !important;
 }
 
-#theaterBox:fullscreen .cinema-fullscreen-toggle-btn,
-.theater-player-box:fullscreen .cinema-fullscreen-toggle-btn,
-.theater-player-box.is-theater-fullscreen .cinema-fullscreen-toggle-btn {
+#theaterBox:fullscreen .cinema-top-action-bar,
+.theater-player-box:fullscreen .cinema-top-action-bar,
+.theater-player-box.is-theater-fullscreen .cinema-top-action-bar {
   top: 20px !important;
   right: 20px !important;
-  background: rgba(0, 0, 0, 0.8) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
   z-index: 2147483647 !important;
 }
 
+/* Subtitle Overlay in Fullscreen (Orientation-Aware Positioning) */
 #theaterBox:fullscreen .cinema-subtitle-overlay,
 .theater-player-box:fullscreen .cinema-subtitle-overlay,
 .theater-player-box.is-theater-fullscreen .cinema-subtitle-overlay {
   position: absolute !important;
-  bottom: clamp(28px, 7vh, 60px) !important;
   left: 0 !important;
   right: 0 !important;
   display: flex !important;
@@ -3145,6 +3235,26 @@ video::cue {
   z-index: 2147483647 !important;
   pointer-events: none !important;
   padding: 0 1.5rem !important;
+}
+
+/* In Landscape or Forced Landscape: Sit neatly at bottom */
+@media (orientation: landscape) {
+  #theaterBox:fullscreen .cinema-subtitle-overlay,
+  .theater-player-box:fullscreen .cinema-subtitle-overlay,
+  .theater-player-box.is-theater-fullscreen .cinema-subtitle-overlay {
+    bottom: clamp(24px, 6.5vh, 48px) !important;
+  }
+}
+
+.theater-player-box.is-forced-landscape-css .cinema-subtitle-overlay {
+  bottom: clamp(24px, 6.5vw, 48px) !important;
+}
+
+/* In Portrait Mode: Align directly over 16:9 letterbox in center */
+@media (orientation: portrait) {
+  #theaterBox.is-theater-fullscreen:not(.is-forced-landscape-css) .cinema-subtitle-overlay {
+    bottom: calc(50% - 28.125vw + 16px) !important;
+  }
 }
 
 #theaterBox:fullscreen .cinema-subtitle-box,

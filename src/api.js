@@ -2117,33 +2117,59 @@ export function cleanSourceTitle(str) {
  */
 export function getPresetSubtitles(title, altTitle, ep) {
   if (!PRESET_SUBTITLES || typeof PRESET_SUBTITLES !== 'object') return [];
-  const epNum = Number(ep);
-  const candidates = [];
-  if (title) {
-    const clean1 = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    candidates.push(`${clean1}:${epNum}`);
+  const epNum = Number(ep) || 1;
+  
+  const rawList = [title, altTitle].filter(Boolean);
+  const normalized = [];
+
+  const SYNONYM_GROUPS = [
+    ['ao no hako', 'blue box', 'kotak biru'],
+    ['k on', 'keion', 'k-on'],
+    ['shiguang dailiren', 'link click'],
+    ['kusuriya no hitorigoto', 'the apothecary diaries', 'apothecary diaries'],
+    ['dandadan', 'dan da dan'],
+    ['bleach sennen kessen hen', 'bleach thousand year blood war', 'bleach tybw', 'bleach']
+  ];
+
+  for (const t of rawList) {
+    const clean = t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (clean) normalized.push(clean);
+    const stripped = clean
+      .replace(/\b(season\s*\d+|s\d+|2nd\s*season|cour\s*\d+|tv)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (stripped && stripped !== clean) normalized.push(stripped);
   }
-  if (altTitle) {
-    const clean2 = altTitle.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    candidates.push(`${clean2}:${epNum}`);
+
+  const allVariants = new Set(normalized);
+  for (const n of normalized) {
+    for (const group of SYNONYM_GROUPS) {
+      if (group.some(g => n.includes(g) || g.includes(n))) {
+        group.forEach(syn => allVariants.add(syn));
+      }
+    }
   }
-  for (const key of candidates) {
+
+  // 1. Direct candidate matching
+  for (const base of allVariants) {
+    const key = `${base}:${epNum}`;
     if (PRESET_SUBTITLES[key]) {
       return PRESET_SUBTITLES[key];
     }
   }
+
+  // 2. Partial prefix / fuzzy key matching
   for (const [k, v] of Object.entries(PRESET_SUBTITLES)) {
     if (k.endsWith(`:${epNum}`)) {
       const kTitle = k.slice(0, -`:${epNum}`.length).trim();
-      for (const cand of [title, altTitle]) {
-        if (!cand) continue;
-        const candNorm = cand.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-        if (candNorm.includes(kTitle) || kTitle.includes(candNorm)) {
+      for (const cand of allVariants) {
+        if (cand.includes(kTitle) || kTitle.includes(cand)) {
           return v;
         }
       }
     }
   }
+
   return [];
 }
 
