@@ -838,6 +838,8 @@ async function loadEpisodeStream(ep) {
     return;
   }
 
+  stopKodikInterpolation();
+  stopIframeTimePolling();
   isLoadingStream.value = true;
   showPlayOverlay.value = false;
   showResumeBanner.value = false;
@@ -1219,11 +1221,9 @@ function updateCurrentCueFromTime(cur) {
     currentSubtitleCueText.value = '';
     return;
   }
-  // Hardsub timing calibration: Russian fansubs in Kodik streams appear ~0.45s earlier than web rip SRTs
-  const streamLead = 0.45;
-  const effectiveTime = cur + subtitleOffset.value + streamLead;
-  // Hold cue (+0.45s) to match full duration of Russian hardsub on screen and prevent early disappearing
-  const cue = activeSubtitleCues.value.find(c => effectiveTime >= c.start && effectiveTime <= (c.end + 0.45));
+  const effectiveTime = cur + subtitleOffset.value;
+  // Match cue with slight 0.15s anticipation tolerance and hold window for zero-lag instant overlay
+  const cue = activeSubtitleCues.value.find(c => (effectiveTime + 0.15) >= c.start && effectiveTime <= (c.end + 0.25));
   currentSubtitleCueText.value = cue ? cue.text : '';
 }
 
@@ -1241,8 +1241,40 @@ function updateCurrentCue() {
   updateCurrentCueFromTime(cur);
 }
 
-// Kodik Iframe postMessage & time synchronization for Subtitle Timpa
+// Kodik Iframe postMessage & 60 FPS clock interpolation for zero-lag Subtitle Timpa
 let iframePollInterval = null;
+let kodikBaseTime = 0;
+let kodikBasePerfTime = 0;
+let isKodikPlaying = false;
+let kodikRafId = null;
+
+function kodikInterpolationLoop() {
+  if (isKodikPlaying && isCurrentSourceEmbed.value) {
+    const elapsed = (performance.now() - kodikBasePerfTime) / 1000;
+    if (elapsed < 3.0) {
+      const cur = kodikBaseTime + elapsed;
+      watchCurrentTime.value = cur;
+      updateCurrentCueFromTime(cur);
+    }
+    kodikRafId = requestAnimationFrame(kodikInterpolationLoop);
+  }
+}
+
+function startKodikInterpolation(baseTime) {
+  kodikBaseTime = baseTime;
+  kodikBasePerfTime = performance.now();
+  isKodikPlaying = true;
+  if (kodikRafId) cancelAnimationFrame(kodikRafId);
+  kodikRafId = requestAnimationFrame(kodikInterpolationLoop);
+}
+
+function stopKodikInterpolation() {
+  isKodikPlaying = false;
+  if (kodikRafId) {
+    cancelAnimationFrame(kodikRafId);
+    kodikRafId = null;
+  }
+}
 
 function requestKodikCurrentTime() {
   const iframe = document.querySelector('.embed-cloud-frame');
@@ -1276,14 +1308,17 @@ function onKodikPlayerMessage(event) {
     const timeSec = typeof rawVal === 'number' ? rawVal : (rawVal?.time || rawVal?.currentTime || 0);
     if (!isNaN(timeSec) && isFinite(timeSec)) {
       watchCurrentTime.value = timeSec;
+      startKodikInterpolation(timeSec);
       updateCurrentCueFromTime(timeSec);
     }
   } else if (data.key === 'kodik_player_duration_update') {
     const dur = Number(data.value);
     if (!isNaN(dur) && dur > 0) watchDuration.value = dur;
   } else if (data.key === 'kodik_player_play' || data.key === 'video_started' || data.key === 'kodik_player_video_started') {
+    startKodikInterpolation(watchCurrentTime.value || 0);
     startIframeTimePolling();
   } else if (data.key === 'kodik_player_pause' || data.key === 'kodik_player_video_ended') {
+    stopKodikInterpolation();
     stopIframeTimePolling();
   }
 }
@@ -1699,6 +1734,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('message', onKodikPlayerMessage);
   stopIframeTimePolling();
+  stopKodikInterpolation();
   clearTimeout(safetyTimer);
   if (rafSubId) {
     cancelAnimationFrame(rafSubId);

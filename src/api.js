@@ -1922,8 +1922,8 @@ export function cleanRussianTitle(str) {
 export function cleanSourceTitle(str) {
   if (!str || typeof str !== 'string') return 'Server Video';
   let s = str;
-  s = s.replace(/Субтитры/gi, 'Sub Indo');
-  s = s.replace(/Озвучка/gi, 'Sulih Suara');
+  s = s.replace(/Субтитры/gi, 'Sub Rusia (Audio Asli)');
+  s = s.replace(/Озвучка/gi, 'Sulih Suara Rusia');
   s = s.replace(/Плеер Kodik/gi, 'Server Kodik');
   s = s.replace(/Плеер CVH/gi, 'Server CVH');
   s = s.replace(/Плеер/gi, 'Server');
