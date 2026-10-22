@@ -6,7 +6,7 @@
       <div class="theater-breadcrumb-bar">
         <router-link to="/" class="bc-link">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          <span class="bc-anime-title">{{ anime?.title?.english || anime?.title?.romaji || 'Kembali ke Beranda' }}</span>
+          <span class="bc-anime-title">{{ cleanRussianTitle(anime?.title?.english || anime?.title?.romaji) || 'Kembali ke Beranda' }}</span>
         </router-link>
       </div>
 
@@ -192,7 +192,7 @@
                 :key="idx" 
                 :value="idx"
               >
-                {{ src.title || `Server ${idx + 1}` }}
+                {{ cleanSourceTitle(src.title) || `Server ${idx + 1}` }}
               </option>
             </select>
             <div class="version-chevron">
@@ -360,8 +360,8 @@
       <div class="watch-info-card" v-if="anime">
         <div class="watch-info-header">
           <div class="watch-title-group">
-            <h2 class="anime-main-title">{{ anime.title?.english || anime.title?.romaji }}</h2>
-            <p class="anime-alt-title">{{ anime.title?.romaji }} <span v-if="anime.title?.native">({{ anime.title?.native }})</span></p>
+            <h2 class="anime-main-title">{{ cleanRussianTitle(anime.title?.english || anime.title?.romaji) }}</h2>
+            <p class="anime-alt-title">{{ cleanRussianTitle(anime.title?.romaji) }} <span v-if="anime.title?.native">({{ cleanRussianTitle(anime.title?.native) }})</span></p>
           </div>
         </div>
 
@@ -484,7 +484,10 @@ import {
   isAiringStatus,
   isMobileNativeApp,
   fetchClientDirectEpisodes,
-  fetchClientDirectStreams
+  fetchClientDirectStreams,
+  cleanRussianTitle,
+  cleanSourceTitle,
+  getPresetSubtitles
 } from '../api.js';
 import { 
   isAuthenticated, 
@@ -1211,19 +1214,78 @@ function loadSavedSubtitleOffset(epNum) {
   return 0.0;
 }
 
-function updateCurrentCue() {
-  const videoEl = videoRef.value;
-  if (!videoEl || activeSubtitleCues.value.length === 0) {
+function updateCurrentCueFromTime(cur) {
+  if (activeSubtitleCues.value.length === 0) {
     currentSubtitleCueText.value = '';
     return;
   }
-  const cur = videoEl.currentTime || 0;
   // Hardsub timing calibration: Russian fansubs in Kodik streams appear ~0.45s earlier than web rip SRTs
   const streamLead = 0.45;
   const effectiveTime = cur + subtitleOffset.value + streamLead;
   // Hold cue (+0.45s) to match full duration of Russian hardsub on screen and prevent early disappearing
   const cue = activeSubtitleCues.value.find(c => effectiveTime >= c.start && effectiveTime <= (c.end + 0.45));
   currentSubtitleCueText.value = cue ? cue.text : '';
+}
+
+function updateCurrentCue() {
+  if (isCurrentSourceEmbed.value) {
+    updateCurrentCueFromTime(watchCurrentTime.value || 0);
+    return;
+  }
+  const videoEl = videoRef.value;
+  if (!videoEl || activeSubtitleCues.value.length === 0) {
+    currentSubtitleCueText.value = '';
+    return;
+  }
+  const cur = videoEl.currentTime || 0;
+  updateCurrentCueFromTime(cur);
+}
+
+// Kodik Iframe postMessage & time synchronization for Subtitle Timpa
+let iframePollInterval = null;
+
+function requestKodikCurrentTime() {
+  const iframe = document.querySelector('.embed-cloud-frame');
+  if (iframe && iframe.contentWindow) {
+    try {
+      iframe.contentWindow.postMessage({ key: 'kodik_player_api', value: { method: 'get_time' } }, '*');
+    } catch (_) {}
+  }
+}
+
+function startIframeTimePolling() {
+  if (iframePollInterval) clearInterval(iframePollInterval);
+  iframePollInterval = setInterval(() => {
+    requestKodikCurrentTime();
+  }, 250);
+}
+
+function stopIframeTimePolling() {
+  if (iframePollInterval) {
+    clearInterval(iframePollInterval);
+    iframePollInterval = null;
+  }
+}
+
+function onKodikPlayerMessage(event) {
+  const data = event.data;
+  if (!data || typeof data !== 'object') return;
+
+  if (data.key === 'kodik_player_time' || data.key === 'kodik_player_time_update') {
+    const rawVal = data.value;
+    const timeSec = typeof rawVal === 'number' ? rawVal : (rawVal?.time || rawVal?.currentTime || 0);
+    if (!isNaN(timeSec) && isFinite(timeSec)) {
+      watchCurrentTime.value = timeSec;
+      updateCurrentCueFromTime(timeSec);
+    }
+  } else if (data.key === 'kodik_player_duration_update') {
+    const dur = Number(data.value);
+    if (!isNaN(dur) && dur > 0) watchDuration.value = dur;
+  } else if (data.key === 'kodik_player_play' || data.key === 'video_started' || data.key === 'kodik_player_video_started') {
+    startIframeTimePolling();
+  } else if (data.key === 'kodik_player_pause' || data.key === 'kodik_player_video_ended') {
+    stopIframeTimePolling();
+  }
 }
 
 function syncSubtitleLoop() {
@@ -1349,6 +1411,18 @@ function applyResume(resume) {
 async function fetchSubtitles(title, altTitle, ep) {
   isSearchingSubtitles.value = true;
   try {
+    // 1. Prioritize pre-cached offline Indonesian subtitles
+    const presetSubs = getPresetSubtitles(title, altTitle, ep);
+    if (presetSubs && presetSubs.length > 0) {
+      subtitlesList.value = presetSubs;
+      const idIdx = presetSubs.findIndex(s => s.lang === 'id' || s.label?.toLowerCase().includes('indo'));
+      if (idIdx !== -1) {
+        selectedSubIndex.value = idIdx;
+        applySubtitleTrack(presetSubs[idIdx]);
+      }
+      return;
+    }
+
     const res = await fetch(apiUrl(`/api/subtitles/search?title=${encodeURIComponent(title)}&alt_title=${encodeURIComponent(altTitle)}&ep=${ep}`));
     const data = await res.json();
     if (data.subtitles && data.subtitles.length > 0) {
@@ -1427,52 +1501,57 @@ async function applySubtitleTrack(sub) {
   activeSubtitleCues.value = [];
   currentSubtitleCueText.value = '';
 
+  if (!sub) return;
+
+  // 1. Fetch / load & parse VTT for the high-contrast cinema overlay (works for both iframe & native video!)
+  try {
+    if (sub.vtt_content) {
+      activeSubtitleCues.value = parseVttToCues(sub.vtt_content);
+    } else if (sub.vtt_url) {
+      const res = await fetch(apiUrl(sub.vtt_url));
+      if (res.ok) {
+        const vtt = await res.text();
+        activeSubtitleCues.value = parseVttToCues(vtt);
+      }
+    }
+    updateCurrentCue();
+  } catch (err) {
+    console.warn('Failed to parse subtitle overlay cues:', err);
+  }
+
+  // 2. Native HTML5 track attach (only when native video element is active)
   const videoEl = videoRef.value;
   if (!videoEl) return;
 
   const tracks = videoEl.querySelectorAll('track');
   tracks.forEach(t => t.remove());
 
-  if (!sub) return;
+  try {
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = sub.label;
+    track.srclang = sub.lang;
+    track.src = sub.vtt_url ? apiUrl(sub.vtt_url) : '';
+    track.default = false;
 
-    // 1. Fetch & parse VTT for the high-contrast cinema overlay
-    try {
-      const res = await fetch(apiUrl(sub.vtt_url));
-      if (res.ok) {
-        const vtt = await res.text();
-        activeSubtitleCues.value = parseVttToCues(vtt);
-      }
-    } catch (err) {
-      console.warn('Failed to parse subtitle overlay cues:', err);
-    }
-
-    // 2. Append native track with mode='hidden' to prevent double subtitles
-    try {
-      const track = document.createElement('track');
-      track.kind = 'subtitles';
-      track.label = sub.label;
-      track.srclang = sub.lang;
-      track.src = apiUrl(sub.vtt_url);
-      track.default = false;
-
-      const syncTrackMode = () => {
-        // If custom Cinema Subtitle Overlay has cues, keep native track hidden to avoid double subtitles
-        const desiredMode = (activeSubtitleCues.value && activeSubtitleCues.value.length > 0) ? 'hidden' : 'showing';
-        if (track.track) track.track.mode = desiredMode;
-        if (videoEl.textTracks) {
-          for (let i = 0; i < videoEl.textTracks.length; i++) {
-            videoEl.textTracks[i].mode = desiredMode;
-          }
+    const syncTrackMode = () => {
+      // If custom Cinema Subtitle Overlay has cues, keep native track hidden to avoid double subtitles
+      const desiredMode = (activeSubtitleCues.value && activeSubtitleCues.value.length > 0) ? 'hidden' : 'showing';
+      if (track.track) track.track.mode = desiredMode;
+      if (videoEl.textTracks) {
+        for (let i = 0; i < videoEl.textTracks.length; i++) {
+          videoEl.textTracks[i].mode = desiredMode;
         }
-      };
+      }
+    };
 
-      track.addEventListener('load', syncTrackMode);
-      videoEl.appendChild(track);
-      syncTrackMode();
-    } catch (e) {
-      // ignore
-    }
+    track.addEventListener('load', syncTrackMode);
+    videoEl.appendChild(track);
+    syncTrackMode();
+  } catch (e) {
+    // ignore
   }
+}
 
 // ---------------- ARM & Kusonime & Translation ----------------
 async function fetchArmMapping(id) {
@@ -1613,10 +1692,13 @@ watch(() => route.query.id, (newId) => {
 onMounted(() => {
   initWatch();
   window.addEventListener('keydown', handleKeydown);
+  window.addEventListener('message', onKodikPlayerMessage);
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('message', onKodikPlayerMessage);
+  stopIframeTimePolling();
   clearTimeout(safetyTimer);
   if (rafSubId) {
     cancelAnimationFrame(rafSubId);

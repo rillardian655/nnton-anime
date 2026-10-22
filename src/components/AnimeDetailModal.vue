@@ -231,6 +231,7 @@ import {
   getKusonimeDownloads,
   getEffectiveEpisodeCount,
   isAiringStatus,
+  cleanRussianTitle,
   apiUrl 
 } from '../api.js';
 import { 
@@ -258,7 +259,7 @@ function handlePlayClick(ep = 1) {
     return;
   }
   emit('close');
-  const title = encodeURIComponent(props.anime?.title?.english || props.anime?.title?.romaji || '');
+  const title = encodeURIComponent(cleanRussianTitle(props.anime?.title?.english || props.anime?.title?.romaji || ''));
   const slugQuery = props.anime?.slug ? `&slug=${encodeURIComponent(props.anime.slug)}` : '';
   router.push(`/watch?id=${props.anime?.id}&ep=${ep}&title=${title}${slugQuery}`);
 }
@@ -278,13 +279,13 @@ const armMapping = ref(null);
 const kusonimeDownloads = ref([]);
 
 const displayTitle = computed(() => {
-  return props.anime?.title?.english || props.anime?.title?.romaji || 'Anime';
+  return cleanRussianTitle(props.anime?.title?.english || props.anime?.title?.romaji) || 'Anime';
 });
 
 const displaySubTitle = computed(() => {
-  const eng = props.anime?.title?.english?.trim();
-  const rom = props.anime?.title?.romaji?.trim();
-  const nat = props.anime?.title?.native?.trim();
+  const eng = cleanRussianTitle(props.anime?.title?.english?.trim());
+  const rom = cleanRussianTitle(props.anime?.title?.romaji?.trim());
+  const nat = cleanRussianTitle(props.anime?.title?.native?.trim());
 
   if (eng && rom && eng.toLowerCase() !== rom.toLowerCase()) {
     return nat ? `${rom} • ${nat}` : rom;

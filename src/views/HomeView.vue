@@ -24,8 +24,8 @@
             <span class="hero-meta-badge">{{ anime.seasonYear || '2026' }}</span>
           </div>
 
-          <h1 class="hero-title">{{ anime.title?.english || anime.title?.romaji }}</h1>
-          <p class="hero-japanese-title">{{ anime.title?.native || anime.title?.romaji }}</p>
+          <h1 class="hero-title">{{ cleanRussianTitle(anime.title?.english || anime.title?.romaji) }}</h1>
+          <p class="hero-japanese-title">{{ cleanRussianTitle(anime.title?.native || anime.title?.romaji) }}</p>
 
           <p class="hero-synopsis">
             {{ getTruncated(stripHtml(anime.description), 200) }}
@@ -244,7 +244,7 @@
           </div>
 
           <div class="card-info">
-            <h4 class="card-title">{{ anime.title?.english || anime.title?.romaji || anime.title }}</h4>
+            <h4 class="card-title">{{ cleanRussianTitle(anime.title?.english || anime.title?.romaji || anime.title) }}</h4>
             <div class="card-meta">
               <span>{{ anime.format || 'TV' }}</span>
               <span>•</span>
@@ -268,7 +268,8 @@ import {
   getTopRated, 
   getAiringSchedule, 
   searchAnime, 
-  getSafeImageUrl 
+  getSafeImageUrl,
+  cleanRussianTitle 
 } from '../api.js';
 import { 
   getWatchlist, 

@@ -3,6 +3,8 @@
 // Supports Web & Android Native (Capacitor)
 // ==========================================
 
+import { PRESET_SUBTITLES } from './data/subtitles_preset.js';
+
 const ENV_BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) || '';
 
 export function isMobileNativeApp() {
@@ -311,7 +313,7 @@ export const OFFLINE_ANIME_DATASET = [
     id: 19655,
     yummyId: 19655,
     slug: 'golubaya-shkatulka-2',
-    title: { romaji: 'Ao no Hako 2nd Season', english: 'Blue Box Season 2', native: 'Голубая шкатулка 2' },
+    title: { romaji: 'Ao no Hako 2nd Season', english: 'Blue Box Season 2', native: 'Kotak Biru Season 2' },
     coverImage: {
       extraLarge: 'https://static.yani.tv/posters/full/1636982711.jpg',
       large: 'https://static.yani.tv/posters/full/1636982711.jpg',
@@ -682,7 +684,7 @@ export function getClientFallbackSchedule() {
       { id: 176166, title: { romaji: "Seirei Gensouki 2", english: "Spirit Chronicles Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/43806/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 69, currentEpisode: 3, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
     ],
     "Kamis": [
-      { id: 19655, yummyId: 19655, title: { romaji: "Ao no Hako 2nd Season", english: "Blue Box Season 2", native: "Голубая шкатулка 2" }, coverImage: { large: "https://static.yani.tv/posters/full/1636982711.jpg" }, genres: ["Romance", "Sports", "Shounen", "School"], averageScore: 84, currentEpisode: 3, episodes: 3, timeText: "23:56", category: "airing", statusLabel: "Episode 3 Tayang" },
+      { id: 19655, yummyId: 19655, title: { romaji: "Ao no Hako 2nd Season", english: "Blue Box Season 2", native: "Kotak Biru Season 2" }, coverImage: { large: "https://static.yani.tv/posters/full/1636982711.jpg" }, genres: ["Romance", "Sports", "Shounen", "School"], averageScore: 84, currentEpisode: 3, episodes: 3, timeText: "23:56", category: "airing", statusLabel: "Episode 3 Tayang" },
       { id: 169829, title: { romaji: "Rurouni Kenshin: Kyoto Douran", english: "Rurouni Kenshin: Kyoto Disturbance" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/41370/medium.jpg" }, genres: ["Action", "Adventure", "Drama"], averageScore: 80, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
       { id: 173599, title: { romaji: "Trillion Game", english: "Trillion Game" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46282/medium.jpg" }, genres: ["Drama"], averageScore: 75, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
       { id: 171617, title: { romaji: "Hoshifuru Oukoku no Nina", english: "Nina the Starry Bride" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Fantasy", "Romance"], averageScore: 74, currentEpisode: 3, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
@@ -1849,13 +1851,15 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
       if (cleanIframe.startsWith('//')) cleanIframe = `https:${cleanIframe}`;
       if (cleanIframe.startsWith('http://')) cleanIframe = cleanIframe.replace('http://', 'https://');
 
-      const playerName = v.data?.player || 'Stream Kodik Cloud';
-      const dubbing = v.data?.dubbing || '';
-      const isSub = dubbing.toLowerCase().includes('субтитр') || 
-                    dubbing.toLowerCase().includes('sub') || 
-                    dubbing.toLowerCase().includes('kazoku');
+      const rawPlayer = v.data?.player || 'Server Kodik Cloud';
+      const rawDubbing = v.data?.dubbing || '';
+      const isSub = rawDubbing.toLowerCase().includes('субтитр') || 
+                    rawDubbing.toLowerCase().includes('sub') || 
+                    rawDubbing.toLowerCase().includes('kazoku');
       
-      let titleLabel = dubbing ? `${dubbing} (${playerName})` : playerName;
+      const cleanPlayer = cleanSourceTitle(rawPlayer);
+      const cleanDub = cleanSourceTitle(rawDubbing);
+      let titleLabel = cleanDub ? `${cleanDub} (${cleanPlayer})` : cleanPlayer;
       if (isSub) {
         titleLabel = `${titleLabel} [Audio Asli Jepang]`;
       }
@@ -1889,6 +1893,82 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
     return [];
   }
 }
+
+/**
+ * Clean & overwrite Russian anime titles with Indonesian / Romaji
+ */
+export function cleanRussianTitle(str) {
+  if (!str || typeof str !== 'string') return '';
+  let s = str;
+  s = s.replace(/Голубая шкатулка\s*2/gi, 'Kotak Biru Season 2');
+  s = s.replace(/Голубая шкатулка/gi, 'Kotak Biru');
+  s = s.replace(/Синяя тюрьма/gi, 'Blue Lock');
+  s = s.replace(/Блю Лок/gi, 'Blue Lock');
+  s = s.replace(/Дандадан/gi, 'DAN DA DAN');
+  s = s.replace(/Блич/gi, 'Bleach');
+  s = s.replace(/Магическая битва/gi, 'Jujutsu Kaisen');
+  s = s.replace(/Поднятие уровня в одиночку/gi, 'Solo Leveling');
+  s = s.replace(/Клинок, рассекающий демонов/gi, 'Demon Slayer');
+  s = s.replace(/Атака титанов/gi, 'Attack on Titan');
+  s = s.replace(/Человек-бензопила/gi, 'Chainsaw Man');
+  // Strip any leftover Russian text in parentheses e.g. "(Голубая шкатулка 2)"
+  s = s.replace(/\s*\([а-яА-ЯёЁ\s0-9:—\-]+\)/g, '');
+  return s.trim();
+}
+
+/**
+ * Clean & overwrite Russian server / dubbing names with Indonesian
+ */
+export function cleanSourceTitle(str) {
+  if (!str || typeof str !== 'string') return 'Server Video';
+  let s = str;
+  s = s.replace(/Субтитры/gi, 'Sub Indo');
+  s = s.replace(/Озвучка/gi, 'Sulih Suara');
+  s = s.replace(/Плеер Kodik/gi, 'Server Kodik');
+  s = s.replace(/Плеер CVH/gi, 'Server CVH');
+  s = s.replace(/Плеер/gi, 'Server');
+  s = s.replace(/Дубляж/gi, 'Dubbing');
+  s = s.replace(/Комната Диди/gi, 'Komnata Didi');
+  s = s.replace(/Закадровый Отдел/gi, 'Zakadrovy Otdel');
+  s = s.replace(/ТО Дубляжная/gi, 'TO Dublyazhnaya');
+  return s.trim();
+}
+
+/**
+ * Retrieve verified offline / preset Indonesian subtitles
+ */
+export function getPresetSubtitles(title, altTitle, ep) {
+  if (!PRESET_SUBTITLES || typeof PRESET_SUBTITLES !== 'object') return [];
+  const epNum = Number(ep);
+  const candidates = [];
+  if (title) {
+    const clean1 = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    candidates.push(`${clean1}:${epNum}`);
+  }
+  if (altTitle) {
+    const clean2 = altTitle.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    candidates.push(`${clean2}:${epNum}`);
+  }
+  for (const key of candidates) {
+    if (PRESET_SUBTITLES[key]) {
+      return PRESET_SUBTITLES[key];
+    }
+  }
+  for (const [k, v] of Object.entries(PRESET_SUBTITLES)) {
+    if (k.endsWith(`:${epNum}`)) {
+      const kTitle = k.slice(0, -`:${epNum}`.length).trim();
+      for (const cand of [title, altTitle]) {
+        if (!cand) continue;
+        const candNorm = cand.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        if (candNorm.includes(kTitle) || kTitle.includes(candNorm)) {
+          return v;
+        }
+      }
+    }
+  }
+  return [];
+}
+
 
 
 
