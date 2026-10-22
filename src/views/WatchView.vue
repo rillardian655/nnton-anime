@@ -470,7 +470,8 @@ import {
   getAuthToken,
   safeFetchJson,
   getEffectiveEpisodeCount,
-  isAiringStatus
+  isAiringStatus,
+  isMobileNativeApp
 } from '../api.js';
 import { 
   isAuthenticated, 
@@ -933,7 +934,10 @@ function playSelectedSource() {
     isLoadingStream.value = false;
   }, 3500);
 
-  const isMp4 = video.type === 'mp4' || (video.direct_url && video.direct_url.includes('.mp4')) || (video.url && video.url.includes('.mp4'));
+  const isHls = video.type === 'm3u8' || 
+                (video.url && (video.url.includes('.m3u8') || video.url.includes('/api/hls/manifest'))) || 
+                (video.direct_url && video.direct_url.includes('.m3u8'));
+  const isMp4 = !isHls && (video.type === 'mp4' || (video.direct_url && video.direct_url.toLowerCase().endsWith('.mp4')));
 
   if (isMp4) {
     streamStatusText.value = `Memutar: ${source.title} (${video.quality}p MP4)`;
@@ -974,7 +978,8 @@ function playSelectedSource() {
   streamStatusText.value = `Memutar: ${source.title} (${video.quality}p HLS)`;
   const directHlsUrl = video.direct_url || '';
   const proxyHlsUrl = video.url ? apiUrl(video.url) : '';
-  let currentHlsUrl = proxyHlsUrl || directHlsUrl;
+  // On mobile native app (Capacitor https://localhost), direct HTTPS stream prevents mixed content and doesn't depend on LAN server
+  let currentHlsUrl = (isMobileNativeApp() && directHlsUrl) ? directHlsUrl : (proxyHlsUrl || directHlsUrl);
 
   if (Hls.isSupported()) {
     hlsInstance = new Hls({

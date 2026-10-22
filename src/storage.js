@@ -114,7 +114,7 @@ export function saveHistory(anime, episodeNumber = 1, currentTime = 0, duration 
     cleanCover = anime.coverImage;
   }
   if (!cleanCover) {
-    cleanCover = 'https://media.kitsu.app/anime/poster_images/45974/medium.jpg';
+    cleanCover = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
   }
 
   const entry = {

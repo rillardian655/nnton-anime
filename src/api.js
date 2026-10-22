@@ -1321,31 +1321,46 @@ export async function auditAllAPIs() {
 }
 
 /**
- * Safe Image Proxy helper to avoid ISP / referrer blocks
+ * Safe Image Proxy helper to avoid ISP / referrer blocks while ensuring native mobile compatibility
  */
 export function getSafeImageUrl(url) {
-  if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  const DEFAULT_ANIME_COVER = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  if (!url) return DEFAULT_ANIME_COVER;
   if (typeof url === 'object' && url !== null) {
     url = url.large || url.extraLarge || url.medium || url.original || '';
-    if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+    if (!url) return DEFAULT_ANIME_COVER;
   }
-  if (typeof url !== 'string' || !url.trim()) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  if (typeof url !== 'string' || !url.trim()) return DEFAULT_ANIME_COVER;
 
   const cleanUrl = url.trim();
 
-  // If URL is from s4.anilist.co, proxy it via backend image-proxy or fallback if known broken hash
-  if (cleanUrl.includes('s4.anilist.co')) {
-    if (cleanUrl.includes('bx170942-') || cleanUrl.includes('bx171018-') || cleanUrl.includes('bx180104-') || cleanUrl.includes('bx159322-') || cleanUrl.includes('bx163134-') || cleanUrl.includes('bx170947-') || cleanUrl.includes('bx169829-') || cleanUrl.includes('bx178551-')) {
-      return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
-    }
-    return apiUrl(`/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`);
+  // Known broken/dead hashes or old Kitsu paths
+  if (
+    cleanUrl.includes('bx170942-') || 
+    cleanUrl.includes('bx171018-') || 
+    cleanUrl.includes('bx180104-') || 
+    cleanUrl.includes('bx159322-') || 
+    cleanUrl.includes('bx163134-') || 
+    cleanUrl.includes('bx170947-') || 
+    cleanUrl.includes('bx169829-') || 
+    cleanUrl.includes('bx178551-') || 
+    cleanUrl.includes('media.kitsu.app/anime/poster_images/')
+  ) {
+    return DEFAULT_ANIME_COVER;
+  }
+
+  // If already full HTTPS URL or data URL, return directly so native mobile WebView loads without mixed-content or LAN proxy dependencies
+  if (cleanUrl.startsWith('https://') || cleanUrl.startsWith('data:')) {
+    return cleanUrl;
+  }
+
+  // If http://, upgrade to https:// to prevent mixed-content blocking on Android WebView (https://localhost)
+  if (cleanUrl.startsWith('http://')) {
+    return cleanUrl.replace(/^http:\/\//i, 'https://');
   }
 
   if (cleanUrl.startsWith('/api/')) return apiUrl(cleanUrl);
-  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://') || cleanUrl.startsWith('data:')) {
-    return cleanUrl;
-  }
-  return apiUrl(`/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`);
+  return cleanUrl;
 }
 
 /**

@@ -505,9 +505,9 @@ function onImgError(e, type = 'poster') {
   if (e.target.dataset.triedFallback) return;
   e.target.dataset.triedFallback = 'true';
   if (type === 'banner') {
-    e.target.src = 'https://media.kitsu.app/anime/cover_images/45974/large.jpg';
+    e.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200&q=80';
   } else {
-    e.target.src = 'https://media.kitsu.app/anime/poster_images/45974/medium.jpg';
+    e.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
   }
 }
 

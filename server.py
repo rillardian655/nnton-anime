@@ -780,24 +780,27 @@ async def get_yummy_streams(
     token = extract_token_from_request(req)
     user = get_user_from_token(token)
 
-    clean_q = q.strip()
-    alt_q = alt.strip() if alt else ""
-    s_key = f"{id or ''}:{slug or ''}:{clean_q.lower()}:{alt_q.lower()}:{ep}"
+    clean_q = str(q).strip() if q else ""
+    alt_q = str(alt).strip() if (alt and isinstance(alt, str)) else ""
+    str_id = str(id).strip() if (id and isinstance(id, str)) else ""
+    str_slug = str(slug).strip() if (slug and isinstance(slug, str)) else ""
+    s_key = f"{str_id}:{str_slug}:{clean_q.lower()}:{alt_q.lower()}:{ep}"
     if not nocache and s_key in streams_cache:
         return streams_cache[s_key]
 
     loop = asyncio.get_event_loop()
     target_anime = None
     target_anime_data = {}
+    episodes = None
 
     # 1. Direct ID match if numeric ID provided and matches the anime query
-    if id and id.strip().isdigit():
-        num_id = int(id.strip())
+    if str_id and str_id.isdigit():
+        num_id = int(str_id)
         try:
             res = await loop.run_in_executor(None, lambda: YummyAnimeApi.anime_by_ids(yummy_extractor.http, ids=[num_id]))
             if res.is_ok and res.value.get("response"):
                 cand_data = res.value["response"][0]
-                if is_yummy_candidate_match(cand_data, clean_q, alt_q, slug):
+                if is_yummy_candidate_match(cand_data, clean_q, alt_q, str_slug):
                     target_anime_data = cand_data
                     target_anime = Anime(
                         title=target_anime_data["title"],
@@ -818,13 +821,23 @@ async def get_yummy_streams(
         if alt_q and alt_q not in candidates:
             candidates.append(alt_q)
         norm_low = clean_q.lower()
-        if "one piece" in norm_low and "Ван-Пис" not in candidates:
+        if "blue box" in norm_low or "ao no hako" in norm_low:
+            if is_s2:
+                candidates.extend(["Голубая шкатулка 2", "Голубая шкатулка"])
+            else:
+                candidates.extend(["Голубая шкатулка", "Голубая шкатулка 2"])
+        elif "one piece" in norm_low and "Ван-Пис" not in candidates:
             candidates.append("Ван-Пис")
         elif "dandadan" in norm_low or "dan da dan" in norm_low:
             if "Дандадан" not in candidates:
                 candidates.append("Дандадан")
             if "Dandadan" not in candidates:
                 candidates.append("Dandadan")
+        elif "k-on" in norm_low or "keion" in norm_low:
+            if "Кэйон!" not in candidates:
+                candidates.append("Кэйон!")
+        elif "bleach" in norm_low and "Блич" not in candidates:
+            candidates.append("Блич")
         if ":" in clean_q:
             c1 = clean_q.split(":")[0].strip()
             if c1 and c1 not in candidates:
