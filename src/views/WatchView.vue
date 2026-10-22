@@ -18,8 +18,19 @@
         @mousemove="onPlayerMouseMove"
         @mouseleave="onPlayerMouseLeave"
       >
+        <!-- Embed Player (Cloud Direct Stream Fallback for Mobile Data / Remote) -->
+        <iframe 
+          v-if="isCurrentSourceEmbed"
+          :src="currentEmbedUrl"
+          class="native-hls-player embed-cloud-frame"
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+          allowfullscreen
+          frameborder="0"
+        ></iframe>
+
         <!-- Direct HLS / MP4 Player (Single Native Player - Kodik / AniLibria) -->
         <video 
+          v-else
           ref="videoRef" 
           class="native-hls-player" 
           controls 
@@ -471,7 +482,9 @@ import {
   safeFetchJson,
   getEffectiveEpisodeCount,
   isAiringStatus,
-  isMobileNativeApp
+  isMobileNativeApp,
+  fetchClientDirectEpisodes,
+  fetchClientDirectStreams
 } from '../api.js';
 import { 
   isAuthenticated, 
@@ -543,6 +556,14 @@ function onAutoSkipOpChanged() {
 }
 
 function skipOpening(isAuto = false) {
+  if (isCurrentSourceEmbed.value) {
+    skipToastMessage.value = 'Fitur Skip Opening tersedia langsung di dalam pemutar Kodik';
+    showSkipToast.value = true;
+    setTimeout(() => {
+      showSkipToast.value = false;
+    }, 2500);
+    return;
+  }
   const videoEl = videoRef.value;
   if (!videoEl) return;
   const target = Math.min((videoEl.duration || Infinity), videoEl.currentTime + 85);
@@ -556,6 +577,8 @@ function skipOpening(isAuto = false) {
 }
 
 const currentSources = ref([]);
+const isCurrentSourceEmbed = ref(false);
+const currentEmbedUrl = ref('');
 const selectedSourceIndex = ref(0);
 const selectedQuality = ref(720);
 const availableVideos = ref([]);
@@ -716,7 +739,18 @@ async function fetchYummyEpisodes(details) {
       }
     }
   } catch (err) {
-    console.warn('Yummy episodes notice:', err);
+    console.warn('Backend episodes unreachable (mobile data / remote), fetching from Cloud direct...', err);
+  }
+
+  // Mobile data / offline backend fallback
+  if (episodesList.value.length === 0) {
+    try {
+      const directEps = await fetchClientDirectEpisodes(searchTerm, altTerm, yummyId);
+      if (directEps && directEps.length > 0) {
+        episodesList.value = directEps;
+        totalEpisodes.value = directEps.length;
+      }
+    } catch (_) {}
   }
 }
 
@@ -820,7 +854,7 @@ async function loadEpisodeStream(ep) {
     const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
 
     const streamQs = new URLSearchParams({
       q: title,
@@ -838,7 +872,7 @@ async function loadEpisodeStream(ep) {
         signal: controller.signal
       });
     } catch (netErr) {
-      console.warn('Stream API fetch error:', netErr.message);
+      console.warn('Stream API fetch error (LAN/backend offline):', netErr.message);
     } finally {
       clearTimeout(timeoutId);
     }
@@ -851,7 +885,7 @@ async function loadEpisodeStream(ep) {
       }
     }
 
-    if (dataSources.length === 0 && altTitle && altTitle !== title) {
+    if (dataSources.length === 0 && altTitle && altTitle !== title && res && res.ok) {
       try {
         const altRes = await fetch(apiUrl(`/api/yummy/streams?q=${encodeURIComponent(altTitle)}&ep=${ep}${tokenQuery}`), {
           headers: authHeaders
@@ -863,6 +897,13 @@ async function loadEpisodeStream(ep) {
           }
         }
       } catch (_) {}
+    }
+
+    // Direct Cloud Stream Fallback (For Mobile Data / Kuota / Remote without LAN server)
+    if (dataSources.length === 0) {
+      console.log('LAN/Backend server unreachable or no sources, falling back to direct Cloud Stream...');
+      const resolvedYummyId = anime.value?.yummyId || (Number(anime.value?.id || route.query.id) < 100000 ? Number(anime.value?.id || route.query.id) : null);
+      dataSources = await fetchClientDirectStreams(title, altTitle, ep, resolvedYummyId);
     }
 
     if (dataSources.length === 0) {
@@ -904,6 +945,18 @@ function playSelectedSource() {
     hlsInstance = null;
   }
   clearTimeout(safetyTimer);
+
+  if (source.is_embed || source.iframe_url) {
+    isCurrentSourceEmbed.value = true;
+    currentEmbedUrl.value = source.iframe_url || source.player_url;
+    streamStatusText.value = `Memutar: ${source.title} (Cloud Direct)`;
+    isLoadingStream.value = false;
+    availableVideos.value = source.videos || [{ quality: 720, type: 'embed' }];
+    return;
+  }
+
+  isCurrentSourceEmbed.value = false;
+  currentEmbedUrl.value = '';
 
   if (!source.videos || source.videos.length === 0) {
     loadingMessage.value = 'Video tidak tersedia untuk server ini.';
@@ -1636,6 +1689,17 @@ onUnmounted(() => {
   object-fit: contain;
   background: #000;
   display: block;
+}
+
+.embed-cloud-frame {
+  border: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
 }
 
 /* Suppress native browser cue to prevent double subtitles */

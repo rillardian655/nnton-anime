@@ -1717,4 +1717,179 @@ export async function translateSynopsis(firstArg, secondArg = null) {
   return { success: false, translation: text, text };
 }
 
+/**
+ * Direct Client-Side Anime Streaming Resolution (Zero-Backend Fallback for Mobile Data / Kuota)
+ * Directly queries public Yani/Kodik API for episode streams if backend server is unreachable
+ */
+export async function fetchClientDirectEpisodes(title, altTitle, yummyId = null) {
+  try {
+    let targetAnimeId = yummyId;
+    if (!targetAnimeId) {
+      const candidates = [title, altTitle].filter(Boolean);
+      for (const cand of candidates) {
+        try {
+          const sRes = await fetch(`https://api.yani.tv/anime?q=${encodeURIComponent(cand)}&offset=0&limit=8`);
+          if (sRes.ok) {
+            const sData = await sRes.json();
+            if (sData.response && sData.response.length > 0) {
+              for (const item of sData.response) {
+                const vRes = await fetch(`https://api.yani.tv/anime/${item.anime_id}/videos`);
+                if (vRes.ok) {
+                  const vData = await vRes.json();
+                  if (vData.response && Array.isArray(vData.response) && vData.response.length > 0) {
+                    targetAnimeId = item.anime_id;
+                    break;
+                  }
+                }
+              }
+              if (targetAnimeId) break;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+    if (!targetAnimeId) return [];
+
+    const vRes = await fetch(`https://api.yani.tv/anime/${targetAnimeId}/videos`);
+    if (!vRes.ok) return [];
+    const vData = await vRes.json();
+    if (!vData.response || !Array.isArray(vData.response)) return [];
+
+    const numSet = new Set();
+    for (const v of vData.response) {
+      const n = Number(v.number);
+      if (!isNaN(n) && n > 0) numSet.add(n);
+    }
+    const sorted = Array.from(numSet).sort((a, b) => a - b);
+    return sorted.map(num => ({
+      num,
+      title: `Episode ${num}`
+    }));
+  } catch (err) {
+    console.warn('fetchClientDirectEpisodes error:', err);
+    return [];
+  }
+}
+
+export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = null) {
+  try {
+    let targetAnimeId = yummyId;
+    let epVideos = [];
+
+    const extractValidVideos = (videos, targetEp) => {
+      if (!Array.isArray(videos)) return [];
+      return videos.filter(v => {
+        if (String(v.number) !== String(targetEp)) return false;
+        if (!v.iframe_url) return false;
+        // ru.yummyani.me blocks iframe embedding via X-Frame-Options: SAMEORIGIN
+        if (v.iframe_url.includes('yummyani.me')) return false;
+        return true;
+      });
+    };
+
+    // 1. Direct fetch if yummyId provided
+    if (targetAnimeId) {
+      try {
+        const vRes = await fetch(`https://api.yani.tv/anime/${targetAnimeId}/videos`);
+        if (vRes.ok) {
+          const vData = await vRes.json();
+          const found = extractValidVideos(vData.response, ep);
+          if (found.length > 0) {
+            epVideos = found;
+          }
+        }
+      } catch (err) {
+        console.warn('Direct yummyId videos error:', err);
+      }
+    }
+
+    // 2. Search candidates if direct ID yielded no videos
+    if (epVideos.length === 0) {
+      const queryCandidates = [];
+      if (title) queryCandidates.push(title);
+      if (altTitle && altTitle !== title) queryCandidates.push(altTitle);
+      
+      const cleanBase = title ? title.replace(/\s*(Season|2nd Season|Part \d+|S\d+).*$/i, '').trim() : '';
+      if (cleanBase && !queryCandidates.includes(cleanBase)) {
+        queryCandidates.push(cleanBase);
+      }
+
+      for (const cand of queryCandidates) {
+        try {
+          const sRes = await fetch(`https://api.yani.tv/anime?q=${encodeURIComponent(cand)}&offset=0&limit=8`);
+          if (sRes.ok) {
+            const sData = await sRes.json();
+            if (sData.response && Array.isArray(sData.response)) {
+              for (const item of sData.response) {
+                try {
+                  const vRes = await fetch(`https://api.yani.tv/anime/${item.anime_id}/videos`);
+                  if (vRes.ok) {
+                    const vData = await vRes.json();
+                    const found = extractValidVideos(vData.response, ep);
+                    if (found.length > 0) {
+                      epVideos = found;
+                      targetAnimeId = item.anime_id;
+                      break;
+                    }
+                  }
+                } catch (_) {}
+              }
+              if (epVideos.length > 0) break;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (epVideos.length === 0) return [];
+
+    const sources = [];
+    for (const v of epVideos) {
+      let cleanIframe = v.iframe_url;
+      if (cleanIframe.startsWith('//')) cleanIframe = `https:${cleanIframe}`;
+      if (cleanIframe.startsWith('http://')) cleanIframe = cleanIframe.replace('http://', 'https://');
+
+      const playerName = v.data?.player || 'Stream Kodik Cloud';
+      const dubbing = v.data?.dubbing || '';
+      const isSub = dubbing.toLowerCase().includes('субтитр') || 
+                    dubbing.toLowerCase().includes('sub') || 
+                    dubbing.toLowerCase().includes('kazoku');
+      
+      let titleLabel = dubbing ? `${dubbing} (${playerName})` : playerName;
+      if (isSub) {
+        titleLabel = `${titleLabel} [Audio Asli Jepang]`;
+      }
+
+      sources.push({
+        title: titleLabel,
+        is_subtitles_original: isSub,
+        player_url: cleanIframe,
+        iframe_url: cleanIframe,
+        is_embed: true,
+        videos: [
+          {
+            quality: 720,
+            type: 'embed',
+            url: cleanIframe,
+            direct_url: cleanIframe
+          }
+        ]
+      });
+    }
+
+    sources.sort((a, b) => {
+      if (a.is_subtitles_original && !b.is_subtitles_original) return -1;
+      if (!a.is_subtitles_original && b.is_subtitles_original) return 1;
+      return 0;
+    });
+
+    return sources;
+  } catch (err) {
+    console.warn('fetchClientDirectStreams error:', err);
+    return [];
+  }
+}
+
+
+
 

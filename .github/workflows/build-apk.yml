@@ -11,6 +11,8 @@ jobs:
   build-apk:
     name: Build AniPulse VIP Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: 📥 Checkout repository
@@ -78,3 +80,39 @@ jobs:
           path: build-output/AniPulse-VIP-v1.0.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: 📦 Publish / Update GitHub Release (Direct Download APK)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "AniPulse VIP Android APK - Rilis Terbaru"
+          body: |
+            ## 📱 AniPulse VIP Android APK - Unduh Langsung
+
+            File APK siap diunduh dan dipasang langsung ke HP Android Anda tanpa perlu mengekstrak file ZIP!
+
+            ### 📥 Download APK:
+            - **[AniPulse-VIP-v1.0.apk](https://github.com/rillardian655/nnton-anime/releases/latest/download/AniPulse-VIP-v1.0.apk)** *(Klik untuk unduh langsung)*
+
+            ---
+
+            ### 🛠️ Fitur & Perbaikan Terbaru:
+            - **Zero-Backend Cloud Streaming**: Pemutaran video Kodik & Cloud langsung berjalan di HP Android via cloud streaming (tanpa ketergantungan server lokal LAN / PC).
+            - **Dukungan Data Seluler / Kuota**: Otomatis fallback ke server Kodik dengan subtitle dan audio asli Jepang.
+            - **Perbaikan Blue Box Season 2 & Anime Terbaru**: Episode 1, 2, 3 dan episode rilis lainnya langsung siap diputar lancar.
+            - **Pemutar Responsif**: Tampilan player bioskop native tanpa error "Stream belum tersedia".
+
+            ---
+
+            ### 📝 Panduan Pasang (Install) di Android:
+            1. Klik tautan **[AniPulse-VIP-v1.0.apk](https://github.com/rillardian655/nnton-anime/releases/latest/download/AniPulse-VIP-v1.0.apk)** di atas (atau di bagian **Assets** di bawah).
+            2. Setelah unduhan selesai di HP, buka file APK tersebut.
+            3. Jika muncul notifikasi keamanan browser, pilih **Tetap Download / Izinkan Pemasangan**.
+            4. Pilih **Install / Pasang** dan nikmati menonton anime!
+          files: build-output/AniPulse-VIP-v1.0.apk
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
