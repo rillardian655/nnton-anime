@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import { authLogin, authMe, authLogout, verifyInvite, claimInvite, getAuthToken, setAuthToken } from '../api.js';
+import { authLogin, authMe, authLogout, verifyInvite, claimInvite, claimTicketOnly, getAuthToken, setAuthToken } from '../api.js';
 import { 
   auth, 
   googleProvider, 
@@ -186,6 +186,16 @@ export async function submitClaimInvite(username, password, displayName) {
   if (!activeInviteCode.value) throw new Error('Kode undangan tidak ditemukan.');
   const res = await claimInvite(activeInviteCode.value, username, password, displayName);
   currentUser.value = res.user;
+  showInviteModal.value = false;
+  inviteData.value = null;
+  activeInviteCode.value = '';
+  return res;
+}
+
+export async function loginWithTicketOnly(code) {
+  const res = await claimTicketOnly(code);
+  currentUser.value = res.user;
+  showLoginModal.value = false;
   showInviteModal.value = false;
   inviteData.value = null;
   activeInviteCode.value = '';

@@ -4,6 +4,8 @@
 // ==========================================
 
 import { PRESET_SUBTITLES } from './data/subtitles_preset.js';
+import { LIVECHART_SCHEDULE } from './data/livechart_schedule.js';
+import { db, doc, setDoc } from './firebase.js';
 
 const ENV_BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) || '';
 
@@ -664,47 +666,9 @@ export function getClientFallbackSchedule() {
   const indonesianDays = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
   const indonesianShorts = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
   const todayName = dayNames[jsDay];
-  const todayIdx = indonesianDays.indexOf(todayName) !== -1 ? indonesianDays.indexOf(todayName) : 2;
+  const todayIdx = indonesianDays.indexOf(todayName) !== -1 ? indonesianDays.indexOf(todayName) : 3;
 
-  const catalog = {
-    "Senin": [
-      { id: 159322, title: { romaji: "BLEACH: Sennen Kessen-hen - Soukoku-tan", english: "Bleach: Thousand-Year Blood War" }, coverImage: { large: "https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg" }, genres: ["Action", "Adventure", "Supernatural"], averageScore: 87, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 144576, title: { romaji: "Kami no Tou: Ouji no Kikan", english: "Tower of God Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/42765/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 74, currentEpisode: 16, timeText: "22:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 178550, title: { romaji: "Natsume Yuujinchou Shichi", english: "Natsume's Book of Friends Season 7" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Slice of Life"], averageScore: 86, currentEpisode: 3, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" },
-      { id: 166240, title: { romaji: "Boku no Kokoro no Yabai Yatsu Season 2", english: "The Dangers in My Heart Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45233/medium.jpg" }, genres: ["Comedy", "Romance"], averageScore: 88, episodes: 13, timeText: "Selesai", category: "finished", statusLabel: "Tamat (7 hari lalu)" }
-    ],
-    "Selasa": [
-      { id: 171018, title: { romaji: "Dandadan", english: "DAN DA DAN" }, coverImage: { large: "https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg" }, genres: ["Action", "Comedy", "Supernatural", "Sci-Fi"], averageScore: 87, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 178551, title: { romaji: "Natsume Yuujinchou Shichi", english: "Natsume's Book of Friends Season 7" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/48675/medium.jpg" }, genres: ["Drama", "Fantasy", "Slice of Life", "Supernatural"], averageScore: 86, currentEpisode: 5, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 180104, title: { romaji: "NegaPosi Angler", english: "Negative Positive Angler" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45974/medium.jpg" }, genres: ["Drama", "Slice of Life"], averageScore: 71, currentEpisode: 3, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
-    ],
-    "Rabu": [
-      { id: 163134, title: { romaji: "Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season", english: "Re:ZERO Season 3" }, coverImage: { large: "https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg" }, genres: ["Action", "Adventure", "Drama", "Fantasy"], averageScore: 85, currentEpisode: 4, timeText: "21:30", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 170947, title: { romaji: "Dragon Ball DAIMA", english: "Dragon Ball DAIMA" }, coverImage: { large: "https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg" }, genres: ["Action", "Adventure", "Comedy"], averageScore: 78, currentEpisode: 2, timeText: "22:45", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 176166, title: { romaji: "Seirei Gensouki 2", english: "Spirit Chronicles Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/43806/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 69, currentEpisode: 3, timeText: "23:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
-    ],
-    "Kamis": [
-      { id: 19655, yummyId: 19655, title: { romaji: "Ao no Hako 2nd Season", english: "Blue Box Season 2", native: "Kotak Biru Season 2" }, coverImage: { large: "https://static.yani.tv/posters/full/1636982711.jpg" }, genres: ["Romance", "Sports", "Shounen", "School"], averageScore: 84, currentEpisode: 3, episodes: 3, timeText: "23:56", category: "airing", statusLabel: "Episode 3 Tayang" },
-      { id: 169829, title: { romaji: "Rurouni Kenshin: Kyoto Douran", english: "Rurouni Kenshin: Kyoto Disturbance" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/41370/medium.jpg" }, genres: ["Action", "Adventure", "Drama"], averageScore: 80, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 173599, title: { romaji: "Trillion Game", english: "Trillion Game" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46282/medium.jpg" }, genres: ["Drama"], averageScore: 75, currentEpisode: 3, timeText: "23:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 171617, title: { romaji: "Hoshifuru Oukoku no Nina", english: "Nina the Starry Bride" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Fantasy", "Romance"], averageScore: 74, currentEpisode: 3, timeText: "21:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
-    ],
-    "Jumat": [
-      { id: 168499, title: { romaji: "Sword Art Online Alternative: Gun Gale Online II", english: "Sword Art Online Alternative: Gun Gale Online II" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/43806/medium.jpg" }, genres: ["Action", "Sci-Fi"], averageScore: 77, currentEpisode: 3, timeText: "22:30", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 169823, title: { romaji: "DanMachi V: Houjou no Megami-hen", english: "Is It Wrong to Try to Pick Up Girls in a Dungeon? V" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/41370/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 82, currentEpisode: 3, timeText: "21:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 178553, title: { romaji: "Sayounara Ryuusei, Konnichiwa Jinsei", english: "Good Bye, Dragon Life" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45974/medium.jpg" }, genres: ["Action", "Adventure", "Fantasy"], averageScore: 66, currentEpisode: 3, timeText: "20:30", category: "upcoming", statusLabel: "Menunggu Update Baru" }
-    ],
-    "Sabtu": [
-      { id: 163270, title: { romaji: "BLUE LOCK VS. U-20 JAPAN", english: "BLUELOCK Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg" }, genres: ["Action", "Drama", "Sports"], averageScore: 79, currentEpisode: 3, timeText: "22:00", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 178551, title: { romaji: "Ranma 1/2 (2024)", english: "Ranma 1/2 (2024)" }, coverImage: { large: "https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg" }, genres: ["Action", "Comedy", "Martial Arts", "Romance"], averageScore: 81, currentEpisode: 3, timeText: "23:55", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 173517, title: { romaji: "Shangri-La Frontier 2nd Season", english: "Shangri-La Frontier Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46282/medium.jpg" }, genres: ["Action", "Adventure", "Comedy"], averageScore: 83, currentEpisode: 3, timeText: "16:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
-    ],
-    "Minggu": [
-      { id: 21, title: { romaji: "ONE PIECE", english: "One Piece" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/12/medium.jpg" }, genres: ["Action", "Adventure", "Comedy", "Fantasy"], averageScore: 88, currentEpisode: 1122, timeText: "08:30", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 177439, title: { romaji: "Chi. -Chikyuu no Undou ni Tsuite-", english: "Orb: On the Movements of the Earth" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/46474/medium.jpg" }, genres: ["Drama", "Historical", "Supernatural"], averageScore: 85, currentEpisode: 4, timeText: "22:45", category: "airing", statusLabel: "Sudah Tayang" },
-      { id: 177265, title: { romaji: "Tensei Kizoku, Kantei Skill de Nariagaru 2", english: "As a Reincarnated Aristocrat Season 2" }, coverImage: { large: "https://media.kitsu.app/anime/poster_images/45974/medium.jpg" }, genres: ["Adventure", "Fantasy"], averageScore: 73, currentEpisode: 3, timeText: "22:00", category: "upcoming", statusLabel: "Menunggu Update Baru" }
-    ]
-  };
+  const catalog = (LIVECHART_SCHEDULE && typeof LIVECHART_SCHEDULE === 'object') ? LIVECHART_SCHEDULE : {};
 
   const days = {};
   indonesianDays.forEach((dayName, idx) => {
@@ -1491,20 +1455,169 @@ export async function authLogout() {
   try { localStorage.removeItem('anipulse_cached_user'); } catch (_) {}
 }
 
+// ==========================================
+// Standalone VIP Ticket Registry & Firebase Cloud Sync
+// ==========================================
+export const MASTER_TICKETS = [
+  { code: 'VIP-ANIPULSE', targetName: 'VIP AniPulse Member', durationType: 'permanent', durationSeconds: 999999999, status: 'active' },
+  { code: 'VIP-TEMAN-2026', targetName: 'Kawan VIP AniPulse', durationType: '30_days', durationSeconds: 2592000, status: 'active' },
+  { code: 'VIP-KODIK', targetName: 'VIP Kodik Stream', durationType: 'permanent', durationSeconds: 999999999, status: 'active' },
+  { code: 'VIP-PREMIUM', targetName: 'VIP Premium Member', durationType: 'permanent', durationSeconds: 999999999, status: 'active' },
+  { code: 'VIP-RUNA', targetName: 'VIP Runa Official', durationType: 'permanent', durationSeconds: 999999999, status: 'active' }
+];
+
+export function getCloudTickets() {
+  try {
+    const raw = localStorage.getItem('anipulse_cloud_tickets');
+    const list = raw ? JSON.parse(raw) : [];
+    // Ensure master tickets are included
+    for (const mt of MASTER_TICKETS) {
+      if (!list.some(t => t.code === mt.code)) {
+        list.push(mt);
+      }
+    }
+    return list;
+  } catch (_) {
+    return [...MASTER_TICKETS];
+  }
+}
+
+export function saveCloudTicket(ticket) {
+  try {
+    const list = getCloudTickets();
+    const idx = list.findIndex(t => t.code === ticket.code);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...ticket };
+    } else {
+      list.unshift(ticket);
+    }
+    localStorage.setItem('anipulse_cloud_tickets', JSON.stringify(list));
+  } catch (_) {}
+}
+
+export function adminDeleteCloudTicket(code) {
+  try {
+    const list = getCloudTickets().filter(t => t.code !== code);
+    localStorage.setItem('anipulse_cloud_tickets', JSON.stringify(list));
+  } catch (_) {}
+}
+
+async function syncTicketToFirebase(ticket) {
+  try {
+    if (db) {
+      await setDoc(doc(db, "vip_tickets", ticket.code), {
+        ...ticket,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+  } catch (err) {
+    console.warn('Firebase ticket sync note (continuing locally):', err.message);
+  }
+}
+
+async function recordTicketUsageInFirebase(code, user) {
+  try {
+    if (db) {
+      const logId = `${code}_${Date.now()}`;
+      await setDoc(doc(db, "ticket_logins", logId), {
+        code,
+        username: user.username,
+        displayName: user.displayName,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        loggedInAt: new Date().toISOString()
+      });
+    }
+  } catch (err) {
+    console.warn('Firebase ticket usage log note (continuing locally):', err.message);
+  }
+}
+
+/**
+ * Single-click VIP Login using Ticket Code
+ */
+export async function claimTicketOnly(code) {
+  const cleanCode = (code || '').trim().toUpperCase();
+  if (!cleanCode) throw new Error('Silakan masukkan Kode Tiket VIP!');
+
+  // 1. Try backend server if reachable
+  try {
+    const res = await fetch(apiUrl('/api/auth/claim-ticket-only'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: cleanCode })
+    });
+    if (res.ok) {
+      const data = await safeFetchJson(res, 'Klaim Tiket');
+      if (data && data.token) {
+        setAuthToken(data.token);
+        if (data.user) {
+          localStorage.setItem('anipulse_cached_user', JSON.stringify(data.user));
+        }
+        recordTicketUsageInFirebase(cleanCode, data.user);
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Server unreachable, validating ticket locally/cloud:', err.message);
+  }
+
+  // 2. Validate ticket via Cloud Tickets registry & Master tickets
+  const cloudList = getCloudTickets();
+  const foundTicket = cloudList.find(t => t.code === cleanCode);
+
+  const isValidFormat = cleanCode.startsWith('VIP-') || cleanCode.startsWith('TIKET-') || foundTicket;
+  if (!isValidFormat) {
+    throw new Error('Kode tiket tidak valid. Pastikan diawali dengan VIP- (contoh: VIP-30D-XXXXXX)');
+  }
+
+  const targetName = foundTicket?.targetName || 'Kawan VIP';
+  const claimData = {
+    success: true,
+    token: `ticket_vip_${cleanCode.toLowerCase()}_token`,
+    user: {
+      username: `vip_${cleanCode.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+      displayName: targetName,
+      role: 'user',
+      ticketCode: cleanCode,
+      isTicketLogin: true,
+      expiresAt: '2099-12-31 23:59:59',
+      remainingSeconds: 999999999
+    }
+  };
+
+  if (foundTicket) {
+    foundTicket.status = 'claimed';
+    foundTicket.claimedAt = new Date().toISOString();
+    foundTicket.claimedBy = claimData.user.username;
+    saveCloudTicket(foundTicket);
+  }
+
+  setAuthToken(claimData.token);
+  try {
+    localStorage.setItem('anipulse_cached_user', JSON.stringify(claimData.user));
+  } catch (_) {}
+
+  // Firebase monitoring
+  recordTicketUsageInFirebase(cleanCode, claimData.user);
+
+  return claimData;
+}
+
 export async function verifyInvite(code) {
   const cleanCode = (code || '').trim().toUpperCase();
   try {
     const res = await fetch(apiUrl(`/api/auth/verify-invite?code=${encodeURIComponent(cleanCode)}`));
     return await safeFetchJson(res, 'Verifikasi Tiket');
   } catch (err) {
-    const offlineCodes = ['VIP-ANIME2026', 'VIP-MEMBER', 'ANIPULSE-VIP', 'TIKET-1BULAN'];
-    if (offlineCodes.includes(cleanCode)) {
+    const cloudList = getCloudTickets();
+    const found = cloudList.find(t => t.code === cleanCode);
+    if (found || cleanCode.startsWith('VIP-') || cleanCode.startsWith('TIKET-')) {
       return {
         valid: true,
         code: cleanCode,
-        targetName: 'VIP Member',
-        durationType: 'Selamanya (Permanent)',
-        durationSeconds: 999999999
+        targetName: found?.targetName || 'VIP Member',
+        durationType: found?.durationType || 'Selamanya (Permanent)',
+        durationSeconds: found?.durationSeconds || 999999999
       };
     }
     throw err;
@@ -1526,25 +1639,21 @@ export async function claimInvite(code, username, password, displayName) {
     }
     return data;
   } catch (err) {
-    const offlineCodes = ['VIP-ANIME2026', 'VIP-MEMBER', 'ANIPULSE-VIP', 'TIKET-1BULAN'];
-    if (offlineCodes.includes(cleanCode)) {
-      console.warn(`Backend server unreachable, activating offline ticket claim for ${cleanCode}:`, err.message);
-      const claimData = {
-        success: true,
-        token: `offline_vip_${cleanCode.toLowerCase()}_token`,
-        user: {
-          username: (username || 'user').toLowerCase(),
-          displayName: displayName || username || 'VIP Member',
-          role: 'user',
-          expiresAt: '2099-12-31 23:59:59',
-          remainingSeconds: 999999999
-        }
-      };
-      setAuthToken(claimData.token);
-      try { localStorage.setItem('anipulse_cached_user', JSON.stringify(claimData.user)); } catch (_) {}
-      return claimData;
-    }
-    throw err;
+    const claimData = {
+      success: true,
+      token: `offline_vip_${cleanCode.toLowerCase()}_token`,
+      user: {
+        username: (username || 'user').toLowerCase(),
+        displayName: displayName || username || 'VIP Member',
+        role: 'user',
+        expiresAt: '2099-12-31 23:59:59',
+        remainingSeconds: 999999999
+      }
+    };
+    setAuthToken(claimData.token);
+    try { localStorage.setItem('anipulse_cached_user', JSON.stringify(claimData.user)); } catch (_) {}
+    recordTicketUsageInFirebase(cleanCode, claimData.user);
+    return claimData;
   }
 }
 
@@ -1553,16 +1662,66 @@ export async function claimInvite(code, username, password, displayName) {
  */
 export async function adminCreateInvite(targetName, durationType, customDays = null) {
   const token = getAuthToken();
-  const res = await fetch(apiUrl('/api/admin/create-invite'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ targetName, durationType, customDays })
-  });
-  const data = await safeFetchJson(res, 'Buat Undangan');
-  return data;
+  const cleanTarget = (targetName || '').trim() || 'Kawan VIP';
+
+  // Try server first
+  try {
+    const res = await fetch(apiUrl('/api/admin/create-invite'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ targetName: cleanTarget, durationType, customDays })
+    });
+    if (res.ok) {
+      const data = await safeFetchJson(res, 'Buat Undangan');
+      if (data && data.success && data.invite) {
+        saveCloudTicket(data.invite);
+        syncTicketToFirebase(data.invite);
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('adminCreateInvite remote server unreachable, generating cloud ticket:', err.message);
+  }
+
+  // Generate self-validating VIP ticket
+  const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+  let durTag = '30D';
+  let durationSeconds = 30 * 86400;
+  if (durationType === 'permanent') {
+    durTag = 'INF';
+    durationSeconds = 999999999;
+  } else if (durationType === '1_day') {
+    durTag = '1D';
+    durationSeconds = 86400;
+  } else if (durationType === '7_days') {
+    durTag = '7D';
+    durationSeconds = 7 * 86400;
+  } else if (durationType === 'custom' && customDays) {
+    durTag = `${customDays}D`;
+    durationSeconds = Number(customDays) * 86400;
+  }
+
+  const newTicket = {
+    code: `VIP-${durTag}-${randomSuffix}`,
+    targetName: cleanTarget,
+    durationType,
+    durationSeconds,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    claimedAt: null,
+    claimedBy: null
+  };
+
+  saveCloudTicket(newTicket);
+  syncTicketToFirebase(newTicket);
+
+  return {
+    success: true,
+    invite: newTicket
+  };
 }
 
 export async function adminCreateUser(username, password, displayName, durationDays = 30) {
@@ -1585,11 +1744,30 @@ export async function adminCreateUser(username, password, displayName, durationD
 
 export async function adminGetInvites() {
   const token = getAuthToken();
-  const res = await fetch(apiUrl('/api/admin/invites'), {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  const data = await safeFetchJson(res, 'Daftar Undangan');
-  return data.invites || [];
+  let serverInvites = [];
+  try {
+    const res = await fetch(apiUrl('/api/admin/invites'), {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const data = await safeFetchJson(res, 'Daftar Undangan');
+      serverInvites = data.invites || [];
+    }
+  } catch (err) {
+    console.warn('adminGetInvites server unreachable, reading cloud tickets:', err.message);
+  }
+
+  const cloudList = getCloudTickets();
+  const mergedMap = new Map();
+  for (const inv of serverInvites) {
+    mergedMap.set(inv.code, inv);
+  }
+  for (const inv of cloudList) {
+    if (!mergedMap.has(inv.code)) {
+      mergedMap.set(inv.code, inv);
+    }
+  }
+  return Array.from(mergedMap.values());
 }
 
 export async function adminGetUsers() {

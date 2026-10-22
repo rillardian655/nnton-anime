@@ -10,6 +10,15 @@ import {
   updateProfile
 } from "firebase/auth";
 
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  getDocs 
+} from "firebase/firestore";
+
 export const firebaseConfig = {
   apiKey: "AIzaSyDgBUVZR-1Dz6RZS8kzD8cxGXFaCWWGKX8",
   authDomain: "runaanime.firebaseapp.com",
@@ -22,6 +31,7 @@ export const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export {
@@ -30,5 +40,10 @@ export {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  getDocs
 };

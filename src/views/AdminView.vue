@@ -287,9 +287,20 @@
             <div class="created-header">
               <div class="result-title">
                 <span class="success-icon">✓</span>
-                <h4>Link Undangan Berhasil Dibuat!</h4>
+                <h4>Kode Tiket VIP Berhasil Dibuat!</h4>
               </div>
-              <span class="result-expiry-badge">{{ latestCreatedInvite.durationLabel }}</span>
+              <span class="result-expiry-badge">{{ latestCreatedInvite.durationLabel || latestCreatedInvite.durationType }}</span>
+            </div>
+
+            <!-- Direct Ticket Code Display Box -->
+            <div class="result-ticket-code-card">
+              <div class="ticket-val-row">
+                <span class="ticket-code-tag">{{ latestCreatedInvite.code }}</span>
+                <button class="btn btn-warning btn-sm" @click="copyTicketCode(latestCreatedInvite.code)">
+                  {{ copiedCode ? '✓ Kode Tersalin!' : '📋 Salin Kode Tiket' }}
+                </button>
+              </div>
+              <span class="ticket-instruction">Kawan tinggal masukkan kode di atas di aplikasi pada tab <strong>"Masuk Pakai Tiket"</strong>!</span>
             </div>
 
             <div class="result-url-box">
@@ -301,7 +312,7 @@
 
             <div class="wa-message-preview">
               <div class="wa-header">
-                <span class="wa-badge">Format Pesan WhatsApp (Siap Kirim):</span>
+                <span class="wa-badge">Format Pesan WhatsApp (Siap Kirim ke Kawan):</span>
                 <button class="btn btn-primary btn-sm btn-copy-wa" @click="copyWaMessage(latestCreatedInvite)">
                   {{ copiedWa ? '✓ Pesan WA Tersalin!' : '📲 Salin Pesan WhatsApp Lengkap' }}
                 </button>
@@ -572,6 +583,7 @@ const isCreating = ref(false);
 const latestCreatedInvite = ref(null);
 const copiedLink = ref(false);
 const copiedWa = ref(false);
+const copiedCode = ref(false);
 
 // Direct User Mode State
 const directUsername = ref('');
@@ -595,8 +607,10 @@ const filteredInvites = computed(() => {
   if (!q) return invitesList.value;
   return invitesList.value.filter(i => 
     i.target_name?.toLowerCase().includes(q) || 
+    i.targetName?.toLowerCase().includes(q) || 
     i.code?.toLowerCase().includes(q) ||
-    i.claimed_by_user?.toLowerCase().includes(q)
+    i.claimed_by_user?.toLowerCase().includes(q) ||
+    i.claimedBy?.toLowerCase().includes(q)
   );
 });
 
@@ -615,19 +629,31 @@ function getInviteFullUrl(code) {
 }
 
 function generateWaText(invite) {
-  const target = invite.target_name || 'Teman';
-  const url = getInviteFullUrl(invite.code);
-  const dur = invite.durationLabel || invite.duration_type || '30 Hari';
+  const target = invite.target_name || invite.targetName || 'Kawan';
+  const code = invite.code || '';
+  const dur = invite.durationLabel || invite.duration_type || invite.durationType || '30 Hari';
 
-  return `Halo ${target}! 🎉
+  return `Halo ${target}! 🎬✨
 
-Berikut link akses khusus AniPulse VIP kamu:
-🔗 ${url}
+Ini Kode Tiket VIP AniPulse kamu:
+🎫 KODE TIKET: ${code}
+⏳ Masa Aktif: ${dur}
 
-⏳ Masa aktif: ${dur} (dihitung sejak aktivasi)
-⚠️ Catatan: Link ini berlaku 1x pakai untuk aktivasi akun baru. Simpan nama pengguna dan kata sandi yang kamu buat untuk login kembali nanti ya!
+Cara Pakai Sangat Mudah:
+1. Buka aplikasi AniPulse di HP kamu
+2. Pilih tab "Masuk Pakai Tiket"
+3. Masukkan kode: ${code}
+Langsung aktif nonton anime sepuasnya tanpa ribet buat email atau password! 🍿✨`;
+}
 
-Selamat menonton anime favorit tanpa iklan! 🍿✨`;
+async function copyTicketCode(code) {
+  try {
+    await navigator.clipboard.writeText(code);
+    copiedCode.value = true;
+    setTimeout(() => copiedCode.value = false, 2500);
+  } catch (_) {
+    prompt('Salin Kode Tiket:', code);
+  }
 }
 
 async function handleCreateInvite() {
@@ -635,6 +661,7 @@ async function handleCreateInvite() {
   isCreating.value = true;
   copiedLink.value = false;
   copiedWa.value = false;
+  copiedCode.value = false;
   try {
     const res = await adminCreateInvite(targetName.value.trim(), durationType.value, customDays.value);
     if (res.success && res.invite) {
@@ -643,7 +670,7 @@ async function handleCreateInvite() {
       await fetchData();
     }
   } catch (err) {
-    alert('Gagal membuat undangan: ' + err.message);
+    alert('Gagal membuat tiket: ' + err.message);
   } finally {
     isCreating.value = false;
   }
@@ -1198,6 +1225,43 @@ onMounted(() => {
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.result-ticket-code-card {
+  background: rgba(217, 119, 6, 0.1);
+  border: 1.5px dashed rgba(245, 158, 11, 0.45);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.ticket-val-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.ticket-code-tag {
+  font-family: monospace;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 1.5px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.ticket-instruction {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.ticket-instruction strong {
+  color: #fbbf24;
 }
 
 .result-url-box {

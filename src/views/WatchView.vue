@@ -14,10 +14,26 @@
       <div 
         class="theater-player-box" 
         id="theaterBox"
-        :class="{ 'controls-active': isPlayerHovered }"
+        :class="{ 'controls-active': isPlayerHovered, 'is-theater-fullscreen': isTheaterFullscreen }"
         @mousemove="onPlayerMouseMove"
         @mouseleave="onPlayerMouseLeave"
       >
+        <!-- Floating Cinema Fullscreen Control Button (Ensures Indonesian Subtitle stays visible) -->
+        <button 
+          v-if="isAuthenticated"
+          type="button" 
+          class="cinema-fullscreen-toggle-btn" 
+          @click.stop="toggleTheaterFullscreen"
+          :title="isTheaterFullscreen ? 'Keluar Layar Penuh (ESC)' : 'Layar Penuh (Sub Indo Aktif)'"
+        >
+          <svg v-if="!isTheaterFullscreen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+          </svg>
+          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+          </svg>
+          <span class="fs-label">{{ isTheaterFullscreen ? 'Keluar' : 'Layar Penuh' }}</span>
+        </button>
         <!-- Embed Player (Cloud Direct Stream Fallback for Mobile Data / Remote) -->
         <iframe 
           v-if="isCurrentSourceEmbed"
@@ -620,6 +636,79 @@ function onPlayerMouseMove() {
 function onPlayerMouseLeave() {
   isPlayerHovered.value = false;
   clearTimeout(playerHoverTimer);
+}
+
+// ---------------- Cinema Fullscreen Controller ----------------
+const isTheaterFullscreen = ref(false);
+
+async function toggleTheaterFullscreen() {
+  const theater = document.getElementById('theaterBox');
+  if (!theater) return;
+
+  const currentFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || isTheaterFullscreen.value);
+
+  if (!currentFs) {
+    isTheaterFullscreen.value = true;
+    try {
+      if (theater.requestFullscreen) {
+        await theater.requestFullscreen();
+      } else if (theater.webkitRequestFullscreen) {
+        await theater.webkitRequestFullscreen();
+      }
+    } catch (err) {
+      console.warn('Native requestFullscreen failed, active CSS full-screen fallback:', err);
+    }
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    } catch (_) {}
+  } else {
+    isTheaterFullscreen.value = false;
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      }
+    } catch (_) {}
+    try {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch (_) {}
+  }
+}
+
+function handleFullscreenChange() {
+  const fsElem = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement;
+  const theater = document.getElementById('theaterBox');
+  if (!theater) return;
+
+  if (fsElem) {
+    if (fsElem !== theater && theater.contains(fsElem)) {
+      // Kodik iframe or native video requested fullscreen alone!
+      // Escalate to theaterBox so Indonesian subtitle overlay stays on top!
+      try {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().then(() => {
+            isTheaterFullscreen.value = true;
+            setTimeout(() => {
+              if (theater.requestFullscreen) theater.requestFullscreen().catch(() => {});
+              else if (theater.webkitRequestFullscreen) theater.webkitRequestFullscreen().catch(() => {});
+            }, 50);
+          }).catch(() => {
+            isTheaterFullscreen.value = true;
+          });
+        }
+      } catch (_) {
+        isTheaterFullscreen.value = true;
+      }
+      return;
+    }
+    isTheaterFullscreen.value = true;
+  } else {
+    isTheaterFullscreen.value = false;
+  }
 }
 
 const isLoadingStream = ref(true);
@@ -1251,11 +1340,9 @@ let kodikRafId = null;
 function kodikInterpolationLoop() {
   if (isKodikPlaying && isCurrentSourceEmbed.value) {
     const elapsed = (performance.now() - kodikBasePerfTime) / 1000;
-    if (elapsed < 3.0) {
-      const cur = kodikBaseTime + elapsed;
-      watchCurrentTime.value = cur;
-      updateCurrentCueFromTime(cur);
-    }
+    const cur = kodikBaseTime + elapsed;
+    watchCurrentTime.value = cur;
+    updateCurrentCueFromTime(cur);
     kodikRafId = requestAnimationFrame(kodikInterpolationLoop);
   }
 }
@@ -1320,6 +1407,13 @@ function onKodikPlayerMessage(event) {
   } else if (data.key === 'kodik_player_pause' || data.key === 'kodik_player_video_ended') {
     stopKodikInterpolation();
     stopIframeTimePolling();
+  } else if (data.key === 'kodik_player_fullscreen_change' || data.action === 'fullscreen') {
+    const isFs = typeof data.value === 'boolean' ? data.value : !!data.value;
+    if (isFs && !isTheaterFullscreen.value) {
+      toggleTheaterFullscreen();
+    } else if (!isFs && isTheaterFullscreen.value) {
+      toggleTheaterFullscreen();
+    }
   }
 }
 
@@ -1680,11 +1774,12 @@ function handleKeydown(e) {
       break;
     case 'KeyF':
       e.preventDefault();
-      const theaterBox = document.getElementById('theaterBox');
-      if (!document.fullscreenElement) {
-        theaterBox?.requestFullscreen().catch(() => {});
-      } else {
-        document.exitFullscreen().catch(() => {});
+      toggleTheaterFullscreen();
+      break;
+    case 'Escape':
+      if (isTheaterFullscreen.value) {
+        e.preventDefault();
+        toggleTheaterFullscreen();
       }
       break;
     case 'KeyM':
@@ -1728,11 +1823,17 @@ onMounted(() => {
   initWatch();
   window.addEventListener('keydown', handleKeydown);
   window.addEventListener('message', onKodikPlayerMessage);
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+  document.addEventListener('mozfullscreenchange', handleFullscreenChange);
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('message', onKodikPlayerMessage);
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+  document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
   stopIframeTimePolling();
   stopKodikInterpolation();
   clearTimeout(safetyTimer);
@@ -2954,5 +3055,107 @@ video::cue {
   max-width: 90%;
   backdrop-filter: blur(4px);
   box-sizing: border-box;
+}
+
+/* Floating Cinema Fullscreen Toggle Button */
+.cinema-fullscreen-toggle-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid rgba(229, 9, 20, 0.7);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(229, 9, 20, 0.35);
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.92;
+}
+
+.cinema-fullscreen-toggle-btn:hover,
+.cinema-fullscreen-toggle-btn:active {
+  opacity: 1;
+  background: rgba(229, 9, 20, 0.95);
+  transform: scale(1.04);
+  box-shadow: 0 6px 20px rgba(229, 9, 20, 0.55);
+}
+
+.cinema-fullscreen-toggle-btn .fs-label {
+  letter-spacing: 0.02em;
+}
+
+/* Fullscreen Mode (Native Fullscreen & CSS Pseudo Fullscreen) */
+#theaterBox:fullscreen,
+.theater-player-box:fullscreen,
+.theater-player-box.is-theater-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  z-index: 2147483647 !important;
+  background: #000000 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#theaterBox:fullscreen .native-hls-player,
+.theater-player-box:fullscreen .native-hls-player,
+.theater-player-box.is-theater-fullscreen .native-hls-player {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+  object-fit: contain !important;
+}
+
+#theaterBox:fullscreen .cinema-fullscreen-toggle-btn,
+.theater-player-box:fullscreen .cinema-fullscreen-toggle-btn,
+.theater-player-box.is-theater-fullscreen .cinema-fullscreen-toggle-btn {
+  top: 20px !important;
+  right: 20px !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  z-index: 2147483647 !important;
+}
+
+#theaterBox:fullscreen .cinema-subtitle-overlay,
+.theater-player-box:fullscreen .cinema-subtitle-overlay,
+.theater-player-box.is-theater-fullscreen .cinema-subtitle-overlay {
+  position: absolute !important;
+  bottom: clamp(28px, 7vh, 60px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  padding: 0 1.5rem !important;
+}
+
+#theaterBox:fullscreen .cinema-subtitle-box,
+.theater-player-box:fullscreen .cinema-subtitle-box,
+.theater-player-box.is-theater-fullscreen .cinema-subtitle-box {
+  font-size: clamp(1.35rem, 3.2vw, 2.3rem) !important;
+  padding: 8px 26px !important;
+  max-width: 90% !important;
+  background: rgba(0, 0, 0, 0.94) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.98) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 8px !important;
 }
 </style>

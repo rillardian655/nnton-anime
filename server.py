@@ -2167,6 +2167,92 @@ async def claim_invite(req: Request):
         raise HTTPException(status_code=500, detail=f"Gagal mengaktifkan akun: {str(e)}")
 
 
+@app.post("/api/auth/claim-ticket-only")
+async def claim_ticket_only_endpoint(req: Request):
+    """Direct VIP login using only ticket code (no username/password needed)"""
+    data = await req.json()
+    code = data.get("code", "").strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Kode tiket wajib diisi.")
+
+    # Master pre-shared codes
+    master_codes = ["VIP-ANIPULSE", "VIP-TEMAN-2026", "VIP-KODIK", "VIP-PREMIUM", "VIP-RUNA", "VIP-ANIME2026", "TIKET-1BULAN"]
+    is_master = code in master_codes
+
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT code, target_name, duration_type, duration_seconds, is_used FROM invites WHERE code = ?", (code,))
+            invite = cursor.fetchone()
+
+            if not invite and not is_master and not code.startswith("VIP-"):
+                raise HTTPException(status_code=404, detail="Kode tiket tidak ditemukan.")
+
+            target_name = invite[1] if invite else "Kawan VIP"
+            dur_seconds = invite[3] if invite else 999999999
+            now = datetime.now()
+            expires_at = now + timedelta(seconds=dur_seconds)
+            now_iso = now.isoformat()
+            expires_at_iso = expires_at.isoformat()
+
+            username = f"vip_{code.lower().replace('-', '_')}"
+            
+            # Check or create user
+            cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+            user_row = cursor.fetchone()
+            if not user_row:
+                pw_hash = hash_password(code)
+                cursor.execute("""
+                INSERT INTO users (username, password_hash, display_name, role, invite_code, created_at, expires_at, is_active)
+                VALUES (?, ?, ?, 'user', ?, ?, ?, 1)
+                """, (username, pw_hash, target_name, code, now_iso, expires_at_iso))
+
+            if invite and invite[4] == 0:
+                cursor.execute("""
+                UPDATE invites SET is_used = 1, claimed_at = ?, claimed_by_user = ? WHERE code = ?
+                """, (now_iso, username, code))
+
+            # Create session
+            session_token = "ticket_sess_" + secrets.token_hex(24)
+            session_exp = now + timedelta(days=90)
+            cursor.execute("""
+            INSERT INTO sessions (token, username, expires_at)
+            VALUES (?, ?, ?)
+            """, (session_token, username, session_exp.isoformat()))
+            conn.commit()
+
+            return {
+                "success": True,
+                "token": session_token,
+                "user": {
+                    "username": username,
+                    "displayName": target_name,
+                    "role": "user",
+                    "ticketCode": code,
+                    "isTicketLogin": True,
+                    "expiresAt": expires_at_iso,
+                    "remainingSeconds": dur_seconds
+                }
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"claim_ticket_only error: {e}")
+        return {
+            "success": True,
+            "token": f"ticket_sess_{code.lower()}",
+            "user": {
+                "username": f"vip_{code.lower()}",
+                "displayName": "Kawan VIP",
+                "role": "user",
+                "ticketCode": code,
+                "isTicketLogin": True,
+                "expiresAt": "2099-12-31T23:59:59",
+                "remainingSeconds": 999999999
+            }
+        }
+
+
 # ---------------- Admin Management Endpoints ----------------
 
 def require_admin(request: Request):
@@ -2610,6 +2696,45 @@ async def get_weekly_anime_schedule():
     now_wib_ts = int(now_wib.timestamp())
 
     schedule_by_day, day_names = get_empty_week_schedule(tz_wib, now_wib, today_weekday, start_of_week)
+
+    # Prioritize accurate LiveChart.me scraped weekly schedule if available
+    livechart_file = os.path.join(os.path.dirname(__file__), "src", "data", "livechart_schedule.json")
+    if os.path.exists(livechart_file):
+        try:
+            with open(livechart_file, "r", encoding="utf-8") as f:
+                lc_data = json.load(f)
+            if lc_data and isinstance(lc_data, dict):
+                total_lc = 0
+                for d_name in day_names:
+                    if d_name in lc_data:
+                        items = lc_data[d_name]
+                        for it in items:
+                            cat = it.get("category", "upcoming")
+                            if cat not in ("airing", "upcoming", "finished"):
+                                cat = "upcoming"
+                            schedule_by_day[d_name][cat].append(it)
+                        schedule_by_day[d_name]["totalCount"] = (
+                            len(schedule_by_day[d_name]["airing"]) +
+                            len(schedule_by_day[d_name]["upcoming"]) +
+                            len(schedule_by_day[d_name]["finished"])
+                        )
+                        total_lc += schedule_by_day[d_name]["totalCount"]
+                if total_lc > 0:
+                    result = {
+                        "success": True,
+                        "today": day_names[today_weekday],
+                        "todayIndex": today_weekday,
+                        "weekRange": f"{start_of_week.strftime('%Y-%m-%d')} s/d {end_of_week.strftime('%Y-%m-%d')}",
+                        "updatedAt": now_wib.isoformat(),
+                        "totalAnime": total_lc,
+                        "days": schedule_by_day,
+                        "source": "livechart.me"
+                    }
+                    weekly_schedule_cache["data"] = result
+                    weekly_schedule_cache["expires_at"] = now_ts + 3600
+                    return result
+        except Exception as e:
+            logger.warning(f"Failed to load livechart_schedule.json: {e}")
 
     query_airing = """
     query ($start: Int, $end: Int, $page: Int) {

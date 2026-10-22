@@ -42,7 +42,21 @@
         </transition>
 
         <!-- Access Mode Tabs -->
+        <!-- Access Mode Tabs -->
         <div class="gate-tabs">
+          <button 
+            type="button" 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'ticket' }"
+            @click="switchTab('ticket')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
+              <line x1="12" y1="9" x2="12" y2="15"></line>
+            </svg>
+            <span>Masuk Pakai Tiket</span>
+          </button>
+
           <button 
             type="button" 
             class="tab-btn" 
@@ -54,25 +68,52 @@
               <polyline points="10 17 15 12 10 7"></polyline>
               <line x1="15" y1="12" x2="3" y2="12"></line>
             </svg>
-            <span>Masuk Akun</span>
-          </button>
-
-          <button 
-            type="button" 
-            class="tab-btn" 
-            :class="{ active: activeTab === 'claim' }"
-            @click="switchTab('claim')"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
-              <line x1="12" y1="9" x2="12" y2="15"></line>
-            </svg>
-            <span>Klaim Tiket</span>
+            <span>Masuk Akun (Admin)</span>
           </button>
         </div>
 
-        <!-- 1. LOGIN FORM -->
-        <form v-if="activeTab === 'login'" @submit.prevent="handleLogin" class="gate-form">
+        <!-- 1. TICKET LOGIN FORM (Default: login hanya butuh tiket) -->
+        <form v-if="activeTab === 'ticket'" @submit.prevent="handleTicketLogin" class="gate-form">
+          <div class="ticket-callout-hero">
+            <div class="ticket-badge-pill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5">
+                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
+              </svg>
+              <span>AKSES KHUSUS KAWAN VIP</span>
+            </div>
+            <p class="ticket-hero-text">
+              Masukkan Kode Tiket yang kamu dapatkan. Langsung aktif untuk menonton sepuasnya tanpa perlu daftar email atau password!
+            </p>
+          </div>
+
+          <div class="form-group">
+            <label for="ticketCodeInput">Kode Tiket VIP</label>
+            <div class="input-wrap ticket-input-wrap">
+              <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
+                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
+                <line x1="12" y1="9" x2="12" y2="15"></line>
+              </svg>
+              <input 
+                id="ticketCodeInput" 
+                v-model="ticketCode" 
+                type="text" 
+                placeholder="VIP-30D-XXXXXX" 
+                required 
+                style="text-transform: uppercase; font-family: monospace; font-size: 1.15rem; letter-spacing: 1.5px; font-weight: 700;"
+                @input="ticketCode = ticketCode.toUpperCase()"
+              />
+            </div>
+            <span class="input-helper">Format kode diawali dengan <code>VIP-</code> (contoh: <code>VIP-30D-8F92A1</code> atau <code>VIP-ANIPULSE</code>)</span>
+          </div>
+
+          <button type="submit" class="btn-gate-submit btn-ticket-submit" :disabled="isLoading">
+            <span v-if="isLoading" class="spinner-small"></span>
+            <span>{{ isLoading ? 'Memverifikasi Tiket...' : '🚀 Klaim Tiket & Langsung Nonton' }}</span>
+          </button>
+        </form>
+
+        <!-- 2. LOGIN FORM (Username / Password) -->
+        <form v-else-if="activeTab === 'login'" @submit.prevent="handleLogin" class="gate-form">
           <div class="form-group">
             <label for="gateUser">Nama Pengguna atau Email</label>
             <div class="input-wrap">
@@ -120,116 +161,24 @@
           <!-- Invite Ticket Prompt -->
           <div class="invite-ticket-callout">
             <div class="callout-left">
-              <span class="callout-badge">UNDANGAN</span>
-              <p class="callout-text">Punya Kode Undangan resmi?</p>
+              <span class="callout-badge">TIKET</span>
+              <p class="callout-text">Punya Kode Tiket dari Admin?</p>
             </div>
-            <button type="button" class="btn-callout-action" @click="switchTab('claim')">
-              Klaim Tiket →
+            <button type="button" class="btn-callout-action" @click="switchTab('ticket')">
+              Masuk Pakai Tiket →
             </button>
           </div>
         </form>
 
-        <!-- 2. CLAIM INVITE FORM -->
-        <form v-else-if="activeTab === 'claim'" @submit.prevent="handleClaimInvite" class="gate-form">
-          <div class="form-group">
-            <label for="claimCode">Kode Tiket Undangan</label>
-            <div class="input-wrap">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
-                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path>
-                <line x1="12" y1="9" x2="12" y2="15"></line>
-              </svg>
-              <input 
-                id="claimCode" 
-                v-model="inviteCode" 
-                type="text" 
-                placeholder="INV-XXXXXX" 
-                required 
-                style="text-transform: uppercase; font-family: monospace; letter-spacing: 1px;"
-                @input="inviteCode = inviteCode.toUpperCase()"
-              />
-            </div>
+        <!-- Optional Server IP changer on connection issue -->
+        <div v-if="showServerConfig" class="gate-server-box">
+          <span class="server-box-lbl">Pengaturan IP Server Backend:</span>
+          <div class="server-box-row">
+            <input v-model="customServerUrl" type="text" placeholder="http://192.168.1.51:8000" class="server-box-input" />
+            <button type="button" class="btn btn-primary btn-sm" @click="saveServerAddress">Simpan</button>
           </div>
-
-          <div class="form-group">
-            <label for="claimUser">Buat Nama Pengguna (Username)</label>
-            <div class="input-wrap">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <input 
-                id="claimUser" 
-                v-model="claimUsername" 
-                type="text" 
-                placeholder="Username akun kamu..." 
-                required 
-                autocomplete="username"
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="claimPass">Buat Kata Sandi</label>
-            <div class="input-wrap">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              <input 
-                id="claimPass" 
-                v-model="claimPassword" 
-                :type="showPassword ? 'text' : 'password'" 
-                placeholder="Minimal 4 karakter..." 
-                required 
-                autocomplete="new-password"
-              />
-              <button type="button" class="btn-toggle-pw" @click="showPassword = !showPassword">
-                {{ showPassword ? 'Sembunyi' : 'Lihat' }}
-              </button>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="claimDisplay">Nama Lengkap / Panggilan (Opsional)</label>
-            <div class="input-wrap">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-              </svg>
-              <input 
-                id="claimDisplay" 
-                v-model="claimDisplayName" 
-                type="text" 
-                placeholder="Nama panggilan kamu..." 
-              />
-            </div>
-          </div>
-
-          <button type="submit" class="btn-gate-submit btn-gold-submit" :disabled="isLoading">
-            <span v-if="isLoading" class="spinner-small"></span>
-            <span>{{ isLoading ? 'Mengklaim Tiket...' : 'Klaim Tiket & Buka Aplikasi' }}</span>
-          </button>
-
-          <div class="invite-ticket-callout">
-            <div class="callout-left">
-              <span class="callout-badge" style="background: rgba(255,255,255,0.08); color: #cbd5e1;">LOGIN</span>
-              <p class="callout-text">Sudah memiliki akun terdaftar?</p>
-            </div>
-            <button type="button" class="btn-callout-action" @click="switchTab('login')">
-              Masuk di Sini →
-            </button>
-          </div>
-
-          <!-- Optional Server IP changer on connection issue -->
-          <div v-if="showServerConfig" class="gate-server-box">
-            <span class="server-box-lbl">Pengaturan IP Server Backend:</span>
-            <div class="server-box-row">
-              <input v-model="customServerUrl" type="text" placeholder="http://192.168.1.51:8000" class="server-box-input" />
-              <button type="button" class="btn btn-primary btn-sm" @click="saveServerAddress">Simpan</button>
-            </div>
-            <span class="server-box-hint">Pastikan HP dan laptop terhubung ke Wi-Fi yang sama.</span>
-          </div>
-        </form>
+          <span class="server-box-hint">Pastikan HP dan laptop terhubung ke Wi-Fi yang sama.</span>
+        </div>
       </div>
     </div>
   </div>
@@ -237,18 +186,14 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { loginUser } from '../stores/auth.js';
-import { claimInvite, getApiBaseUrl, setBackendUrl } from '../api.js';
+import { loginUser, loginWithTicketOnly } from '../stores/auth.js';
+import { getApiBaseUrl, setBackendUrl } from '../api.js';
 
-const activeTab = ref('login');
+const activeTab = ref('ticket');
+const ticketCode = ref('');
 const loginUsername = ref('');
 const loginPassword = ref('');
 const showPassword = ref(false);
-
-const inviteCode = ref('');
-const claimUsername = ref('');
-const claimPassword = ref('');
-const claimDisplayName = ref('');
 
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -268,6 +213,30 @@ function switchTab(tab) {
   activeTab.value = tab;
   errorMessage.value = '';
   successMessage.value = '';
+}
+
+async function handleTicketLogin() {
+  if (!ticketCode.value.trim()) {
+    errorMessage.value = 'Silakan masukkan Kode Tiket VIP.';
+    return;
+  }
+
+  isLoading.value = true;
+  errorMessage.value = '';
+  successMessage.value = '';
+
+  try {
+    const code = ticketCode.value.trim().toUpperCase();
+    const res = await loginWithTicketOnly(code);
+    successMessage.value = `✓ Tiket VIP Valid! Selamat menonton, ${res.user?.displayName || 'Kawan VIP'}. Memasuki aplikasi...`;
+    setTimeout(() => {
+      window.location.reload();
+    }, 600);
+  } catch (err) {
+    errorMessage.value = err.message || 'Kode tiket tidak valid atau salah format. Pastikan kode diawali dengan VIP-';
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 async function handleLogin() {
@@ -296,46 +265,13 @@ async function handleLogin() {
   }
 }
 
-async function handleClaimInvite() {
-  if (!inviteCode.value.trim()) {
-    errorMessage.value = 'Kode undangan wajib diisi.';
-    return;
-  }
-  if (!claimUsername.value.trim() || !claimPassword.value) {
-    errorMessage.value = 'Username dan kata sandi baru wajib diisi.';
-    return;
-  }
-
-  isLoading.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-
-  try {
-    const code = inviteCode.value.trim().toUpperCase();
-    const res = await claimInvite(
-      code,
-      claimUsername.value.trim().toLowerCase(),
-      claimPassword.value,
-      claimDisplayName.value.trim() || claimUsername.value.trim()
-    );
-    successMessage.value = `Tiket berhasil diklaim! Akun ${res.user?.username} aktif. Memasuki aplikasi...`;
-    setTimeout(() => {
-      window.location.reload();
-    }, 800);
-  } catch (err) {
-    errorMessage.value = err.message || 'Gagal mengklaim tiket. Pastikan kode valid dan belum pernah digunakan.';
-  } finally {
-    isLoading.value = false;
-  }
-}
-
 onMounted(() => {
   // Check if URL has invite parameter
   const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('invite') || urlParams.get('code');
+  const code = urlParams.get('invite') || urlParams.get('code') || urlParams.get('ticket');
   if (code) {
-    inviteCode.value = code.toUpperCase();
-    activeTab.value = 'claim';
+    ticketCode.value = code.toUpperCase();
+    activeTab.value = 'ticket';
   }
 });
 </script>
@@ -711,5 +647,71 @@ onMounted(() => {
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* Ticket Entry Hero & Badge */
+.ticket-callout-hero {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.12), rgba(15, 23, 42, 0.6));
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.ticket-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(217, 119, 6, 0.2);
+  border: 1px solid rgba(217, 119, 6, 0.4);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.ticket-hero-text {
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.ticket-input-wrap input {
+  color: #fbbf24 !important;
+}
+
+.input-helper {
+  display: block;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 0.35rem;
+  line-height: 1.4;
+}
+
+.input-helper code {
+  color: #fbbf24;
+  background: rgba(217, 119, 6, 0.15);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 0.76rem;
+}
+
+.btn-ticket-submit {
+  background: linear-gradient(135deg, #d97706, #b45309) !important;
+  border: 1px solid rgba(251, 191, 36, 0.5) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.35) !important;
+}
+
+.btn-ticket-submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  box-shadow: 0 6px 20px rgba(217, 119, 6, 0.55) !important;
+  transform: translateY(-1px);
 }
 </style>
