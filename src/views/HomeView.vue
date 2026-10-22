@@ -32,11 +32,11 @@
           </p>
 
           <div class="hero-buttons">
-            <button type="button" @click="handleHeroPlay(anime.id)" class="btn btn-primary hero-btn-play">
+            <button type="button" @click="handleHeroPlay(anime.id, anime.title?.english || anime.title?.romaji)" class="btn btn-primary hero-btn-play">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               <span>Tonton Sekarang</span>
             </button>
-            <router-link :to="`/anime?id=${anime.id}`" class="btn btn-secondary hero-btn-info">
+            <router-link :to="`/anime?id=${anime.id}&title=${encodeURIComponent(cleanRussianTitle(anime.title?.english || anime.title?.romaji || ''))}`" class="btn btn-secondary hero-btn-info">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               <span>Detail Anime</span>
             </router-link>
@@ -78,7 +78,7 @@
             v-for="item in historyList.slice(0, 4)" 
             :key="item.id" 
             class="continue-card"
-            @click="navigateToWatch(item.id, item.episode || item.lastEpisode || 1)"
+            @click="navigateToWatch(item.id, item.episode || item.lastEpisode || 1, item.title)"
           >
             <div class="continue-thumb-wrap">
               <img :src="getSafeImageUrl(item.coverImage)" :alt="item.title" class="continue-thumb" @error="onImgError($event, 'thumb')" />
@@ -235,7 +235,7 @@
             <div class="card-hover-overlay">
               <button 
                 class="hover-play-btn" 
-                @click.stop="navigateToWatch(anime.id, currentTab === 'history' ? (anime.episode || 1) : 1)"
+                @click.stop="navigateToWatch(anime.id, currentTab === 'history' ? (anime.episode || 1) : 1, anime.title?.english || anime.title?.romaji || anime.title)"
                 title="Tonton Sekarang"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
@@ -358,31 +358,35 @@ function openAnimeModal(anime) {
 }
 
 function onCardClick(anime) {
+  const title = anime.title?.english || anime.title?.romaji || anime.title || '';
   if (currentTab.value === 'history') {
-    navigateToWatch(anime.id, anime.episode || 1);
+    navigateToWatch(anime.id, anime.episode || 1, title);
   } else {
-    navigateToDetail(anime.id);
+    navigateToDetail(anime.id, title);
   }
 }
 
-function navigateToDetail(animeId) {
-  router.push(`/anime?id=${animeId}`);
+function navigateToDetail(animeId, title = '') {
+  const query = title ? `?id=${animeId}&title=${encodeURIComponent(cleanRussianTitle(title))}` : `?id=${animeId}`;
+  router.push(`/anime${query}`);
 }
 
-function handleHeroPlay(animeId) {
+function handleHeroPlay(animeId, title = '') {
   if (!isAuthenticated.value) {
     showLoginModal.value = true;
     return;
   }
-  router.push(`/watch?id=${animeId}&ep=1`);
+  const query = title ? `?id=${animeId}&ep=1&title=${encodeURIComponent(cleanRussianTitle(title))}` : `?id=${animeId}&ep=1`;
+  router.push(`/watch${query}`);
 }
 
-function navigateToWatch(animeId, ep = 1) {
+function navigateToWatch(animeId, ep = 1, title = '') {
   if (!isAuthenticated.value) {
     showLoginModal.value = true;
     return;
   }
-  router.push(`/watch?id=${animeId}&ep=${ep}`);
+  const query = title ? `?id=${animeId}&ep=${ep}&title=${encodeURIComponent(cleanRussianTitle(title))}` : `?id=${animeId}&ep=${ep}`;
+  router.push(`/watch${query}`);
 }
 
 function handleClearHistory() {
@@ -513,6 +517,21 @@ function onImgError(e, type = 'poster') {
 }
 
 onMounted(() => {
+  // Purge any poisoned cache entries from localStorage (e.g. Himitsukessha / Eagle Talon)
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('anipulse_anime_detail_') || k.startsWith('anipulse_history') || k.startsWith('anipulse_fav'))) {
+        const val = localStorage.getItem(k);
+        if (val && (val.includes('himitsukessha') || val.includes('Himitsukessha') || val.includes('Eagle Talon') || val.includes('Schastlivyy'))) {
+          keysToRemove.push(k);
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+
   historyList.value = getHistory();
   fetchCurrentList();
   startHeroCarousel();

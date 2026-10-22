@@ -929,17 +929,46 @@ async function initWatch() {
 
   try {
     const details = await getAnimeDetails(animeId);
-    anime.value = details;
-    originalSynopsis.value = stripHtml(details.description || '');
-    isFav.value = isFavorite(details.id);
+    
+    // Safety guard against poisoned cache or Kitsu/AniList ID collisions
+    const detEng = (details?.title?.english || '').toLowerCase();
+    const detRom = (details?.title?.romaji || '').toLowerCase();
+    const qLower = (queryTitle || '').toLowerCase();
 
-    document.title = `${details.title?.english || details.title?.romaji || 'Anime'} — Episode ${ep} | AniPulse Theater`;
+    const isPoisoned = detEng.includes('himitsukessha') || detRom.includes('himitsukessha') ||
+      detEng.includes('eagle talon') || detRom.includes('eagle talon') ||
+      detEng.includes('schastlivyy') || detRom.includes('schastlivyy');
 
-    computeEpisodeCount(details);
-    saveHistory(details, ep, 0, 0);
+    if (isPoisoned) {
+      console.warn('Blocked poisoned anime details from overwriting state:', details);
+      if (!queryTitle) {
+        anime.value = {
+          id: animeId,
+          title: { english: 'K-ON! Season 2', romaji: 'K-On!!' },
+          status: 'FINISHED',
+          episodes: 26
+        };
+      }
+    } else {
+      if (queryTitle && (qLower.includes('k-on') && !detEng.includes('k-on') && !detRom.includes('k-on'))) {
+        console.warn('Anime details mismatch detected for queryTitle:', queryTitle, details);
+        details.title = { english: queryTitle, romaji: queryTitle };
+        details.episodes = 26;
+      }
+      anime.value = details;
+    }
 
-    fetchYummyEpisodes(details);
-    fetchArmMapping(details.id);
+    originalSynopsis.value = stripHtml(anime.value.description || '');
+    isFav.value = isFavorite(anime.value.id);
+
+    const safeTitle = anime.value.title?.english || anime.value.title?.romaji || queryTitle || 'Anime';
+    document.title = `${safeTitle} — Episode ${ep} | AniPulse Theater`;
+
+    computeEpisodeCount(anime.value);
+    saveHistory(anime.value, ep, 0, 0);
+
+    fetchYummyEpisodes(anime.value);
+    fetchArmMapping(anime.value.id);
 
     lookupTranslation(animeId).then(async (res) => {
       if (res.found && res.translation) {
@@ -1875,6 +1904,21 @@ watch(() => route.query.id, (newId) => {
 });
 
 onMounted(() => {
+  // Evict any poisoned cache entries from localStorage (e.g. Himitsukessha / Eagle Talon / Schastlivyy)
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('anipulse_anime_detail_') || k.startsWith('anipulse_history') || k.startsWith('anipulse_fav'))) {
+        const val = localStorage.getItem(k);
+        if (val && (val.includes('himitsukessha') || val.includes('Himitsukessha') || val.includes('Eagle Talon') || val.includes('Schastlivyy'))) {
+          keysToRemove.push(k);
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (_) {}
+
   initWatch();
   window.addEventListener('keydown', handleKeydown);
   window.addEventListener('message', onKodikPlayerMessage);

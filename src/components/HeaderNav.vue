@@ -207,7 +207,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { currentUser, isAdmin, showLoginModal, logoutUser, formatRemainingTime } from '../stores/auth.js';
-import { searchAnime, getSafeImageUrl } from '../api.js';
+import { searchAnime, getSafeImageUrl, cleanRussianTitle } from '../api.js';
 
 const props = defineProps({
   currentTab: {
@@ -264,7 +264,9 @@ function openAnime(anime) {
   isSearchOpen.value = false;
   searchQuery.value = '';
   searchResults.value = [];
-  router.push(`/anime?id=${anime.id}`);
+  const title = anime.title?.english || anime.title?.romaji || anime.title || '';
+  const query = title ? `?id=${anime.id}&title=${encodeURIComponent(cleanRussianTitle(title))}` : `?id=${anime.id}`;
+  router.push(`/anime${query}`);
 }
 
 function handleSearchSubmit() {

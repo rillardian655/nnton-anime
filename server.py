@@ -36,6 +36,8 @@ def _ipv4_first_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
 socket.getaddrinfo = _ipv4_first_getaddrinfo
 
 from anicli_api.source.yummy_anime import Extractor, Anime, Episode
+from anicli_api.source.animego import Extractor as AnimeGoExtractor
+from anicli_api.source.anilibria import Extractor as AnilibriaExtractor
 from anicli_api.source.parsers.yummy_anime_me_parser import YummyAnimeApi
 from anicli_api.player.kodik import Kodik
 
@@ -275,6 +277,8 @@ def extract_token_from_request(request: Request) -> Optional[str]:
 
 # Shared anicli Extractor & Kodik Engine
 yummy_extractor = Extractor()
+animego_extractor = AnimeGoExtractor()
+anilibria_extractor = AnilibriaExtractor()
 kodik_player = Kodik()
 
 # OpenRouter API Key for Claude Haiku 5.5
@@ -315,6 +319,10 @@ def clean_yummy_title(raw_title: str, slug: str = "") -> str:
         return "Blue Box (Ao no Hako) Season 2"
     if "Голубая шкатулка" in raw_title or "golubaya-shkatulka" in slug:
         return "Blue Box (Ao no Hako)"
+    if "Кэйон!!" in raw_title or "keyon-2" in slug or "keyon-2514" in slug:
+        return "K-ON! Season 2"
+    if "Кэйон" in raw_title or "keyon" in slug:
+        return "K-ON!"
     if "Синяя тюрьма" in raw_title or "Блю Лок" in raw_title:
         if "2" in raw_title or "-2" in slug:
             return "Blue Lock vs. U-20 Japan (Season 2)"
@@ -707,6 +715,11 @@ async def get_yummy_episodes(
             candidates.append("Дандадан")
         if "Dandadan" not in candidates:
             candidates.append("Dandadan")
+    elif "k-on" in norm_low or "keion" in norm_low or "k on" in norm_low:
+        if is_s2:
+            candidates.extend(["Кэйон!!", "Кэйон! 2", "Кэйон (2 сезон)", "K-On!!", "Кэйон!"])
+        else:
+            candidates.extend(["Кэйон!", "Кэйон", "K-On!"])
     if ":" in clean_q:
         c1 = clean_q.split(":")[0].strip()
         if c1 and c1 not in candidates:
@@ -721,7 +734,7 @@ async def get_yummy_episodes(
                     score = 0
                     r_title = r.title.lower()
                     r_url = r.data.get("anime_url", "").lower()
-                    has_2 = " 2" in r_title or "-2" in r_url or "2" in r_title or "ii" in r_url
+                    has_2 = " 2" in r_title or "-2" in r_url or "2" in r_title or "ii" in r_url or "!!" in r_title or "2 сезон" in r_title
                     if slug and r.data.get("anime_url") == slug:
                         score += 50
                     if r_url.endswith("-tv") or "-tv-" in r_url:
@@ -762,6 +775,38 @@ async def get_yummy_episodes(
                         continue
         except Exception as e:
             logger.warning(f"Yummy search '{cand}' episodes error: {e}")
+
+    # Fallback to AnimeGo Extractor if YummyAnime returned 0 episodes
+    for cand in candidates:
+        try:
+            ag_results = await loop.run_in_executor(None, animego_extractor.search, cand)
+            if ag_results:
+                for r in ag_results:
+                    r_title = r.title.lower()
+                    r_url = getattr(r, "url", "").lower()
+                    has_2 = "!!" in r.title or " 2" in r_title or "-2" in r_url or "2" in r_title or "2 сезон" in r_title
+                    if is_s2 and not has_2:
+                        continue
+                    if not is_s2 and has_2:
+                        continue
+                    anime = await loop.run_in_executor(None, r.get_anime)
+                    eps = await loop.run_in_executor(None, anime.get_episodes)
+                    if eps:
+                        ep_list = []
+                        for ep in eps:
+                            ep_num = getattr(ep, "ordinal", None) if getattr(ep, "ordinal", None) is not None else int(str(ep.num).strip())
+                            ep_list.append({
+                                "num": ep_num,
+                                "title": ep.title or f"Episode {ep_num}"
+                            })
+                        ep_list.sort(key=lambda x: x["num"])
+                        return {
+                            "anime_title": clean_yummy_title(r.title, r.url),
+                            "total_episodes": len(ep_list),
+                            "episodes": ep_list
+                        }
+        except Exception as ag_err:
+            logger.warning(f"AnimeGo episode fallback error for '{cand}': {ag_err}")
 
     return {"episodes": [], "total_episodes": 0}
 
@@ -833,9 +878,11 @@ async def get_yummy_streams(
                 candidates.append("Дандадан")
             if "Dandadan" not in candidates:
                 candidates.append("Dandadan")
-        elif "k-on" in norm_low or "keion" in norm_low:
-            if "Кэйон!" not in candidates:
-                candidates.append("Кэйон!")
+        elif "k-on" in norm_low or "keion" in norm_low or "k on" in norm_low:
+            if is_s2:
+                candidates.extend(["Кэйон!!", "Кэйон! 2", "Кэйон (2 сезон)", "K-On!!", "Кэйон!"])
+            else:
+                candidates.extend(["Кэйон!", "Кэйон", "K-On!"])
         elif "bleach" in norm_low and "Блич" not in candidates:
             candidates.append("Блич")
         if ":" in clean_q:
@@ -853,7 +900,7 @@ async def get_yummy_streams(
                         score = 0
                         r_title = r.title.lower()
                         r_url = r.data.get("anime_url", "").lower()
-                        has_2 = " 2" in r_title or "-2" in r_url or "2" in r_title or "ii" in r_url
+                        has_2 = " 2" in r_title or "-2" in r_url or "2" in r_title or "ii" in r_url or "!!" in r_title or "2 сезон" in r_title
                         if slug and r.data.get("anime_url") == slug:
                             score += 50
                         if r_url.endswith("-tv") or "-tv-" in r_url:
@@ -890,13 +937,160 @@ async def get_yummy_streams(
             except Exception as e:
                 logger.warning(f"Search for stream cand '{cand}' error: {e}")
 
+    async def try_animego_streams():
+        for cand in candidates:
+            try:
+                ag_results = await loop.run_in_executor(None, animego_extractor.search, cand)
+                if not ag_results:
+                    continue
+                for r in ag_results:
+                    r_title = r.title.lower()
+                    r_url = getattr(r, "url", "").lower()
+                    has_2 = "!!" in r.title or " 2" in r_title or "-2" in r_url or "2" in r_title or "2 сезон" in r_title
+                    if is_s2 and not has_2:
+                        continue
+                    if not is_s2 and has_2:
+                        continue
+                    anime = await loop.run_in_executor(None, r.get_anime)
+                    eps = await loop.run_in_executor(None, anime.get_episodes)
+                    if not eps:
+                        continue
+                    t_ep = None
+                    for e in eps:
+                        try:
+                            e_num = int(getattr(e, "ordinal", None) if getattr(e, "ordinal", None) is not None else int(str(e.num).strip()))
+                            if e_num == int(ep):
+                                t_ep = e
+                                break
+                        except Exception:
+                            if str(getattr(e, "num", "")).strip() == str(ep).strip():
+                                t_ep = e
+                                break
+                    if not t_ep and 1 <= int(ep) <= len(eps):
+                        t_ep = eps[int(ep) - 1]
+
+                    if t_ep:
+                        srcs = await loop.run_in_executor(None, t_ep.get_sources)
+                        ag_sources = []
+                        for s in srcs:
+                            vids = await loop.run_in_executor(None, s.get_videos)
+                            if not vids:
+                                continue
+                            video_items = []
+                            for v in vids:
+                                raw_url = v.url
+                                proxied_url = f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}" if (".m3u8" in raw_url or "solodcdn" in raw_url) else raw_url
+                                video_items.append({
+                                    "quality": v.quality,
+                                    "type": "hls" if ".m3u8" in raw_url else v.type,
+                                    "url": proxied_url,
+                                    "direct_url": raw_url
+                                })
+                            video_items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
+                            is_sub = "субтитр" in s.title.lower() or "sub" in s.title.lower()
+                            clean_source_title = f"{s.title} (Audio Asli Jepang)" if is_sub else f"{s.title} (AnimeGo)"
+                            ag_sources.append({
+                                "title": clean_source_title,
+                                "is_subtitles_original": is_sub,
+                                "player_url": getattr(s, "url", None),
+                                "videos": video_items
+                            })
+                        if ag_sources:
+                            return {
+                                "anime": clean_q,
+                                "anime_title": clean_yummy_title(r.title, r.url),
+                                "episode": ep,
+                                "sources": ag_sources
+                            }
+            except Exception as e:
+                logger.warning(f"AnimeGo fallback stream search error for '{cand}': {e}")
+        return None
+
+    async def try_anilibria_streams():
+        for cand in candidates:
+            try:
+                al_results = await loop.run_in_executor(None, anilibria_extractor.search, cand)
+                if not al_results:
+                    continue
+                for r in al_results:
+                    r_title = r.title.lower()
+                    has_2 = "!!" in r.title or " 2" in r_title or "2" in r_title or "2 сезон" in r_title
+                    if is_s2 and not has_2:
+                        continue
+                    if not is_s2 and has_2:
+                        continue
+                    anime = await loop.run_in_executor(None, r.get_anime)
+                    eps = await loop.run_in_executor(None, anime.get_episodes)
+                    if not eps:
+                        continue
+                    t_ep = None
+                    for e in eps:
+                        try:
+                            e_num = int(getattr(e, "ordinal", None) if getattr(e, "ordinal", None) is not None else int(str(e.num).strip()))
+                            if e_num == int(ep):
+                                t_ep = e
+                                break
+                        except Exception:
+                            if str(getattr(e, "num", "")).strip() == str(ep).strip():
+                                t_ep = e
+                                break
+                    if not t_ep and 1 <= int(ep) <= len(eps):
+                        t_ep = eps[int(ep) - 1]
+
+                    if t_ep:
+                        srcs = await loop.run_in_executor(None, t_ep.get_sources)
+                        al_sources = []
+                        for s in srcs:
+                            vids = await loop.run_in_executor(None, s.get_videos)
+                            if not vids:
+                                continue
+                            video_items = []
+                            for v in vids:
+                                raw_url = v.url
+                                proxied_url = f"/api/hls/manifest?url={urllib.parse.quote(raw_url)}" if (".m3u8" in raw_url or "solodcdn" in raw_url) else raw_url
+                                video_items.append({
+                                    "quality": v.quality,
+                                    "type": "hls" if ".m3u8" in raw_url else v.type,
+                                    "url": proxied_url,
+                                    "direct_url": raw_url
+                                })
+                            video_items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
+                            al_sources.append({
+                                "title": f"Anilibria HD ({r.title})",
+                                "is_subtitles_original": False,
+                                "player_url": getattr(s, "url", None),
+                                "videos": video_items
+                            })
+                        if al_sources:
+                            return {
+                                "anime": clean_q,
+                                "anime_title": clean_yummy_title(r.title, getattr(r, "url", "")),
+                                "episode": ep,
+                                "sources": al_sources
+                            }
+            except Exception as e:
+                logger.warning(f"Anilibria fallback stream search error for '{cand}': {e}")
+        return None
+
     if not target_anime:
+        ag_res = await try_animego_streams()
+        if ag_res:
+            streams_cache[s_key] = ag_res
+            return ag_res
+        al_res = await try_anilibria_streams()
+        if al_res:
+            streams_cache[s_key] = al_res
+            return al_res
         return {"sources": [], "message": f"Anime tidak ditemukan untuk '{clean_q}'"}
 
     # 3. Get episodes if not already loaded and find target episode
     if not episodes:
         episodes = await loop.run_in_executor(None, target_anime.get_episodes)
     if not episodes:
+        ag_res = await try_animego_streams()
+        if ag_res:
+            streams_cache[s_key] = ag_res
+            return ag_res
         return {"sources": [], "message": f"Episode tidak tersedia untuk '{clean_q}'"}
 
     target_ep = None
@@ -914,6 +1108,10 @@ async def get_yummy_streams(
         target_ep = episodes[int(ep) - 1]
 
     if not target_ep:
+        ag_res = await try_animego_streams()
+        if ag_res:
+            streams_cache[s_key] = ag_res
+            return ag_res
         return {"sources": [], "message": f"Episode {ep} belum rilis atau tidak tersedia"}
 
     # 4. Extract Kodik sources from target episode
@@ -962,6 +1160,16 @@ async def get_yummy_streams(
     tasks = [extract_one_source(s) for s in kodik_sources[:4]]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     output_sources = [r for r in results if isinstance(r, dict) and r.get("videos")]
+
+    if not output_sources:
+        ag_res = await try_animego_streams()
+        if ag_res:
+            streams_cache[s_key] = ag_res
+            return ag_res
+        al_res = await try_anilibria_streams()
+        if al_res:
+            streams_cache[s_key] = al_res
+            return al_res
 
     result_payload = {
         "anime": clean_q,
@@ -1089,6 +1297,16 @@ async def proxy_hls_manifest(request: Request, url: str = Query(...)):
                     segment_urls.append(full_item_url)
                     rewritten_line = f"segment?url={urllib.parse.quote(full_item_url)}"
                 rewritten_lines.append(rewritten_line)
+            elif 'URI="' in line:
+                def repl_uri(m):
+                    raw_uri = m.group(1)
+                    full_uri = urllib.parse.urljoin(base_url, raw_uri)
+                    if ".m3u8" in raw_uri:
+                        return f'URI="manifest?url={urllib.parse.quote(full_uri)}"'
+                    else:
+                        segment_urls.append(full_uri)
+                        return f'URI="segment?url={urllib.parse.quote(full_uri)}"'
+                rewritten_lines.append(re.sub(r'URI="([^"]+)"', repl_uri, line))
             else:
                 rewritten_lines.append(line)
 
