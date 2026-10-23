@@ -1954,9 +1954,9 @@ export async function translateSynopsis(firstArg, secondArg = null) {
  * Direct Client-Side Anime Streaming Resolution (Zero-Backend Fallback for Mobile Data / Kuota)
  * Directly queries public Yani/Kodik API for episode streams if backend server is unreachable
  */
-export async function fetchClientDirectEpisodes(title, altTitle, yummyId = null) {
+export async function fetchClientDirectEpisodes(title, altTitle, yummyId = null, animeObj = null) {
   try {
-    const rawT = `${title || ''} ${altTitle || ''}`.toLowerCase();
+    const rawT = `${title || ''} ${altTitle || ''} ${animeObj?.title?.english || ''} ${animeObj?.title?.romaji || ''}`.toLowerCase();
     const isS2 = rawT.includes('season 2') || rawT.includes('2nd season') || rawT.includes('s2') || rawT.includes(' 2');
     
     // 1. Instant fallback for prominent known franchise catalog
@@ -1964,68 +1964,55 @@ export async function fetchClientDirectEpisodes(title, altTitle, yummyId = null)
       const epCount = isS2 ? 26 : 14;
       return Array.from({ length: epCount }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
     }
-    if (rawT.includes('blue box') || rawT.includes('ao no hako') || rawT.includes('kotak biru')) {
-      const epCount = isS2 ? 4 : 25;
-      return Array.from({ length: epCount }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
-    }
-    if (rawT.includes('dandadan') || rawT.includes('dan da dan')) {
-      return Array.from({ length: 12 }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
+
+    // 2. Official AniList Schedule sync (strictly prevents showing phantom future episodes for ongoing anime)
+    if (animeObj) {
+      const effCount = getEffectiveEpisodeCount(animeObj);
+      if (effCount && effCount > 0) {
+        return Array.from({ length: effCount }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
+      }
     }
 
-    let targetAnimeId = yummyId;
-    if (!targetAnimeId) {
-      const candidates = [title, altTitle].filter(Boolean);
-      for (const cand of candidates) {
-        try {
-          const sRes = await fetch(`https://api.yani.tv/anime?q=${encodeURIComponent(cand)}&offset=0&limit=8`);
-          if (sRes.ok) {
-            const sData = await sRes.json();
-            if (sData.response && sData.response.length > 0) {
-              for (const item of sData.response) {
-                const vRes = await fetch(`https://api.yani.tv/anime/${item.anime_id}/videos`);
-                if (vRes.ok) {
-                  const vData = await vRes.json();
-                  if (vData.response && Array.isArray(vData.response) && vData.response.length > 0) {
-                    targetAnimeId = item.anime_id;
-                    break;
-                  }
-                }
+    // 3. Kodik Cloud search for actual uploaded episode count
+    try {
+      const kRes = await fetch('https://kodik-api.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          token: '56a768d08f43091901c44b54fe970049',
+          title: title || altTitle,
+          types: 'anime-serial,anime',
+          with_episodes: 'true'
+        })
+      });
+      if (kRes.ok) {
+        const kData = await kRes.json();
+        const results = kData.results || [];
+        let maxEp = 0;
+        for (const r of results) {
+          if (r.seasons) {
+            const seasonKeys = Object.keys(r.seasons);
+            let targetSKey = isS2 ? (seasonKeys.find(k => k === '2') || seasonKeys[0]) : seasonKeys[0];
+            const sObj = r.seasons[targetSKey];
+            if (sObj?.episodes) {
+              const epNums = Object.keys(sObj.episodes).map(Number).filter(n => !isNaN(n));
+              if (epNums.length > 0) {
+                maxEp = Math.max(maxEp, Math.max(...epNums));
               }
-              if (targetAnimeId) break;
             }
           }
-        } catch (_) {}
-      }
-    }
-    if (targetAnimeId) {
-      const vRes = await fetch(`https://api.yani.tv/anime/${targetAnimeId}/videos`);
-      if (vRes.ok) {
-        const vData = await vRes.json();
-        if (vData.response && Array.isArray(vData.response)) {
-          const numSet = new Set();
-          for (const v of vData.response) {
-            const n = Number(v.number);
-            if (!isNaN(n) && n > 0) numSet.add(n);
-          }
-          const sorted = Array.from(numSet).sort((a, b) => a - b);
-          if (sorted.length > 0) {
-            return sorted.map(num => ({
-              num,
-              title: `Episode ${num}`
-            }));
-          }
+        }
+        if (maxEp > 0) {
+          return Array.from({ length: maxEp }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
         }
       }
-    }
+    } catch (_) {}
 
-    // Default resilient episode list
-    return Array.from({ length: 12 }, (_, i) => ({
-      num: i + 1,
-      title: `Episode ${i + 1}`
-    }));
+    // Resilient fallback: return 1 episode
+    return Array.from({ length: 1 }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
   } catch (err) {
     console.warn('fetchClientDirectEpisodes error:', err);
-    return Array.from({ length: 12 }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
+    return Array.from({ length: 1 }, (_, i) => ({ num: i + 1, title: `Episode ${i + 1}` }));
   }
 }
 

@@ -881,8 +881,15 @@ async function fetchYummyEpisodes(details) {
 
       if (validEps.length > 0) {
         validEps.sort((a, b) => a.num - b.num);
-        episodesList.value = validEps;
-        totalEpisodes.value = validEps.length;
+        // If anime is currently airing, prevent showing phantom unreleased future episodes
+        if (isAiringStatus(details) && details.nextAiringEpisode?.episode) {
+          const maxAllowed = details.nextAiringEpisode.episode;
+          validEps = validEps.filter(e => e.num <= maxAllowed);
+        }
+        if (validEps.length > 0) {
+          episodesList.value = validEps;
+          totalEpisodes.value = validEps.length;
+        }
       }
     }
   } catch (err) {
@@ -892,7 +899,7 @@ async function fetchYummyEpisodes(details) {
   // Mobile data / offline backend fallback
   if (episodesList.value.length === 0) {
     try {
-      const directEps = await fetchClientDirectEpisodes(searchTerm, altTerm, yummyId);
+      const directEps = await fetchClientDirectEpisodes(searchTerm, altTerm, yummyId, details);
       if (directEps && directEps.length > 0) {
         episodesList.value = directEps;
         totalEpisodes.value = directEps.length;
