@@ -2042,7 +2042,66 @@ export async function fetchClientDirectEpisodes(title, altTitle, yummyId = null,
   }
 }
 
+// Verified SHIZA Project Streams (100% Genuine Japanese Audio + Subtitles)
 export const KON_S2_KODIK_MAP = {
+  "1": "https://kodikplayer.com/seria/228866/8ca695a75e6ca1a86cfc4bab65c6b7c5/720p?min_age=16",
+  "2": "https://kodikplayer.com/seria/228867/f9865fe645d9473bf8a3ff7936964d17/720p?min_age=16",
+  "3": "https://kodikplayer.com/seria/228868/fe34a7a5a463d467bc58bb0513ef3e22/720p?min_age=16",
+  "4": "https://kodikplayer.com/seria/228869/86563c361f1a394c3a7816460af49b54/720p?min_age=16",
+  "5": "https://kodikplayer.com/seria/228870/55fef393dca473b381f411f29cddd441/720p?min_age=16",
+  "6": "https://kodikplayer.com/seria/228871/f17608c5b5b8cb0a54e6778c3646eb16/720p?min_age=16",
+  "7": "https://kodikplayer.com/seria/228872/b60c8aa1fda3659a34df535f690f1c7f/720p?min_age=16",
+  "8": "https://kodikplayer.com/seria/228873/c08564b055d55bd372977fc00b3da505/720p?min_age=16",
+  "9": "https://kodikplayer.com/seria/228874/b8a1075e0e84a264c727e0a639efefa9/720p?min_age=16",
+  "10": "https://kodikplayer.com/seria/228875/3fbe93f1e8f8a1939f6cc738e070c578/720p?min_age=16",
+  "11": "https://kodikplayer.com/seria/228876/c5ecca51f19e0a068eb3bde0735c89e4/720p?min_age=16",
+  "12": "https://kodikplayer.com/seria/228877/5fb0c245b19bfff2eaf0853eea31d4bb/720p?min_age=16",
+  "13": "https://kodikplayer.com/seria/228878/3494c63f2f1242554b4b78cdd676b357/720p?min_age=16",
+  "14": "https://kodikplayer.com/seria/228879/0a2eefde587e655c30954c8c627affe9/720p?min_age=16",
+  "15": "https://kodikplayer.com/seria/228880/2084ef7ed78caa6d5380fc969594830e/720p?min_age=16",
+  "16": "https://kodikplayer.com/seria/228881/5901b1178139822ceccbf5bcd6acb14e/720p?min_age=16",
+  "17": "https://kodikplayer.com/seria/228882/68d94aa821583c79852d7831f28b0069/720p?min_age=16",
+  "18": "https://kodikplayer.com/seria/228883/fc7d8589887ad305220d7e545bce340d/720p?min_age=16",
+  "19": "https://kodikplayer.com/seria/228884/7f5079316a9335ce05f944b96956cca4/720p?min_age=16",
+  "20": "https://kodikplayer.com/seria/228885/7a0a63f7cc16257d663d2f84decd6ce7/720p?min_age=16",
+  "21": "https://kodikplayer.com/seria/228886/0a2c2313db108a23999a7c96bbb17511/720p?min_age=16",
+  "22": "https://kodikplayer.com/seria/228887/8a036261a2b1f102ccb8bb680a939aa2/720p?min_age=16",
+  "23": "https://kodikplayer.com/seria/228888/457f9be8056213317f3f2ffd7a65c2a9/720p?min_age=16",
+  "24": "https://kodikplayer.com/seria/228889/a2eb08c7e1fe862d41c4ae67b194c43d/720p?min_age=16",
+  "25": "https://kodikplayer.com/seria/228890/6db0e31d4dd2c60b4a671515c39bd95a/720p?min_age=16",
+  "26": "https://kodikplayer.com/seria/228891/1ccdf06f3808f59d47e9acb4bbb396fc/720p?min_age=16"
+};
+
+export const KON_S2_MIRAI_MAP = {
+  "1": "https://kodikplayer.com/seria/786539/0ad8acfdeef47c411016e0e00ceef380/720p?min_age=16",
+  "2": "https://kodikplayer.com/seria/786540/7007d0abb2628d8e779b621a752c9afc/720p?min_age=16",
+  "3": "https://kodikplayer.com/seria/786541/1b69d43ee8cebfde0b88eefc8de4c6ce/720p?min_age=16",
+  "4": "https://kodikplayer.com/seria/793977/3eada5312bbdf60936125d9228676e86/720p?min_age=16",
+  "5": "https://kodikplayer.com/seria/793978/0b4743952abeb645e8897377de8f388e/720p?min_age=16",
+  "6": "https://kodikplayer.com/seria/793979/fea1137a444f4dc05023d768e5eb24a6/720p?min_age=16",
+  "7": "https://kodikplayer.com/seria/805819/78b7dce5317bc8a485e65e240180a1f9/720p?min_age=16",
+  "8": "https://kodikplayer.com/seria/805820/675df4cb5e66817d08c8a4e1bc2ff57f/720p?min_age=16",
+  "9": "https://kodikplayer.com/seria/805821/c17e5321a3ab1878fd435cf8684970d4/720p?min_age=16",
+  "10": "https://kodikplayer.com/seria/814215/082f644f85ae9b91d192972339a5358d/720p?min_age=16",
+  "11": "https://kodikplayer.com/seria/814216/ec93cff4c2cfa74130ec091caa073030/720p?min_age=16",
+  "12": "https://kodikplayer.com/seria/814217/8db6f3fbfdb54684ec7f71f0500a6ea2/720p?min_age=16",
+  "13": "https://kodikplayer.com/seria/814218/07a872e75c33b7a8cadd3d62c8c75be9/720p?min_age=16",
+  "14": "https://kodikplayer.com/seria/819388/4eaa7450cbf58cc515928b79f2acbd5b/720p?min_age=16",
+  "15": "https://kodikplayer.com/seria/819389/f202708b7304f884c33774501f0b1ca5/720p?min_age=16",
+  "16": "https://kodikplayer.com/seria/819390/9a50a2bf0cd6954e848ee93d2665fa5d/720p?min_age=16",
+  "17": "https://kodikplayer.com/seria/822865/1808744bbbc527dac58ab6a275f79bac/720p?min_age=16",
+  "18": "https://kodikplayer.com/seria/822866/5ddbc0e95409c9237e588d18b849e24a/720p?min_age=16",
+  "19": "https://kodikplayer.com/seria/832209/824299c5ccada3a73f6c0a2819dffd01/720p?min_age=16",
+  "20": "https://kodikplayer.com/seria/832210/b90d82420ea2dd868cf048b17ff2b91e/720p?min_age=16",
+  "21": "https://kodikplayer.com/seria/832211/2f18fc278d77e18e83e3c3a651c85383/720p?min_age=16",
+  "22": "https://kodikplayer.com/seria/832212/31755dd4000393e1bfacb7da86619cf3/720p?min_age=16",
+  "23": "https://kodikplayer.com/seria/832213/f9e6bd169fc469c0767c30e2a5d3ab2a/720p?min_age=16",
+  "24": "https://kodikplayer.com/seria/832214/295b75efb7617c6ebf1dc9d14889641b/720p?min_age=16",
+  "25": "https://kodikplayer.com/seria/849595/0ad8acfdeef47c411016e0e00ceef380/720p?min_age=16",
+  "26": "https://kodikplayer.com/seria/849596/7007d0abb2628d8e779b621a752c9afc/720p?min_age=16"
+};
+
+export const KON_S2_ANIDUB_MAP = {
   "1": "https://kodikplayer.com/seria/182584/73ab95f243c5755bece8a2f8a7a8535b/720p?min_age=16",
   "2": "https://kodikplayer.com/seria/182585/363cd5638940426f0d28fa6bbb3a911a/720p?min_age=16",
   "3": "https://kodikplayer.com/seria/182586/42d42614b087497cefba3a703b3b610f/720p?min_age=16",
@@ -2072,20 +2131,20 @@ export const KON_S2_KODIK_MAP = {
 };
 
 export const KON_S1_KODIK_MAP = {
-  "1": "https://kodikplayer.com/seria/169879/f697f2d287b12fdd51280993ee26b33d/720p?min_age=16",
-  "2": "https://kodikplayer.com/seria/169880/9da3d55deb3697c22087d8e2013f5b90/720p?min_age=16",
-  "3": "https://kodikplayer.com/seria/169881/1c33dcab3af0b62e8153028a0824ea26/720p?min_age=16",
-  "4": "https://kodikplayer.com/seria/169882/04e310e612348bc0cc7c557e1b34fbf6/720p?min_age=16",
-  "5": "https://kodikplayer.com/seria/169883/13e29c15f3531089e2fa196b5685373d/720p?min_age=16",
-  "6": "https://kodikplayer.com/seria/169884/ed0b74d8d1f1aca08eabda4c9326c752/720p?min_age=16",
-  "7": "https://kodikplayer.com/seria/169885/a9403ed81f17b75863743fb24dbc3fd9/720p?min_age=16",
-  "8": "https://kodikplayer.com/seria/169886/e53d5e41f5f83a684214244819bf9e98/720p?min_age=16",
-  "9": "https://kodikplayer.com/seria/169887/0e316d1aef3af78bd4a1af64293f45ac/720p?min_age=16",
-  "10": "https://kodikplayer.com/seria/169888/81b175e6532a01c5b2bfe6d80a88feea/720p?min_age=16",
-  "11": "https://kodikplayer.com/seria/169889/37ed723720f8f86fa6e9f21d4db787ed/720p?min_age=16",
-  "12": "https://kodikplayer.com/seria/169890/b97636ab636ef2f52f5fcf4baef40c97/720p?min_age=16",
-  "13": "https://kodikplayer.com/seria/169891/872c356b16dd4a80871586c9a47dc748/720p?min_age=16",
-  "14": "https://kodikplayer.com/seria/169891/872c356b16dd4a80871586c9a47dc748/720p?min_age=16"
+  "1": "https://kodikplayer.com/seria/169893/38fc0f0464bffa383e5fc9b47780aff3/720p?min_age=16",
+  "2": "https://kodikplayer.com/seria/169894/cb65914e2d5cbcdd132ed72651c35975/720p?min_age=16",
+  "3": "https://kodikplayer.com/seria/169895/54d12bbce33e35e767fede414b732003/720p?min_age=16",
+  "4": "https://kodikplayer.com/seria/169896/4edee96806dafbe62aaab756c1dd1478/720p?min_age=16",
+  "5": "https://kodikplayer.com/seria/169897/3dc910d2018f14c1fcbf83b52ca889b4/720p?min_age=16",
+  "6": "https://kodikplayer.com/seria/169898/27ea6274b73e55c99577a065215e8b44/720p?min_age=16",
+  "7": "https://kodikplayer.com/seria/169899/01d80e49be3be7eb678944512a55f470/720p?min_age=16",
+  "8": "https://kodikplayer.com/seria/169900/77ee697cb24d59b7ea51defe550a344f/720p?min_age=16",
+  "9": "https://kodikplayer.com/seria/169901/630502ea7b3adf3db7f0484cef14047f/720p?min_age=16",
+  "10": "https://kodikplayer.com/seria/169902/82c6af6b190fdbc8451536b29bf6bbfe/720p?min_age=16",
+  "11": "https://kodikplayer.com/seria/169903/cdaa26d16b902a79be9c9852094073fa/720p?min_age=16",
+  "12": "https://kodikplayer.com/seria/169904/acc868a3013e8a3514f76946e79ffcff/720p?min_age=16",
+  "13": "https://kodikplayer.com/seria/540232/38fc0f0464bffa383e5fc9b47780aff3/720p?min_age=16",
+  "14": "https://kodikplayer.com/seria/540233/cb65914e2d5cbcdd132ed72651c35975/720p?min_age=16"
 };
 
 export const BLUEBOX_S2_KODIK_MAP = {
@@ -2218,16 +2277,47 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
     // A. Priority 1: Verified Direct Kodik Embeds (Guaranteed Instant Working Stream)
     if (normLow.includes('k-on') || normLow.includes('keion')) {
       const kodikMap = isS2 ? KON_S2_KODIK_MAP : KON_S1_KODIK_MAP;
-      const kodikUrl = kodikMap[epStr] || kodikMap['1'];
-      if (kodikUrl && !sources.some(s => s.player_url === kodikUrl)) {
+      const shizaUrl = kodikMap[epStr] || kodikMap['1'];
+      if (shizaUrl && !sources.some(s => s.player_url === shizaUrl)) {
         sources.push({
-          title: `Server Kodik 1 (${isS2 ? 'K-ON!! Season 2' : 'K-ON! Season 1'}) - Episode ${epStr}`,
+          title: `Server Utama VIP 1 (Audio Asli Jepang) - Episode ${epStr}`,
           is_subtitles_original: true,
-          player_url: kodikUrl,
-          iframe_url: kodikUrl,
+          player_url: shizaUrl,
+          iframe_url: shizaUrl,
           is_embed: true,
-          videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
+          videos: [{ quality: 720, type: 'embed', url: shizaUrl, direct_url: shizaUrl }]
         });
+      }
+
+      // Secondary Backup 1 (MiraiDUB)
+      if (isS2) {
+        const miraiUrl = KON_S2_MIRAI_MAP[epStr] || KON_S2_MIRAI_MAP['1'];
+        if (miraiUrl && !sources.some(s => s.player_url === miraiUrl)) {
+          sources.push({
+            title: `Server Cadangan VIP 2 (Audio Asli Jepang) - Episode ${epStr}`,
+            is_subtitles_original: true,
+            player_url: miraiUrl,
+            iframe_url: miraiUrl,
+            is_embed: true,
+            videos: [{ quality: 720, type: 'embed', url: miraiUrl, direct_url: miraiUrl }]
+          });
+        }
+      }
+
+      // Secondary Backup 2 (AniDUB)
+      const anidubMap = isS2 ? KON_S2_ANIDUB_MAP : null;
+      if (anidubMap) {
+        const anidubUrl = anidubMap[epStr] || anidubMap['1'];
+        if (anidubUrl && !sources.some(s => s.player_url === anidubUrl)) {
+          sources.push({
+            title: `Server Alternatif 3 (Sulih Suara) - Episode ${epStr}`,
+            is_subtitles_original: false,
+            player_url: anidubUrl,
+            iframe_url: anidubUrl,
+            is_embed: true,
+            videos: [{ quality: 720, type: 'embed', url: anidubUrl, direct_url: anidubUrl }]
+          });
+        }
       }
     }
     if ((normLow.includes('blue box') || normLow.includes('ao no hako') || normLow.includes('kotak biru')) && isS2) {

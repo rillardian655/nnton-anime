@@ -63,6 +63,7 @@
           :src="currentEmbedUrl"
           class="native-hls-player embed-cloud-frame"
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+          referrerpolicy="no-referrer"
           allowfullscreen
           frameborder="0"
         ></iframe>
@@ -293,6 +294,18 @@
             <button type="button" class="btn-sync-step btn-sync-reset" @click="resetSubtitleOffset" title="Reset sinkronisasi ke pas timpa (0.0s)">0.0s Pas</button>
             <button type="button" class="btn-sync-step" @click="adjustSubtitleOffset(-0.2)" title="Tunda subtitle 0.2 detik lebih mundur">-0.2s</button>
             <button type="button" class="btn-sync-step btn-sync-slower" @click="adjustSubtitleOffset(-0.5)" title="Tunda subtitle 0.5 detik lebih mundur">-0.5s Mundur</button>
+          </div>
+        </div>
+
+        <!-- Resilient Multi-Server Switcher Helper -->
+        <div class="version-item server-help-hint-item" v-if="currentSources.length > 1">
+          <div class="server-help-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e50914" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Tersedia <strong>{{ currentSources.length }} Server Video</strong>. Jika server saat ini menampilkan <em>"Сервер не отвечает"</em>, cukup pilih <strong>Server Cadangan</strong> pada menu Server Video di atas.</span>
           </div>
         </div>
       </div>
@@ -3350,5 +3363,33 @@ video::cue {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.98) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.22) !important;
   border-radius: 8px !important;
+}
+
+.server-help-hint-item {
+  grid-column: 1 / -1;
+  margin-top: 0.25rem;
+}
+
+.server-help-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(229, 9, 20, 0.08);
+  border: 1px solid rgba(229, 9, 20, 0.25);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.server-help-hint strong {
+  color: #fff;
+}
+
+.server-help-hint em {
+  color: #f87171;
+  font-style: normal;
+  font-weight: 600;
 }
 </style>
