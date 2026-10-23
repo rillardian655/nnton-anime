@@ -1280,7 +1280,7 @@ function playSelectedSource() {
     });
   } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
     // Safari / WebKit native HLS
-    videoEl.src = streamUrl;
+    videoEl.src = currentHlsUrl;
     videoEl.onloadedmetadata = () => {
       isLoadingStream.value = false;
       checkResumeProgress();
