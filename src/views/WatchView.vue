@@ -526,7 +526,8 @@ import {
   fetchClientDirectStreams,
   cleanRussianTitle,
   cleanSourceTitle,
-  getPresetSubtitles
+  getPresetSubtitles,
+  OFFLINE_ANIME_DATASET
 } from '../api.js';
 import { 
   isAuthenticated, 
@@ -921,14 +922,28 @@ async function initWatch() {
   }
 
   const queryTitle = route.query.title ? decodeURIComponent(route.query.title) : '';
-  if (queryTitle) {
+  const numId = Number(animeId);
+  const offlineMatch = OFFLINE_ANIME_DATASET.find(a => 
+    a.id === numId || 
+    (queryTitle && (
+      a.title?.english?.toLowerCase() === queryTitle.toLowerCase() || 
+      a.title?.romaji?.toLowerCase() === queryTitle.toLowerCase()
+    ))
+  );
+
+  if (queryTitle || offlineMatch) {
     anime.value = {
       id: animeId,
-      title: { english: queryTitle, romaji: queryTitle },
-      status: 'RELEASING'
+      title: offlineMatch?.title || { english: queryTitle, romaji: queryTitle },
+      coverImage: offlineMatch?.coverImage || (route.query.cover ? { large: decodeURIComponent(route.query.cover) } : null),
+      bannerImage: offlineMatch?.bannerImage || '',
+      idMal: offlineMatch?.idMal || (numId === 7791 ? 7791 : numId === 5680 ? 5680 : null),
+      status: offlineMatch?.status || 'RELEASING',
+      episodes: offlineMatch?.episodes || 26
     };
     computeEpisodeCount(anime.value);
-    document.title = `${queryTitle} — Episode ${ep} | AniPulse Theater`;
+    const titleText = anime.value.title?.english || queryTitle;
+    document.title = `${titleText} — Episode ${ep} | AniPulse Theater`;
     if (isAuthenticated.value) {
       loadEpisodeStream(ep);
     }
@@ -952,6 +967,9 @@ async function initWatch() {
         anime.value = {
           id: animeId,
           title: { english: 'K-ON! Season 2', romaji: 'K-On!!' },
+          coverImage: {
+            large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx7791-4tnomla2mMDp.png'
+          },
           status: 'FINISHED',
           episodes: 26
         };
@@ -961,6 +979,9 @@ async function initWatch() {
         console.warn('Anime details mismatch detected for queryTitle:', queryTitle, details);
         details.title = { english: queryTitle, romaji: queryTitle };
         details.episodes = 26;
+      }
+      if (!details.coverImage && (offlineMatch?.coverImage || anime.value?.coverImage)) {
+        details.coverImage = offlineMatch?.coverImage || anime.value?.coverImage;
       }
       anime.value = details;
     }

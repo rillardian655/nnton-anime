@@ -72,10 +72,72 @@ export function formatTime(seconds) {
   return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
+const CANONICAL_COVERS = {
+  7791: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx7791-4tnomla2mMDp.png', // K-ON! Season 2
+  5680: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx5680-r3AI3Cwfv0Aq.png', // K-ON! Season 1
+  170942: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170942-KKcLfQzV57nG.jpg', // Blue Box
+  19655: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170942-KKcLfQzV57nG.jpg', // Blue Box S2
+  171018: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx171018-60q1B6GK2Ghb.jpg', // Dandadan
+  151807: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx151807-it355ZgzquUd.png', // Solo Leveling
+  154587: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-qQTzQnEJJ3oB.jpg', // Frieren
+  127230: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx127230-DdP4vAdssLoz.png', // Chainsaw Man
+  113415: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx113415-LHBAeoZDIsnF.jpg', // Jujutsu Kaisen
+  101922: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx101922-WBsBl0ClmgYL.jpg', // Demon Slayer
+  16498: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-buvcRTBx4NSm.jpg', // Attack on Titan
+  21: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-ELSYx3yMPcKM.jpg', // One Piece
+};
+
+function resolveRealCover(animeId, candidateCover, currentHistoryItem = null, title = '') {
+  const isBad = (u) => !u || typeof u !== 'string' || u.includes('photo-1578632767115-351597cf2477') || u.includes('placeholder');
+  
+  if (!isBad(candidateCover)) return candidateCover;
+
+  if (currentHistoryItem && !isBad(currentHistoryItem.coverImage)) {
+    return currentHistoryItem.coverImage;
+  }
+
+  const numId = Number(animeId);
+  if (CANONICAL_COVERS[numId]) return CANONICAL_COVERS[numId];
+
+  const tLower = (title || '').toLowerCase();
+  if (tLower.includes('k-on') || tLower.includes('keion')) {
+    return (tLower.includes('season 2') || tLower.includes('!!') || tLower.includes('s2') || tLower.includes(' 2'))
+      ? CANONICAL_COVERS[7791]
+      : CANONICAL_COVERS[5680];
+  }
+  if (tLower.includes('blue box') || tLower.includes('ao no hako') || tLower.includes('kotak biru')) {
+    return CANONICAL_COVERS[170942];
+  }
+  if (tLower.includes('solo leveling') || tLower.includes('ore dake level up')) {
+    return CANONICAL_COVERS[151807];
+  }
+  if (tLower.includes('dandadan')) {
+    return CANONICAL_COVERS[171018];
+  }
+
+  return candidateCover || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+}
+
 export function getHistory() {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    let modified = false;
+    const healed = list.map(item => {
+      const real = resolveRealCover(item.id, item.coverImage, null, item.title);
+      if (real !== item.coverImage) {
+        modified = true;
+        return { ...item, coverImage: real };
+      }
+      return item;
+    });
+    if (modified) {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(healed));
+      } catch (_) {}
+    }
+    return healed;
   } catch (e) {
     console.error('Failed to get history:', e);
     return [];
@@ -113,13 +175,13 @@ export function saveHistory(anime, episodeNumber = 1, currentTime = 0, duration 
   } else if (typeof anime.coverImage === 'string') {
     cleanCover = anime.coverImage;
   }
-  if (!cleanCover) {
-    cleanCover = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
-  }
+
+  const titleStr = anime.title?.english || anime.title?.romaji || anime.title || 'Anime';
+  cleanCover = resolveRealCover(anime.id, cleanCover, index >= 0 ? history[index] : null, titleStr);
 
   const entry = {
     id: Number(anime.id),
-    title: anime.title?.english || anime.title?.romaji || anime.title || 'Anime',
+    title: titleStr,
     coverImage: cleanCover,
     bannerImage: anime.bannerImage || '',
     episode: epNum,

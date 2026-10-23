@@ -213,8 +213,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 151807,
     title: { romaji: 'Ore dake Level Up na Ken', english: 'Solo Leveling', native: '俺だけレベルアップな件' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/45974/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/45974/medium.jpg', color: '#3b82f6' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/45974/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx151807-it355ZgzquUd.png', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx151807-it355ZgzquUd.png', 
+      color: '#3b82f6' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/151807-37yfQA3ym8PA.jpg',
     format: 'TV', episodes: 12, duration: 24, status: 'FINISHED', seasonYear: 2024, averageScore: 86, popularity: 95000,
     genres: ['Action', 'Adventure', 'Fantasy'],
     description: 'Sudah lebih dari satu dekade sejak Gerbang misterius menghubungkan dunia manusia dengan monster. Jinwoo Sung yang terlemah mendapatkan sistem rahasia untuk naik level tanpa batas.'
@@ -222,8 +226,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 16498,
     title: { romaji: 'Shingeki no Kyojin', english: 'Attack on Titan', native: '進撃の巨人' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/7442/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/7442/medium.jpg', color: '#ef4444' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/7442/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-buvcRTBx4NSm.jpg', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx16498-buvcRTBx4NSm.jpg', 
+      color: '#ef4444' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/16498-8jpFCOcDmneX.jpg',
     format: 'TV', episodes: 25, duration: 24, status: 'FINISHED', seasonYear: 2013, averageScore: 90, popularity: 120000,
     genres: ['Action', 'Drama', 'Fantasy', 'Mystery'],
     description: 'Setelah tembok pelindung dihancurkan oleh Titan Kolosal, Eren Yeager bersumpah membasmi seluruh Titan demi kebebasan umat manusia.'
@@ -231,8 +239,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 101922,
     title: { romaji: 'Kimetsu no Yaiba', english: 'Demon Slayer: Kimetsu no Yaiba', native: '鬼滅の刃' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/41370/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/41370/medium.jpg', color: '#10b981' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/41370/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx101922-WBsBl0ClmgYL.jpg', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx101922-WBsBl0ClmgYL.jpg', 
+      color: '#10b981' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/101922-33MtJGsUSxga.jpg',
     format: 'TV', episodes: 26, duration: 24, status: 'FINISHED', seasonYear: 2019, averageScore: 88, popularity: 110000,
     genres: ['Action', 'Fantasy', 'Historical', 'Supernatural'],
     description: 'Keluarganya dibantai iblis dan adiknya Nezuko berubah menjadi iblis. Tanjiro Kamado bergabung dengan Korps Pemburu Iblis untuk mengembalikan kemanusiaan adiknya.'
@@ -240,8 +252,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 113415,
     title: { romaji: 'Jujutsu Kaisen', english: 'Jujutsu Kaisen', native: '呪術廻戦' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/42765/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/42765/medium.jpg', color: '#6366f1' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/42765/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx113415-LHBAeoZDIsnF.jpg', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx113415-LHBAeoZDIsnF.jpg', 
+      color: '#6366f1' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/113415-jQBSkxWAAk83.jpg',
     format: 'TV', episodes: 24, duration: 24, status: 'FINISHED', seasonYear: 2020, averageScore: 87, popularity: 105000,
     genres: ['Action', 'Fantasy', 'Supernatural'],
     description: 'Yuuji Itadori menelan jari terkutuk Ryomen Sukuna dan memasuki dunia Penyihir Jujutsu Tokyo untuk mengumpulkan sisa kutukan berbahaya.'
@@ -249,8 +265,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 154587,
     title: { romaji: 'Sousou no Frieren', english: 'Frieren: Beyond Journey\'s End', native: '葬送のフリーレン' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/46474/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/46474/medium.jpg', color: '#a855f7' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/46474/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-qQTzQnEJJ3oB.jpg', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx154587-qQTzQnEJJ3oB.jpg', 
+      color: '#a855f7' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/154587-ivXNJ23SM1xB.jpg',
     format: 'TV', episodes: 28, duration: 24, status: 'FINISHED', seasonYear: 2023, averageScore: 92, popularity: 98000,
     genres: ['Adventure', 'Drama', 'Fantasy'],
     description: 'Setelah mengalahkan Raja Iblis bersama pahlawan Himmel, elf penyihir Frieren memulai perjalanan panjang memahami arti kehidupan manusia dan persahabatan.'
@@ -258,8 +278,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 21,
     title: { romaji: 'ONE PIECE', english: 'One Piece', native: 'ONE PIECE' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/12/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/12/medium.jpg', color: '#f59e0b' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/12/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-ELSYx3yMPcKM.jpg', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx21-ELSYx3yMPcKM.jpg', 
+      color: '#f59e0b' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/21-wf37VakJmZqs.jpg',
     format: 'TV', episodes: 1100, duration: 24, status: 'RELEASING', seasonYear: 1999, averageScore: 89, popularity: 130000,
     genres: ['Action', 'Adventure', 'Comedy', 'Fantasy'],
     description: 'Monkey D. Luffy mengarungi lautan Grand Line bersama Kru Bajak Laut Topi Jerami untuk menemukan harta karun legendaris One Piece dan menjadi Raja Bajak Laut.'
@@ -267,8 +291,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 140960,
     title: { romaji: 'SPY×FAMILY', english: 'SPY x FAMILY', native: 'SPY×FAMILY' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/45233/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/45233/medium.jpg', color: '#ec4899' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/45233/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx140960-Kb6R5nYQfjmP.jpg', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx140960-Kb6R5nYQfjmP.jpg', 
+      color: '#ec4899' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/140960-Z7xSvkRxHKfj.jpg',
     format: 'TV', episodes: 25, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 85, popularity: 92000,
     genres: ['Action', 'Comedy', 'Slice of Life'],
     description: 'Mata-mata Twilight harus membangun keluarga palsu untuk misinya. Tanpa disadari, istrinya adalah pembunuh bayaran dan putrinya Anya memiliki kemampuan telepati.'
@@ -276,8 +304,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 127230,
     title: { romaji: 'Chainsaw Man', english: 'Chainsaw Man', native: 'チェンソーマン' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/43806/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/43806/medium.jpg', color: '#f97316' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/43806/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx127230-DdP4vAdssLoz.png', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx127230-DdP4vAdssLoz.png', 
+      color: '#f97316' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/127230-o8IRwCGVr9KW.jpg',
     format: 'TV', episodes: 12, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 86, popularity: 90000,
     genres: ['Action', 'Fantasy', 'Horror', 'Supernatural'],
     description: 'Denji hidup miskin dan berburu iblis bersama Pochita. Setelah dikhianati, ia terlahir kembali sebagai Manusia Gergaji Mesin dan bergabung dengan Pemburu Iblis Keselamatan Publik.'
@@ -285,8 +317,12 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 153288,
     title: { romaji: 'Kaijuu 8-gou', english: 'Kaiju No. 8', native: '怪獣8号' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/46282/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/46282/medium.jpg', color: '#14b8a6' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/46282/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx153288-25FBfFJzEQ5O.jpg', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx153288-25FBfFJzEQ5O.jpg', 
+      color: '#14b8a6' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/153288-JNsWuMPMAuJL.jpg',
     format: 'TV', episodes: 12, duration: 24, status: 'FINISHED', seasonYear: 2024, averageScore: 84, popularity: 75000,
     genres: ['Action', 'Sci-Fi'],
     description: 'Kafka Hibino bercita-cita masuk Pasukan Pertahanan Kaiju. Setelah tubuhnya kemasukan parasit kaiju kecil, ia memperoleh kekuatan monster misterius berkode Kaiju No. 8.'
@@ -294,22 +330,25 @@ export const OFFLINE_ANIME_DATASET = [
   {
     id: 137822,
     title: { romaji: 'Blue Lock', english: 'BLUE LOCK', native: 'ブルーロック' },
-    coverImage: { extraLarge: 'https://media.kitsu.app/anime/poster_images/44888/large.jpg', large: 'https://media.kitsu.app/anime/poster_images/44888/medium.jpg', color: '#0284c7' },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/44888/large.jpg',
+    coverImage: { 
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx137822-U8naszP96vzC.png', 
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx137822-U8naszP96vzC.png', 
+      color: '#0284c7' 
+    },
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/137822-oevspckMGLuY.jpg',
     format: 'TV', episodes: 24, duration: 24, status: 'FINISHED', seasonYear: 2022, averageScore: 83, popularity: 78000,
     genres: ['Action', 'Sports'],
     description: '300 penyerang sepak bola SMA terbaik Jepang dikumpulkan di fasilitas pelatihan tertutup Blue Lock untuk menciptakan striker paling egois dan mematikan di dunia.'
   },
   {
     id: 170942,
-    kitsuId: '48239',
     title: { romaji: 'Ao no Hako', english: 'Blue Box', native: 'アオのハコ' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg',
-      large: 'https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170942-KKcLfQzV57nG.jpg',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx170942-KKcLfQzV57nG.jpg',
       color: '#3b82f6'
     },
-    bannerImage: 'https://media.kitsu.app/anime/48239/poster_image/medium-4653e38d1bfe79ce7af766adf8e8d56e.jpeg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/170942-v2GO5YNO0Q5I.jpg',
     format: 'TV', episodes: 25, duration: 24, status: 'FINISHED', seasonYear: 2024, averageScore: 82, popularity: 75000,
     genres: ['Romance', 'Sports', 'Slice of Life'],
     description: 'Taiki Inomata adalah anggota klub bulu tangkis di Eimei High. Setiap pagi ia berlatih bersama Chinatsu Kano, bintang klub basket wanita yang ia kagumi secara diam-diam.'
@@ -320,11 +359,11 @@ export const OFFLINE_ANIME_DATASET = [
     slug: 'golubaya-shkatulka-2',
     title: { romaji: 'Ao no Hako 2nd Season', english: 'Blue Box Season 2', native: 'Kotak Biru Season 2' },
     coverImage: {
-      extraLarge: 'https://static.yani.tv/posters/full/1636982711.jpg',
-      large: 'https://static.yani.tv/posters/full/1636982711.jpg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170942-KKcLfQzV57nG.jpg',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx170942-KKcLfQzV57nG.jpg',
       color: '#3b82f6'
     },
-    bannerImage: 'https://static.yani.tv/posters/full/1636982711.jpg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/170942-v2GO5YNO0Q5I.jpg',
     format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2026, averageScore: 84, popularity: 82000,
     genres: ['Shounen', 'Romance', 'Sports', 'School'],
     studios: { nodes: [{ name: 'Telecom Animation Film' }] },
@@ -334,11 +373,11 @@ export const OFFLINE_ANIME_DATASET = [
     id: 7791,
     title: { romaji: 'K-ON!!', english: 'K-ON! Season 2', native: 'けいおん!!' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/poster_images/5124/large.jpg',
-      large: 'https://media.kitsu.app/anime/poster_images/5124/medium.jpg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx7791-4tnomla2mMDp.png',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx7791-4tnomla2mMDp.png',
       color: '#ec4899'
     },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/5124/large.jpg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/7791-XUCEPg0lbD1K.jpg',
     format: 'TV',
     episodes: 26,
     currentEpisode: 26,
@@ -354,11 +393,11 @@ export const OFFLINE_ANIME_DATASET = [
     id: 5680,
     title: { romaji: 'K-ON!', english: 'K-ON!', native: 'けいおん!' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/poster_images/4240/large.jpg',
-      large: 'https://media.kitsu.app/anime/poster_images/4240/medium.jpg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx5680-r3AI3Cwfv0Aq.png',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx5680-r3AI3Cwfv0Aq.png',
       color: '#ec4899'
     },
-    bannerImage: 'https://media.kitsu.app/anime/cover_images/4240/large.jpg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/5680-Mc9n4eFI4i0Y.jpg',
     format: 'TV',
     episodes: 13,
     currentEpisode: 13,
@@ -372,84 +411,78 @@ export const OFFLINE_ANIME_DATASET = [
   },
   {
     id: 171018,
-    kitsuId: '48269',
     title: { romaji: 'Dandadan', english: 'Dan Da Dan', native: 'ダンダダン' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg',
-      large: 'https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx171018-60q1B6GK2Ghb.jpg',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171018-60q1B6GK2Ghb.jpg',
       color: '#e11d48'
     },
-    bannerImage: 'https://media.kitsu.app/anime/48269/poster_image/medium-9feb265c75b7016c63b21e122f69a84b.jpeg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/171018-SpwPNAduszXl.jpg',
     format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 87, popularity: 82000,
     genres: ['Action', 'Comedy', 'Sci-Fi', 'Supernatural'],
     description: 'Momo percaya pada hantu dan Okarun percaya pada alien. Pertaruhan mereka mengungkap bahwa keduanya nyata dan memicu pertempuran supranatural spektakuler.'
   },
   {
     id: 163134,
-    kitsuId: '47235',
     title: { romaji: 'Re:Zero kara Hajimeru Isekai Seikatsu 3rd Season', english: 'Re:ZERO Season 3', native: 'Re:ゼロから始める異世界生活 3rd season' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg',
-      large: 'https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx163134-yieRFbvUOH9a.jpg',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx163134-yieRFbvUOH9a.jpg',
       color: '#8b5cf6'
     },
-    bannerImage: 'https://media.kitsu.app/anime/47235/poster_image/medium-d7e11c48c36ab4d4925125e7279e9d47.jpeg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/163134-CqaXjXVivwJ5.jpg',
     format: 'TV', episodes: 4, currentEpisode: 4, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 85, popularity: 79000,
     genres: ['Action', 'Adventure', 'Drama', 'Fantasy'],
     description: 'Subaru Natsuki dan Emilia menerima undangan ke kota air Priestella, di mana Uskup Agung Dosa Sin Archbishop dari Witch Cult melancarkan serangan dahsyat.'
   },
   {
     id: 170947,
-    kitsuId: '48108',
     title: { romaji: 'Dragon Ball DAIMA', english: 'Dragon Ball DAIMA', native: 'ドラゴンボールDAIMA' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg',
-      large: 'https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170083-GTwRrhTApcLR.png',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx170083-GTwRrhTApcLR.png',
       color: '#f97316'
     },
-    bannerImage: 'https://media.kitsu.app/anime/48108/poster_image/medium-e08ccbe94f8579a6baab5abfee2bc242.jpeg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/170083-SYCCWWlq3hqF.jpg',
     format: 'TV', episodes: 2, currentEpisode: 2, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 78, popularity: 71000,
     genres: ['Action', 'Adventure', 'Comedy', 'Fantasy'],
     description: 'Karena sebuah konspirasi misterius, Goku dan teman-temannya berubah menjadi anak kecil dan memulai petualangan baru di alam semesta yang belum pernah terjamah.'
   },
   {
     id: 163270,
-    kitsuId: '47245',
     title: { romaji: 'BLUE LOCK VS. U-20 JAPAN', english: 'BLUELOCK Season 2', native: 'ブルーロック VS. U-20 JAPAN' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg',
-      large: 'https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx163270-wboZJp0ybwVK.jpg',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx163270-wboZJp0ybwVK.jpg',
       color: '#0284c7'
     },
-    bannerImage: 'https://media.kitsu.app/anime/47245/poster_image/medium-c58851ee6f99efdaf6df6a284f3cde05.jpeg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/163270-fcjrqp3iKWdb.jpg',
     format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 79, popularity: 80000,
     genres: ['Action', 'Drama', 'Sports'],
     description: 'Sebelas pemain terpilih dari Blue Lock berhadapan langsung melawan Timnas Jepang U-20 dalam pertandingan hidup mati menentukan masa depan sepak bola Jepang.'
   },
   {
     id: 178551,
-    kitsuId: '48981',
     title: { romaji: 'Ranma 1/2 (2024)', english: 'Ranma 1/2 (2024)', native: 'らんま1/2 (2024)' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg',
-      large: 'https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx178533-b88OLxm50jcH.jpg',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx178533-b88OLxm50jcH.jpg',
       color: '#ef4444'
     },
-    bannerImage: 'https://media.kitsu.app/anime/48981/poster_image/medium-abfe4d8f087bdfef4385faeb830873d4.jpeg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/178533-LrfKdOUWOLyS.jpg',
     format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 81, popularity: 68000,
     genres: ['Action', 'Comedy', 'Martial Arts', 'Romance'],
     description: 'Ranma Saotome dan Akane Tendo dijodohkan oleh orang tua mereka di tengah kutukan Jusenkyo di mana Ranma berubah jadi perempuan jika tersiram air dingin.'
   },
   {
     id: 159322,
-    kitsuId: '43078',
     title: { romaji: 'BLEACH: Sennen Kessen-hen - Soukoku-tan', english: 'Bleach: Thousand-Year Blood War - The Conflict', native: 'BLEACH 千年血戦篇-相剋譚-' },
     coverImage: {
-      extraLarge: 'https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg',
-      large: 'https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg',
+      extraLarge: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx159322-Sp1GflRhE6Po.jpg',
+      large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx159322-Sp1GflRhE6Po.jpg',
       color: '#475569'
     },
-    bannerImage: 'https://media.kitsu.app/anime/43078/poster_image/medium-c33a4b2e827f0e99ea57f831af0adabd.jpeg',
+    bannerImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/159322-biJjvtNkhkxR.jpg',
     format: 'TV', episodes: 3, currentEpisode: 3, duration: 24, status: 'RELEASING', seasonYear: 2024, averageScore: 87, popularity: 84000,
     genres: ['Action', 'Adventure', 'Supernatural'],
     description: 'Pertempuran babak ketiga perang darah seribu tahun antara Shinigami dan Quincy mencapai klimaks saat Yhwach menembus Istana Raja Roh.'
@@ -1353,21 +1386,6 @@ export function getSafeImageUrl(url) {
 
   const cleanUrl = url.trim();
 
-  // Known broken/dead hashes or old Kitsu paths
-  if (
-    cleanUrl.includes('bx170942-') || 
-    cleanUrl.includes('bx171018-') || 
-    cleanUrl.includes('bx180104-') || 
-    cleanUrl.includes('bx159322-') || 
-    cleanUrl.includes('bx163134-') || 
-    cleanUrl.includes('bx170947-') || 
-    cleanUrl.includes('bx169829-') || 
-    cleanUrl.includes('bx178551-') || 
-    cleanUrl.includes('media.kitsu.app/anime/poster_images/')
-  ) {
-    return DEFAULT_ANIME_COVER;
-  }
-
   // If already full HTTPS URL or data URL, return directly so native mobile WebView loads without mixed-content or LAN proxy dependencies
   if (cleanUrl.startsWith('https://') || cleanUrl.startsWith('data:')) {
     return cleanUrl;
@@ -2069,6 +2087,80 @@ export const BLUEBOX_S2_KODIK_MAP = {
   "4": "https://kodikplayer.com/seria/1680366/63a7fba1856eee0e7c1d98ab99450304/720p?min_age=16"
 };
 
+/**
+ * Strict candidate validator to prevent cross-anime pollution in Kodik search results
+ */
+export function isKodikCandidateMatch(r, searchTitle, altTitle, animeObj, isS2) {
+  if (!r) return false;
+  const rTitle = (r.title || '').toLowerCase();
+  const rOrig = (r.title_orig || '').toLowerCase();
+  const rOther = (r.other_title || '').toLowerCase();
+  const fullResult = `${rTitle} ${rOrig} ${rOther}`;
+
+  const cleanQ = (searchTitle || '').toLowerCase();
+  const cleanAlt = (altTitle || '').toLowerCase();
+  const eng = (animeObj?.title?.english || '').toLowerCase();
+  const rom = (animeObj?.title?.romaji || '').toLowerCase();
+  const combinedQuery = `${cleanQ} ${cleanAlt} ${eng} ${rom}`;
+
+  // 1. Strict Franchise Guard for K-ON vs Project K / K: Missing Kings
+  const isKOnQuery = combinedQuery.includes('k-on') || combinedQuery.includes('keion') || combinedQuery.includes('k on');
+  if (isKOnQuery) {
+    const hasKon = rOrig.includes('k-on') || rOrig.includes('keion') || rTitle.includes('кэйон');
+    const isProjectK = rOrig.includes('missing kings') || rOrig.includes('seven stories') || 
+                       rOrig.includes('return of kings') || rOrig.includes('project k') || 
+                       rTitle.includes('проект кей') || rTitle.includes('пропавшие короли') || 
+                       rOrig.trim() === 'k' || rTitle.trim() === 'к';
+    if (!hasKon || isProjectK) return false;
+
+    // Multi-episode TV series must not match standalone movies (e.g. Eiga Keion)
+    if (rTitle.includes('фильм') || rOrig.includes('eiga') || (r.type === 'anime' && !r.seasons)) {
+      return false;
+    }
+    return true;
+  }
+
+  // 2. Strict Franchise Guard for Blue Box / Ao no Hako
+  const isBlueBoxQuery = combinedQuery.includes('blue box') || combinedQuery.includes('ao no hako') || combinedQuery.includes('kotak biru');
+  if (isBlueBoxQuery) {
+    return fullResult.includes('ao no hako') || fullResult.includes('blue box') || fullResult.includes('голубая шкатулка');
+  }
+
+  // 3. Strict Franchise Guard for Solo Leveling
+  const isSoloLeveling = combinedQuery.includes('solo leveling') || combinedQuery.includes('ore dake level up');
+  if (isSoloLeveling) {
+    return fullResult.includes('solo leveling') || fullResult.includes('ore dake level up') || fullResult.includes('поднятие уровня');
+  }
+
+  // 4. Strict Franchise Guard for Dandadan
+  const isDandadan = combinedQuery.includes('dandadan') || combinedQuery.includes('dan da dan');
+  if (isDandadan) {
+    return fullResult.includes('dandadan') || fullResult.includes('дандадан');
+  }
+
+  // 5. Strict Franchise Guard for Bleach
+  const isBleach = combinedQuery.includes('bleach');
+  if (isBleach) {
+    return fullResult.includes('bleach') || fullResult.includes('блич');
+  }
+
+  // 6. Strict Franchise Guard for Jujutsu Kaisen
+  const isJJK = combinedQuery.includes('jujutsu kaisen');
+  if (isJJK) {
+    return fullResult.includes('jujutsu kaisen') || fullResult.includes('магическая битва');
+  }
+
+  // 7. General Word-based validation: require at least one distinct keyword match
+  const stopwords = new Set(['season', 'the', 'part', 'ova', 'special', 'episode', 'and', 'for', 'with', '2nd', '3rd', '4th', 'tv']);
+  const queryWords = `${cleanQ} ${cleanAlt}`.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(w => w.length >= 3 && !stopwords.has(w));
+
+  if (queryWords.length === 0) return true;
+
+  const cleanResultText = `${rOrig} ${rTitle}`.toLowerCase().replace(/[^a-zа-я0-9\s]/g, ' ');
+  return queryWords.some(w => cleanResultText.includes(w));
+}
+
 export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = null, idMal = null, animeObj = null) {
   try {
     const normLow = `${title || ''} ${altTitle || ''} ${animeObj?.title?.english || ''} ${animeObj?.title?.romaji || ''}`.toLowerCase();
@@ -2124,7 +2216,7 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
       });
     }
 
-    // B. Priority 2: Direct Kodik Cloud API Search (Supports both Subtitles & Dubbing)
+    // B. Priority 2: Direct Kodik Cloud API Search (Strictly Validated Anime Match)
     try {
       const kodikSearchTitles = [];
       if (title) kodikSearchTitles.push(title);
@@ -2152,6 +2244,11 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
             const kData = await kRes.json();
             const results = kData.results || [];
             for (const r of results) {
+              // Strict verification against wrong anime mismatch
+              if (!isKodikCandidateMatch(r, title, altTitle, animeObj, isS2)) {
+                continue;
+              }
+
               const t = r.translation || {};
               const tType = t.type || 'voice';
               const tName = t.title || 'Kodik';
@@ -2169,8 +2266,11 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
                 if (sObj?.episodes) {
                   epUrl = sObj.episodes[epStr] || sObj.episodes[String(Number(epStr))];
                 }
-              } else if (r.link && (epStr === '1' || r.type === 'anime')) {
-                epUrl = r.link;
+              } else if (r.link && !isS2) {
+                const isMovieFormat = animeObj?.format === 'MOVIE' || (!animeObj?.episodes || animeObj?.episodes <= 1);
+                if (isMovieFormat && (epStr === '1' || r.type === 'anime')) {
+                  epUrl = r.link;
+                }
               }
 
               if (epUrl) {
@@ -2181,7 +2281,7 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
                 const cleanDubTitle = cleanSourceTitle(tName);
                 const sourceLabel = isSub 
                   ? `Server Kodik VIP (Audio Asli Jepang) - ${cleanDubTitle}`
-                  : `Server Kodik (Sulih Suara) - ${cleanDubTitle}`;
+                  : `Server Kodik (Sulih Suara Rusia) - ${cleanDubTitle}`;
 
                 // Avoid duplicate iframe URLs
                 if (!sources.some(s => s.player_url === fullEpUrl)) {
@@ -2207,33 +2307,31 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
     }
 
     // C. Fallback: Pre-mapped verified embeds
-    if (sources.length === 0) {
-      if (normLow.includes('k-on') || normLow.includes('keion')) {
-        const kodikMap = isS2 ? KON_S2_KODIK_MAP : KON_S1_KODIK_MAP;
-        const kodikUrl = kodikMap[epStr] || kodikMap['1'];
-        if (kodikUrl) {
-          sources.push({
-            title: `Server Kodik Alternatif (${isS2 ? 'K-ON!! S2' : 'K-ON! S1'}) - Episode ${epStr}`,
-            is_subtitles_original: false,
-            player_url: kodikUrl,
-            iframe_url: kodikUrl,
-            is_embed: true,
-            videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
-          });
-        }
+    if (normLow.includes('k-on') || normLow.includes('keion')) {
+      const kodikMap = isS2 ? KON_S2_KODIK_MAP : KON_S1_KODIK_MAP;
+      const kodikUrl = kodikMap[epStr] || kodikMap['1'];
+      if (kodikUrl && !sources.some(s => s.player_url === kodikUrl)) {
+        sources.push({
+          title: `Server Kodik Alternatif (${isS2 ? 'K-ON!! S2' : 'K-ON! S1'}) - Episode ${epStr}`,
+          is_subtitles_original: false,
+          player_url: kodikUrl,
+          iframe_url: kodikUrl,
+          is_embed: true,
+          videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
+        });
       }
-      if ((normLow.includes('blue box') || normLow.includes('ao no hako') || normLow.includes('kotak biru')) && isS2) {
-        const kodikUrl = BLUEBOX_S2_KODIK_MAP[epStr] || BLUEBOX_S2_KODIK_MAP['1'];
-        if (kodikUrl) {
-          sources.push({
-            title: `Server Kodik VIP (Kotak Biru Season 2) - Episode ${epStr}`,
-            is_subtitles_original: true,
-            player_url: kodikUrl,
-            iframe_url: kodikUrl,
-            is_embed: true,
-            videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
-          });
-        }
+    }
+    if ((normLow.includes('blue box') || normLow.includes('ao no hako') || normLow.includes('kotak biru')) && isS2) {
+      const kodikUrl = BLUEBOX_S2_KODIK_MAP[epStr] || BLUEBOX_S2_KODIK_MAP['1'];
+      if (kodikUrl && !sources.some(s => s.player_url === kodikUrl)) {
+        sources.push({
+          title: `Server Kodik VIP (Kotak Biru Season 2) - Episode ${epStr}`,
+          is_subtitles_original: true,
+          player_url: kodikUrl,
+          iframe_url: kodikUrl,
+          is_embed: true,
+          videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
+        });
       }
     }
 
