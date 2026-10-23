@@ -62,7 +62,7 @@ const searchDropdown = document.getElementById('dashboardSearchDropdown');
 
 // Helper to route images through proxy
 function getSafeImageUrl(url) {
-  if (!url) return 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  if (!url || url.includes('photo-1578632767115-351597cf2477')) return 'https://cdn.myanimelist.net/images/anime/12/76121.jpg';
   if (url.startsWith('/api/') || url.startsWith('data:')) return url;
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 }

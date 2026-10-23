@@ -509,15 +509,28 @@ watch(() => [route.query.search, route.query.q], ([newSearch, newQ]) => {
 function onImgError(e, type = 'poster') {
   if (e.target.dataset.triedFallback) return;
   e.target.dataset.triedFallback = 'true';
+  const alt = (e.target.alt || '').toLowerCase();
+  if (alt.includes('k-on') || alt.includes('keion')) {
+    e.target.src = 'https://cdn.myanimelist.net/images/anime/12/76121.jpg';
+    return;
+  }
+  if (alt.includes('blue box') || alt.includes('ao no hako') || alt.includes('kotak biru')) {
+    e.target.src = 'https://cdn.myanimelist.net/images/anime/1066/145455.jpg';
+    return;
+  }
+  if (alt.includes('solo leveling')) {
+    e.target.src = 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx151807-it355ZgzquUd.png';
+    return;
+  }
   if (type === 'banner') {
-    e.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200&q=80';
+    e.target.src = 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/7791-XUCEPg0lbD1K.jpg';
   } else {
-    e.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+    e.target.src = 'https://cdn.myanimelist.net/images/anime/12/76121.jpg';
   }
 }
 
 onMounted(() => {
-  // Purge any poisoned cache entries from localStorage (e.g. Himitsukessha / Eagle Talon)
+  // Purge any poisoned cache entries or stale Unsplash figurines from localStorage
   try {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -530,6 +543,24 @@ onMounted(() => {
       }
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // Specifically scrub any stored Unsplash figurine placeholders in history
+    const rawHist = localStorage.getItem('anipulse_history_v1');
+    if (rawHist && rawHist.includes('photo-1578632767115-351597cf2477')) {
+      const parsed = JSON.parse(rawHist);
+      const cleaned = parsed.map(item => {
+        const t = (item.title || '').toLowerCase();
+        if ((item.coverImage || '').includes('photo-1578632767115-351597cf2477') || !item.coverImage) {
+          if (t.includes('k-on') || t.includes('keion')) {
+            item.coverImage = 'https://cdn.myanimelist.net/images/anime/12/76121.jpg';
+          } else {
+            item.coverImage = 'https://cdn.myanimelist.net/images/anime/12/76121.jpg';
+          }
+        }
+        return item;
+      });
+      localStorage.setItem('anipulse_history_v1', JSON.stringify(cleaned));
+    }
   } catch (_) {}
 
   historyList.value = getHistory();

@@ -1163,6 +1163,12 @@ function playSelectedSource() {
     streamStatusText.value = `Memutar: ${source.title} (Cloud Direct)`;
     isLoadingStream.value = false;
     availableVideos.value = source.videos || [{ quality: 720, type: 'embed' }];
+    if (availableVideos.value.length > 0) {
+      const match = availableVideos.value.find(v => Number(v.quality) === Number(selectedQuality.value));
+      if (!match) {
+        selectedQuality.value = Number(availableVideos.value[0].quality);
+      }
+    }
     return;
   }
 

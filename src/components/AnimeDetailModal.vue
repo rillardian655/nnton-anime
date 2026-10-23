@@ -18,7 +18,7 @@
           :src="getSafeImageUrl(anime.bannerImage || anime.coverImage?.extraLarge || anime.coverImage?.large)" 
           :alt="anime.title?.romaji" 
           class="detail-banner-img" 
-          @error="$event.target.src = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80'"
+          @error="$event.target.src = 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/7791-XUCEPg0lbD1K.jpg'"
         />
         <div class="detail-banner-gradient"></div>
 

@@ -73,10 +73,10 @@ export function formatTime(seconds) {
 }
 
 const CANONICAL_COVERS = {
-  7791: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx7791-4tnomla2mMDp.png', // K-ON! Season 2
-  5680: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx5680-r3AI3Cwfv0Aq.png', // K-ON! Season 1
-  170942: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170942-KKcLfQzV57nG.jpg', // Blue Box
-  19655: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170942-KKcLfQzV57nG.jpg', // Blue Box S2
+  7791: 'https://cdn.myanimelist.net/images/anime/12/76121.jpg', // K-ON! Season 2
+  5680: 'https://cdn.myanimelist.net/images/anime/10/76120.jpg', // K-ON! Season 1
+  170942: 'https://cdn.myanimelist.net/images/anime/1066/145455.jpg', // Blue Box
+  19655: 'https://cdn.myanimelist.net/images/anime/1066/145455.jpg', // Blue Box S2
   171018: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx171018-60q1B6GK2Ghb.jpg', // Dandadan
   151807: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx151807-it355ZgzquUd.png', // Solo Leveling
   154587: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-qQTzQnEJJ3oB.jpg', // Frieren
@@ -115,7 +115,7 @@ function resolveRealCover(animeId, candidateCover, currentHistoryItem = null, ti
     return CANONICAL_COVERS[171018];
   }
 
-  return candidateCover || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80';
+  return 'https://cdn.myanimelist.net/images/anime/12/76121.jpg';
 }
 
 export function getHistory() {
