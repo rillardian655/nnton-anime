@@ -16,21 +16,20 @@
         id="theaterBox"
         :class="{ 
           'controls-active': isPlayerHovered, 
-          'is-theater-fullscreen': isTheaterFullscreen,
-          'is-forced-landscape-css': isForcedLandscapeCss
+          'is-theater-fullscreen': isTheaterFullscreen
         }"
         @mousemove="onPlayerMouseMove"
         @mouseleave="onPlayerMouseLeave"
       >
         <!-- Floating Cinema Top Action Bar (Rotate & Fullscreen) -->
         <div v-if="isAuthenticated" class="cinema-top-action-bar">
-          <!-- Manual Rotate Screen Button (Landscape Mereng Toggle) -->
+          <!-- Manual Rotate Screen Button (Landscape Mereng 16:9 Toggle) -->
           <button 
             v-if="isTheaterFullscreen"
             type="button" 
             class="cinema-action-btn cinema-rotate-btn" 
             @click.stop="toggleOrientationMode"
-            :title="isForcedLandscapeCss ? 'Layar Tegak (Portrait)' : 'Putar Layar Penuh (Landscape Mereng)'"
+            :title="isCurrentLandscape ? 'Kunci Layar Tegak (Portrait)' : 'Kunci Layar Mereng (Landscape 16:9)'"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -38,7 +37,7 @@
               <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
               <path d="M16 21h5v-5"/>
             </svg>
-            <span class="fs-label">{{ isForcedLandscapeCss ? 'Tegak' : 'Putar Mereng' }}</span>
+            <span class="fs-label">{{ isCurrentLandscape ? '16:9 Aktif' : 'Putar 16:9' }}</span>
           </button>
 
           <!-- Cinema Fullscreen Toggle Button -->
@@ -679,15 +678,27 @@ function onPlayerMouseLeave() {
 
 // ---------------- Cinema Fullscreen & Screen Orientation Controller ----------------
 const isTheaterFullscreen = ref(false);
-const isForcedLandscapeCss = ref(false);
+const isCurrentLandscape = ref(typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false);
+
+function updateOrientationState() {
+  if (typeof window !== 'undefined') {
+    isCurrentLandscape.value = window.innerWidth > window.innerHeight;
+  }
+}
 
 async function toggleOrientationMode() {
-  if (isForcedLandscapeCss.value) {
-    isForcedLandscapeCss.value = false;
-  } else {
-    isForcedLandscapeCss.value = true;
-    try {
+  const isLandscape = typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false;
+  try {
+    if (isLandscape) {
+      await ScreenOrientation.lock({ orientation: 'portrait' });
+    } else {
       await ScreenOrientation.lock({ orientation: 'landscape' });
+    }
+  } catch (e1) {
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock(isLandscape ? 'portrait' : 'landscape');
+      }
     } catch (_) {}
   }
 }
@@ -710,7 +721,7 @@ async function toggleTheaterFullscreen() {
       console.warn('Native requestFullscreen failed, active CSS full-screen fallback:', err);
     }
 
-    // 1. Force hardware screen orientation to Landscape (mereng)
+    // Force hardware screen orientation to Landscape (16:9 mereng layar penuh)
     try {
       await ScreenOrientation.lock({ orientation: 'landscape' });
     } catch (e1) {
@@ -721,16 +732,8 @@ async function toggleTheaterFullscreen() {
       } catch (_) {}
     }
 
-    // 2. Fallback: if user device has system orientation lock on, apply CSS rotation
-    setTimeout(() => {
-      if (isTheaterFullscreen.value && window.innerHeight > window.innerWidth) {
-        isForcedLandscapeCss.value = true;
-      }
-    }, 280);
-
   } else {
     isTheaterFullscreen.value = false;
-    isForcedLandscapeCss.value = false;
     try {
       if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
         if (document.exitFullscreen) await document.exitFullscreen();
@@ -778,6 +781,14 @@ function handleFullscreenChange() {
     isTheaterFullscreen.value = true;
   } else {
     isTheaterFullscreen.value = false;
+    try {
+      ScreenOrientation.unlock().catch(() => {});
+    } catch (_) {}
+    try {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch (_) {}
   }
 }
 
@@ -1774,6 +1785,24 @@ function parseVttToCues(vttText) {
           text: textLines.join('<br>')
         });
       }
+    } else if (line.startsWith('Dialogue:') || line.startsWith('Dialog:')) {
+      // ASS / SSA Dialogue line: Dialogue: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+      const parts = line.split(',');
+      if (parts.length >= 10) {
+        const start = parseTimestamp(parts[1].trim());
+        const end = parseTimestamp(parts[2].trim());
+        let text = parts.slice(9).join(',');
+        // Remove ASS override tags like {\pos(100,200)}, {\an8}, {\i1}, etc.
+        text = text.replace(/\{[^}]+\}/g, '').replace(/\\N/gi, '<br>').replace(/\\n/gi, '<br>').trim();
+        if (text && end > start) {
+          cues.push({
+            start,
+            end,
+            text
+          });
+        }
+      }
+      i++;
     } else {
       i++;
     }
@@ -1993,6 +2022,8 @@ onMounted(() => {
   initWatch();
   window.addEventListener('keydown', handleKeydown);
   window.addEventListener('message', onKodikPlayerMessage);
+  window.addEventListener('resize', updateOrientationState);
+  window.addEventListener('orientationchange', updateOrientationState);
   document.addEventListener('fullscreenchange', handleFullscreenChange);
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
   document.addEventListener('mozfullscreenchange', handleFullscreenChange);
@@ -2001,9 +2032,19 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('message', onKodikPlayerMessage);
+  window.removeEventListener('resize', updateOrientationState);
+  window.removeEventListener('orientationchange', updateOrientationState);
   document.removeEventListener('fullscreenchange', handleFullscreenChange);
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
   document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+  try {
+    ScreenOrientation.unlock().catch(() => {});
+  } catch (_) {}
+  try {
+    if (screen.orientation && screen.orientation.unlock) {
+      screen.orientation.unlock();
+    }
+  } catch (_) {}
   stopIframeTimePolling();
   stopKodikInterpolation();
   clearTimeout(safetyTimer);
@@ -3304,20 +3345,10 @@ video::cue {
   border: none !important;
   margin: 0 !important;
   padding: 0 !important;
-}
-
-/* Forced Landscape CSS (Rotates video 90deg horizontally if device is portrait) */
-.theater-player-box.is-forced-landscape-css {
-  transform: rotate(90deg) !important;
-  transform-origin: center center !important;
-  width: 100vh !important;
-  height: 100vw !important;
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  margin-top: -50vw !important;
-  margin-left: -50vh !important;
-  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: none !important;
 }
 
 #theaterBox:fullscreen .native-hls-player,
@@ -3327,13 +3358,14 @@ video::cue {
   height: 100% !important;
   border-radius: 0 !important;
   object-fit: contain !important;
+  transform: none !important;
 }
 
 #theaterBox:fullscreen .cinema-top-action-bar,
 .theater-player-box:fullscreen .cinema-top-action-bar,
 .theater-player-box.is-theater-fullscreen .cinema-top-action-bar {
-  top: 20px !important;
-  right: 20px !important;
+  top: 18px !important;
+  right: 18px !important;
   z-index: 2147483647 !important;
 }
 
@@ -3352,22 +3384,18 @@ video::cue {
   padding: 0 1.5rem !important;
 }
 
-/* In Landscape or Forced Landscape: Sit neatly at bottom */
+/* In Landscape Mode: Sit neatly at bottom */
 @media (orientation: landscape) {
   #theaterBox:fullscreen .cinema-subtitle-overlay,
   .theater-player-box:fullscreen .cinema-subtitle-overlay,
   .theater-player-box.is-theater-fullscreen .cinema-subtitle-overlay {
-    bottom: clamp(24px, 6.5vh, 48px) !important;
+    bottom: clamp(20px, 6vh, 44px) !important;
   }
-}
-
-.theater-player-box.is-forced-landscape-css .cinema-subtitle-overlay {
-  bottom: clamp(24px, 6.5vw, 48px) !important;
 }
 
 /* In Portrait Mode: Align directly over 16:9 letterbox in center */
 @media (orientation: portrait) {
-  #theaterBox.is-theater-fullscreen:not(.is-forced-landscape-css) .cinema-subtitle-overlay {
+  #theaterBox.is-theater-fullscreen .cinema-subtitle-overlay {
     bottom: calc(50% - 28.125vw + 16px) !important;
   }
 }
@@ -3375,13 +3403,14 @@ video::cue {
 #theaterBox:fullscreen .cinema-subtitle-box,
 .theater-player-box:fullscreen .cinema-subtitle-box,
 .theater-player-box.is-theater-fullscreen .cinema-subtitle-box {
-  font-size: clamp(1.35rem, 3.2vw, 2.3rem) !important;
-  padding: 8px 26px !important;
+  font-size: clamp(1.15rem, 2.8vw, 2.1rem) !important;
+  padding: 8px 24px !important;
   max-width: 90% !important;
   background: rgba(0, 0, 0, 0.94) !important;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.98) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.22) !important;
   border-radius: 8px !important;
+  text-align: center !important;
 }
 
 .server-help-hint-item {

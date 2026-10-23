@@ -1495,10 +1495,37 @@ subtitle_search_in_flight: Dict[str, asyncio.Future] = {}
 subtitle_vtt_in_flight: Dict[str, asyncio.Future] = {}
 
 def srt_to_vtt(srt_text: str) -> str:
-    """Convert SRT subtitle format to clean WebVTT format for browser video tag"""
-    clean_srt = srt_text.lstrip('\ufeff').replace('\r\n', '\n').replace('\r', '\n')
-    # Replace comma with period in timestamps (00:00:00,000 -> 00:00:00.000)
-    clean_srt = re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', clean_srt)
+    """Convert SRT / ASS subtitle format to clean WebVTT format for browser video tag"""
+    clean = srt_text.lstrip('\ufeff').replace('\r\n', '\n').replace('\r', '\n')
+    
+    # Check if this is an ASS/SSA file (e.g. from SubsPlease / Erai-raws)
+    if "[Events]" in clean or "Dialogue:" in clean or "Dialog:" in clean:
+        vtt_lines = ["WEBVTT\n"]
+        for line in clean.splitlines():
+            line = line.strip()
+            if line.startswith("Dialogue:") or line.startswith("Dialog:"):
+                parts = line.split(",", 9)
+                if len(parts) >= 10:
+                    start_str = parts[1].strip()
+                    end_str = parts[2].strip()
+                    def norm_ts(ts):
+                        p = ts.split(":")
+                        if len(p) == 3:
+                            return f"{int(p[0]):02d}:{int(p[1]):02d}:{float(p[2]):06.3f}"
+                        elif len(p) == 2:
+                            return f"00:{int(p[0]):02d}:{float(p[1]):06.3f}"
+                        return ts
+                    s_norm = norm_ts(start_str)
+                    e_norm = norm_ts(end_str)
+                    text = parts[9].replace("\\N", "\n").replace("\\n", "\n")
+                    text = re.sub(r'\{[^}]+\}', '', text).strip()
+                    if text:
+                        vtt_lines.append(f"{s_norm} --> {e_norm}\n{text}\n")
+        if len(vtt_lines) > 1:
+            return "\n".join(vtt_lines) + "\n"
+
+    # Standard SRT to WebVTT conversion
+    clean_srt = re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', clean)
     return "WEBVTT\n\n" + clean_srt.strip() + "\n"
 
 

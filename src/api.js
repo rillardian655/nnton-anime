@@ -2551,11 +2551,18 @@ export function getPresetSubtitles(title, altTitle, ep) {
 
   const SYNONYM_GROUPS = [
     ['ao no hako', 'blue box', 'kotak biru'],
-    ['k on', 'keion', 'k-on'],
+    ['k on', 'keion', 'k-on', 'k on!!', 'k-on!!', 'k on season 2', 'k-on season 2', 'keion!!'],
     ['shiguang dailiren', 'link click'],
     ['kusuriya no hitorigoto', 'the apothecary diaries', 'apothecary diaries'],
     ['dandadan', 'dan da dan'],
-    ['bleach sennen kessen hen', 'bleach thousand year blood war', 'bleach tybw', 'bleach']
+    ['bleach sennen kessen hen', 'bleach thousand year blood war', 'bleach tybw', 'bleach'],
+    ['solo leveling', 'ore dake level up na ken', 'ore dake level up'],
+    ['jujutsu kaisen', 'jjk'],
+    ['demon slayer kimetsu no yaiba', 'kimetsu no yaiba', 'demon slayer', 'blade of demon destruction'],
+    ['attack on titan', 'shingeki no kyojin', 'aot'],
+    ['chainsaw man', 'csm'],
+    ['frieren beyond journey s end', 'sousou no frieren', 'frieren'],
+    ['kaiju no 8', 'kaijuu 8 gou', 'kaijuu 8-gou', 'kaiju 8']
   ];
 
   for (const t of rawList) {
