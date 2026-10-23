@@ -66,6 +66,7 @@
           referrerpolicy="no-referrer"
           allowfullscreen
           frameborder="0"
+          @load="onEmbedIframeLoad"
         ></iframe>
 
         <!-- Direct HLS / MP4 Player (Single Native Player - Kodik / AniLibria) -->
@@ -924,7 +925,7 @@ async function fetchYummyEpisodes(details) {
 
 // ---------------- Watch Initialization & Stream ----------------
 async function initWatch() {
-  const animeId = route.query.id;
+  const animeId = route.query.id || route.params.id;
   const ep = Number(route.query.ep) || 1;
   currentEpisode.value = ep;
   subtitleOffset.value = loadSavedSubtitleOffset(ep);
@@ -1175,6 +1176,7 @@ function playSelectedSource() {
     currentEmbedUrl.value = source.iframe_url || source.player_url;
     streamStatusText.value = `Memutar: ${source.title} (Cloud Direct)`;
     isLoadingStream.value = false;
+    startIframeTimePolling();
     availableVideos.value = source.videos || [{ quality: 720, type: 'embed' }];
     if (availableVideos.value.length > 0) {
       const match = availableVideos.value.find(v => Number(v.quality) === Number(selectedQuality.value));
@@ -1508,6 +1510,11 @@ function requestKodikCurrentTime() {
   }
 }
 
+function onEmbedIframeLoad() {
+  startIframeTimePolling();
+  requestKodikCurrentTime();
+}
+
 function startIframeTimePolling() {
   if (iframePollInterval) clearInterval(iframePollInterval);
   iframePollInterval = setInterval(() => {
@@ -1526,13 +1533,25 @@ function onKodikPlayerMessage(event) {
   const data = event.data;
   if (!data || typeof data !== 'object') return;
 
-  if (data.key === 'kodik_player_time' || data.key === 'kodik_player_time_update') {
+  if (data.key === 'kodik_player_time') {
+    // High-precision float time from flowApi
     const rawVal = data.value;
     const timeSec = typeof rawVal === 'number' ? rawVal : (rawVal?.time || rawVal?.currentTime || 0);
     if (!isNaN(timeSec) && isFinite(timeSec)) {
       watchCurrentTime.value = timeSec;
       startKodikInterpolation(timeSec);
       updateCurrentCueFromTime(timeSec);
+    }
+  } else if (data.key === 'kodik_player_time_update') {
+    // Integer-second update from player
+    const rawVal = data.value;
+    const timeSec = typeof rawVal === 'number' ? rawVal : (rawVal?.time || rawVal?.currentTime || 0);
+    if (!isNaN(timeSec) && isFinite(timeSec)) {
+      if (!isKodikPlaying || Math.abs((watchCurrentTime.value || 0) - timeSec) > 1.5) {
+        watchCurrentTime.value = timeSec;
+        startKodikInterpolation(timeSec);
+        updateCurrentCueFromTime(timeSec);
+      }
     }
   } else if (data.key === 'kodik_player_duration_update') {
     const dur = Number(data.value);

@@ -47,6 +47,11 @@ const routes = [
     component: WatchView
   },
   {
+    path: '/watch/:id',
+    name: 'watch-id',
+    component: WatchView
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: AdminView

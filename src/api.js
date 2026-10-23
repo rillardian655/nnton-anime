@@ -2280,7 +2280,7 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
       const shizaUrl = kodikMap[epStr] || kodikMap['1'];
       if (shizaUrl && !sources.some(s => s.player_url === shizaUrl)) {
         sources.push({
-          title: `Server Utama VIP 1 (Audio Asli Jepang) - Episode ${epStr}`,
+          title: `Server Utama 1 (SHIZA - Sub Indo) - Episode ${epStr}`,
           is_subtitles_original: true,
           player_url: shizaUrl,
           iframe_url: shizaUrl,
@@ -2294,8 +2294,8 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
         const miraiUrl = KON_S2_MIRAI_MAP[epStr] || KON_S2_MIRAI_MAP['1'];
         if (miraiUrl && !sources.some(s => s.player_url === miraiUrl)) {
           sources.push({
-            title: `Server Cadangan VIP 2 (Audio Asli Jepang) - Episode ${epStr}`,
-            is_subtitles_original: true,
+            title: `Server Cadangan 2 (MiraiDUB - Sulih Suara) - Episode ${epStr}`,
+            is_subtitles_original: false,
             player_url: miraiUrl,
             iframe_url: miraiUrl,
             is_embed: true,
@@ -2310,7 +2310,7 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
         const anidubUrl = anidubMap[epStr] || anidubMap['1'];
         if (anidubUrl && !sources.some(s => s.player_url === anidubUrl)) {
           sources.push({
-            title: `Server Alternatif 3 (Sulih Suara) - Episode ${epStr}`,
+            title: `Server Alternatif 3 (AniDUB - Sulih Suara) - Episode ${epStr}`,
             is_subtitles_original: false,
             player_url: anidubUrl,
             iframe_url: anidubUrl,

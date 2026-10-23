@@ -27,3 +27,4 @@ data/hls_cache/
 .venv/
 __pycache__/
 *.pyc
+*.apk
