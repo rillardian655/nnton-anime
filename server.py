@@ -1121,7 +1121,7 @@ async def get_yummy_streams(
     # Sort sources: prioritize Subtitles (Субтитры - Original JP audio with subtitles) FIRST!
     def source_sort_key(s):
         title_lower = s.title.lower()
-        if "субтитр" in title_lower or "sub" in title_lower or "kazoku" in title_lower or "subvost" in title_lower:
+        if any(k in title_lower for k in ["субтитр", "sub", "kazoku", "subvost", "crunchyroll"]):
             return 0
         return 1
 
@@ -1145,7 +1145,7 @@ async def get_yummy_streams(
                 })
             video_items.sort(key=lambda x: int(x["quality"]) if str(x["quality"]).isdigit() else 0, reverse=True)
 
-            is_sub = "субтитр" in s.title.lower() or "sub" in s.title.lower()
+            is_sub = any(k in s.title.lower() for k in ["субтитр", "sub", "kazoku", "subvost", "crunchyroll"])
             clean_source_title = f"{s.title} (Audio Asli Jepang)" if is_sub else f"{s.title} (Dub)"
             return {
                 "title": clean_source_title,

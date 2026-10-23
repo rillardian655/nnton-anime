@@ -1077,11 +1077,16 @@ async function loadEpisodeStream(ep) {
       } catch (_) {}
     }
 
-    // Direct Cloud Stream Fallback (For Mobile Data / Kuota / Remote without LAN server)
-    if (dataSources.length === 0) {
-      console.log('LAN/Backend server unreachable or no sources, falling back to direct Cloud Stream...');
+    // Direct Cloud Stream Fallback (For Mobile Data / Kuota / Remote without LAN server, or to prioritize Audio Asli Jepang)
+    if (dataSources.length === 0 || !dataSources.some(s => s.is_subtitles_original)) {
+      console.log('Resolving direct Cloud Streams with Audio Asli Jepang...');
       const resolvedYummyId = anime.value?.yummyId || (Number(anime.value?.id || route.query.id) < 100000 ? Number(anime.value?.id || route.query.id) : null);
-      dataSources = await fetchClientDirectStreams(title, altTitle, ep, resolvedYummyId);
+      const cloudSources = await fetchClientDirectStreams(title, altTitle, ep, resolvedYummyId, anime.value?.idMal, anime.value);
+      if (cloudSources && cloudSources.length > 0) {
+        const existingUrls = new Set(dataSources.map(s => s.player_url || s.iframe_url || ''));
+        const newSources = cloudSources.filter(s => !existingUrls.has(s.player_url || s.iframe_url || ''));
+        dataSources = [...newSources, ...dataSources];
+      }
     }
 
     if (dataSources.length === 0) {

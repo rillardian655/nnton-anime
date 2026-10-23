@@ -160,6 +160,7 @@ export async function fetchAniList(query, variables = {}) {
  */
 const MEDIA_FRAGMENT = `
   id
+  idMal
   title {
     romaji
     english
@@ -2029,216 +2030,232 @@ export async function fetchClientDirectEpisodes(title, altTitle, yummyId = null)
 }
 
 export const KON_S2_KODIK_MAP = {
-  "1": "https://kodikplayer.com/seria/182584/73ab95f243c5755bece8a2f8a7a8535b/720p?translations=false&min_age=16",
-  "2": "https://kodikplayer.com/seria/182585/363cd5638940426f0d28fa6bbb3a911a/720p?translations=false&min_age=16",
-  "3": "https://kodikplayer.com/seria/182586/42d42614b087497cefba3a703b3b610f/720p?translations=false&min_age=16",
-  "4": "https://kodikplayer.com/seria/182587/035330e5331528210a4cb18551324f83/720p?translations=false&min_age=16",
-  "5": "https://kodikplayer.com/seria/182588/35cd0066c0eeebc4671a902573237602/720p?translations=false&min_age=16",
-  "6": "https://kodikplayer.com/seria/182589/69eb2c548a357ded472c942b20e176e7/720p?translations=false&min_age=16",
-  "7": "https://kodikplayer.com/seria/182590/683e5101f415a5895a62bac5d7188c86/720p?translations=false&min_age=16",
-  "8": "https://kodikplayer.com/seria/182591/70048bcc09c284ea1b20a3e95a640da6/720p?translations=false&min_age=16",
-  "9": "https://kodikplayer.com/seria/182592/acc273d0c7c71ff9e0a3a7b5a992f91a/720p?translations=false&min_age=16",
-  "10": "https://kodikplayer.com/seria/182593/792727671f26de48d879ce1201d535bb/720p?translations=false&min_age=16",
-  "11": "https://kodikplayer.com/seria/182594/97c0f7f4ae68b321a4711d1f7c1585bb/720p?translations=false&min_age=16",
-  "12": "https://kodikplayer.com/seria/182595/b03b33666d553b3a16ebaa44d07a71f5/720p?translations=false&min_age=16",
-  "13": "https://kodikplayer.com/seria/182596/10a83818b40def9cd3d00f7405e21d29/720p?translations=false&min_age=16",
-  "14": "https://kodikplayer.com/seria/182597/b5692b10c69d6308f9f2b743e94397a7/720p?translations=false&min_age=16",
-  "15": "https://kodikplayer.com/seria/182598/b464f0337b5a857af211ab5d9c8875c8/720p?translations=false&min_age=16",
-  "16": "https://kodikplayer.com/seria/182599/ce2acbd8b032c6b4b13657136041a1e0/720p?translations=false&min_age=16",
-  "17": "https://kodikplayer.com/seria/182600/f70e462e93f3a91c942d7c708b9d7e87/720p?translations=false&min_age=16",
-  "18": "https://kodikplayer.com/seria/182601/b196cd6fc767692657d307363a89a91a/720p?translations=false&min_age=16",
-  "19": "https://kodikplayer.com/seria/182602/df0700f8cc69c213560a202590993cd7/720p?translations=false&min_age=16",
-  "20": "https://kodikplayer.com/seria/182603/4d84d04846c3ccf9f3992fd0ae8fd058/720p?translations=false&min_age=16",
-  "21": "https://kodikplayer.com/seria/182604/e3fe5e17cf5fa0e1651be9789ffeb0ec/720p?translations=false&min_age=16",
-  "22": "https://kodikplayer.com/seria/182605/04400ccabf089cd7e6bfcf9a0b4309b9/720p?translations=false&min_age=16",
-  "23": "https://kodikplayer.com/seria/182606/5b164ec1a48e4dc8851d4a05839c6196/720p?translations=false&min_age=16",
-  "24": "https://kodikplayer.com/seria/182607/98593af755e5fa1712954fbd9346b589/720p?translations=false&min_age=16",
-  "25": "https://kodikplayer.com/seria/182608/5cf40c7f26027170aac9bca5117ddc53/720p?translations=false&min_age=16",
-  "26": "https://kodikplayer.com/seria/182609/a11597496d50ba437d2f2d348b5c74e1/720p?translations=false&min_age=16"
+  "1": "https://kodikplayer.com/seria/182584/73ab95f243c5755bece8a2f8a7a8535b/720p?min_age=16",
+  "2": "https://kodikplayer.com/seria/182585/363cd5638940426f0d28fa6bbb3a911a/720p?min_age=16",
+  "3": "https://kodikplayer.com/seria/182586/42d42614b087497cefba3a703b3b610f/720p?min_age=16",
+  "4": "https://kodikplayer.com/seria/182587/035330e5331528210a4cb18551324f83/720p?min_age=16",
+  "5": "https://kodikplayer.com/seria/182588/35cd0066c0eeebc4671a902573237602/720p?min_age=16",
+  "6": "https://kodikplayer.com/seria/182589/69eb2c548a357ded472c942b20e176e7/720p?min_age=16",
+  "7": "https://kodikplayer.com/seria/182590/683e5101f415a5895a62bac5d7188c86/720p?min_age=16",
+  "8": "https://kodikplayer.com/seria/182591/70048bcc09c284ea1b20a3e95a640da6/720p?min_age=16",
+  "9": "https://kodikplayer.com/seria/182592/acc273d0c7c71ff9e0a3a7b5a992f91a/720p?min_age=16",
+  "10": "https://kodikplayer.com/seria/182593/792727671f26de48d879ce1201d535bb/720p?min_age=16",
+  "11": "https://kodikplayer.com/seria/182594/97c0f7f4ae68b321a4711d1f7c1585bb/720p?min_age=16",
+  "12": "https://kodikplayer.com/seria/182595/b03b33666d553b3a16ebaa44d07a71f5/720p?min_age=16",
+  "13": "https://kodikplayer.com/seria/182596/10a83818b40def9cd3d00f7405e21d29/720p?min_age=16",
+  "14": "https://kodikplayer.com/seria/182597/b5692b10c69d6308f9f2b743e94397a7/720p?min_age=16",
+  "15": "https://kodikplayer.com/seria/182598/b464f0337b5a857af211ab5d9c8875c8/720p?min_age=16",
+  "16": "https://kodikplayer.com/seria/182599/ce2acbd8b032c6b4b13657136041a1e0/720p?min_age=16",
+  "17": "https://kodikplayer.com/seria/182600/f70e462e93f3a91c942d7c708b9d7e87/720p?min_age=16",
+  "18": "https://kodikplayer.com/seria/182601/b196cd6fc767692657d307363a89a91a/720p?min_age=16",
+  "19": "https://kodikplayer.com/seria/182602/df0700f8cc69c213560a202590993cd7/720p?min_age=16",
+  "20": "https://kodikplayer.com/seria/182603/4d84d04846c3ccf9f3992fd0ae8fd058/720p?min_age=16",
+  "21": "https://kodikplayer.com/seria/182604/e3fe5e17cf5fa0e1651be9789ffeb0ec/720p?min_age=16",
+  "22": "https://kodikplayer.com/seria/182605/04400ccabf089cd7e6bfcf9a0b4309b9/720p?min_age=16",
+  "23": "https://kodikplayer.com/seria/182606/5b164ec1a48e4dc8851d4a05839c6196/720p?min_age=16",
+  "24": "https://kodikplayer.com/seria/182607/98593af755e5fa1712954fbd9346b589/720p?min_age=16",
+  "25": "https://kodikplayer.com/seria/182608/5cf40c7f26027170aac9bca5117ddc53/720p?min_age=16",
+  "26": "https://kodikplayer.com/seria/182609/a11597496d50ba437d2f2d348b5c74e1/720p?min_age=16"
 };
 
 export const KON_S1_KODIK_MAP = {
-  "1": "https://kodikplayer.com/seria/169879/f697f2d287b12fdd51280993ee26b33d/720p?translations=false&min_age=16",
-  "2": "https://kodikplayer.com/seria/169880/9da3d55deb3697c22087d8e2013f5b90/720p?translations=false&min_age=16",
-  "3": "https://kodikplayer.com/seria/169881/1c33dcab3af0b62e8153028a0824ea26/720p?translations=false&min_age=16",
-  "4": "https://kodikplayer.com/seria/169882/04e310e612348bc0cc7c557e1b34fbf6/720p?translations=false&min_age=16",
-  "5": "https://kodikplayer.com/seria/169883/13e29c15f3531089e2fa196b5685373d/720p?translations=false&min_age=16",
-  "6": "https://kodikplayer.com/seria/169884/ed0b74d8d1f1aca08eabda4c9326c752/720p?translations=false&min_age=16",
-  "7": "https://kodikplayer.com/seria/169885/a9403ed81f17b75863743fb24dbc3fd9/720p?translations=false&min_age=16",
-  "8": "https://kodikplayer.com/seria/169886/e53d5e41f5f83a684214244819bf9e98/720p?translations=false&min_age=16",
-  "9": "https://kodikplayer.com/seria/169887/0e316d1aef3af78bd4a1af64293f45ac/720p?translations=false&min_age=16",
-  "10": "https://kodikplayer.com/seria/169888/81b175e6532a01c5b2bfe6d80a88feea/720p?translations=false&min_age=16",
-  "11": "https://kodikplayer.com/seria/169889/37ed723720f8f86fa6e9f21d4db787ed/720p?translations=false&min_age=16",
-  "12": "https://kodikplayer.com/seria/169890/b97636ab636ef2f52f5fcf4baef40c97/720p?translations=false&min_age=16",
-  "13": "https://kodikplayer.com/seria/169891/872c356b16dd4a80871586c9a47dc748/720p?translations=false&min_age=16",
-  "14": "https://kodikplayer.com/seria/169891/872c356b16dd4a80871586c9a47dc748/720p?translations=false&min_age=16"
+  "1": "https://kodikplayer.com/seria/169879/f697f2d287b12fdd51280993ee26b33d/720p?min_age=16",
+  "2": "https://kodikplayer.com/seria/169880/9da3d55deb3697c22087d8e2013f5b90/720p?min_age=16",
+  "3": "https://kodikplayer.com/seria/169881/1c33dcab3af0b62e8153028a0824ea26/720p?min_age=16",
+  "4": "https://kodikplayer.com/seria/169882/04e310e612348bc0cc7c557e1b34fbf6/720p?min_age=16",
+  "5": "https://kodikplayer.com/seria/169883/13e29c15f3531089e2fa196b5685373d/720p?min_age=16",
+  "6": "https://kodikplayer.com/seria/169884/ed0b74d8d1f1aca08eabda4c9326c752/720p?min_age=16",
+  "7": "https://kodikplayer.com/seria/169885/a9403ed81f17b75863743fb24dbc3fd9/720p?min_age=16",
+  "8": "https://kodikplayer.com/seria/169886/e53d5e41f5f83a684214244819bf9e98/720p?min_age=16",
+  "9": "https://kodikplayer.com/seria/169887/0e316d1aef3af78bd4a1af64293f45ac/720p?min_age=16",
+  "10": "https://kodikplayer.com/seria/169888/81b175e6532a01c5b2bfe6d80a88feea/720p?min_age=16",
+  "11": "https://kodikplayer.com/seria/169889/37ed723720f8f86fa6e9f21d4db787ed/720p?min_age=16",
+  "12": "https://kodikplayer.com/seria/169890/b97636ab636ef2f52f5fcf4baef40c97/720p?min_age=16",
+  "13": "https://kodikplayer.com/seria/169891/872c356b16dd4a80871586c9a47dc748/720p?min_age=16",
+  "14": "https://kodikplayer.com/seria/169891/872c356b16dd4a80871586c9a47dc748/720p?min_age=16"
 };
 
 export const BLUEBOX_S2_KODIK_MAP = {
-  "1": "https://kodikplayer.com/seria/1674529/f64e32b52b60c83c21c9bc2471d1d1f8/720p?translations=false&min_age=16",
-  "2": "https://kodikplayer.com/seria/1677743/e67603fe818901bf32fb647ba0f126dd/720p?translations=false&min_age=16",
-  "3": "https://kodikplayer.com/seria/1680366/63a7fba1856eee0e7c1d98ab99450304/720p?translations=false&min_age=16",
-  "4": "https://kodikplayer.com/seria/1680366/63a7fba1856eee0e7c1d98ab99450304/720p?translations=false&min_age=16"
+  "1": "https://kodikplayer.com/seria/1674529/f64e32b52b60c83c21c9bc2471d1d1f8/720p?min_age=16",
+  "2": "https://kodikplayer.com/seria/1677743/e67603fe818901bf32fb647ba0f126dd/720p?min_age=16",
+  "3": "https://kodikplayer.com/seria/1680366/63a7fba1856eee0e7c1d98ab99450304/720p?min_age=16",
+  "4": "https://kodikplayer.com/seria/1680366/63a7fba1856eee0e7c1d98ab99450304/720p?min_age=16"
 };
 
-export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = null) {
+export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = null, idMal = null, animeObj = null) {
   try {
-    let targetAnimeId = yummyId;
-    let epVideos = [];
-    const normLow = `${title || ''} ${altTitle || ''}`.toLowerCase();
+    const normLow = `${title || ''} ${altTitle || ''} ${animeObj?.title?.english || ''} ${animeObj?.title?.romaji || ''}`.toLowerCase();
     const isS2 = normLow.includes('season 2') || normLow.includes('2nd season') || normLow.includes('s2') || normLow.includes(' 2');
     const epStr = String(ep || 1);
-
-    // 0. Verified Direct VIP Kodik Player Embeds (Immediate 100% reliable cloud playback)
-    if (normLow.includes('k-on') || normLow.includes('keion')) {
-      const kodikMap = isS2 ? KON_S2_KODIK_MAP : KON_S1_KODIK_MAP;
-      const kodikUrl = kodikMap[epStr] || kodikMap['1'];
-      if (kodikUrl) {
-        return [{
-          title: `Server Kodik VIP (${isS2 ? 'K-ON!! Season 2' : 'K-ON! Season 1'}) - Episode ${epStr}`,
-          is_subtitles_original: true,
-          player_url: kodikUrl,
-          iframe_url: kodikUrl,
-          is_embed: true,
-          videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
-        }];
-      }
-    }
-
-    if ((normLow.includes('blue box') || normLow.includes('ao no hako') || normLow.includes('kotak biru')) && isS2) {
-      const kodikUrl = BLUEBOX_S2_KODIK_MAP[epStr] || BLUEBOX_S2_KODIK_MAP['1'];
-      if (kodikUrl) {
-        return [{
-          title: `Server Kodik VIP (Kotak Biru Season 2) - Episode ${epStr}`,
-          is_subtitles_original: true,
-          player_url: kodikUrl,
-          iframe_url: kodikUrl,
-          is_embed: true,
-          videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
-        }];
-      }
-    }
-
-    const extractValidVideos = (videos, targetEp) => {
-      if (!Array.isArray(videos)) return [];
-      return videos.filter(v => {
-        if (String(v.number) !== String(targetEp)) return false;
-        if (!v.iframe_url) return false;
-        if (v.iframe_url.includes('yummyani.me')) return false;
-        return true;
-      });
-    };
-
-    // 1. Direct fetch if yummyId provided
-    if (targetAnimeId) {
-      try {
-        const vRes = await fetch(`https://api.yani.tv/anime/${targetAnimeId}/videos`);
-        if (vRes.ok) {
-          const vData = await vRes.json();
-          const found = extractValidVideos(vData.response, ep);
-          if (found.length > 0) {
-            epVideos = found;
-          }
-        }
-      } catch (err) {
-        console.warn('Direct yummyId videos error:', err);
-      }
-    }
-
-    // 2. Search Yani candidates if direct ID yielded no videos
-    if (epVideos.length === 0) {
-      const queryCandidates = [];
-      if (title) queryCandidates.push(title);
-      if (altTitle && altTitle !== title) queryCandidates.push(altTitle);
-      
-      const cleanBase = title ? title.replace(/\s*(Season|2nd Season|Part \d+|S\d+).*$/i, '').trim() : '';
-      if (cleanBase && !queryCandidates.includes(cleanBase)) {
-        queryCandidates.push(cleanBase);
-      }
-
-      for (const cand of queryCandidates) {
-        try {
-          const sRes = await fetch(`https://api.yani.tv/anime?q=${encodeURIComponent(cand)}&offset=0&limit=8`);
-          if (sRes.ok) {
-            const sData = await sRes.json();
-            if (sData.response && Array.isArray(sData.response)) {
-              for (const item of sData.response) {
-                try {
-                  const vRes = await fetch(`https://api.yani.tv/anime/${item.anime_id}/videos`);
-                  if (vRes.ok) {
-                    const vData = await vRes.json();
-                    const found = extractValidVideos(vData.response, ep);
-                    if (found.length > 0) {
-                      epVideos = found;
-                      targetAnimeId = item.anime_id;
-                      break;
-                    }
-                  }
-                } catch (_) {}
-              }
-              if (epVideos.length > 0) break;
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
     const sources = [];
 
-    // Parse Yani videos if found
-    for (const v of epVideos) {
-      let cleanIframe = v.iframe_url;
-      if (cleanIframe.startsWith('//')) cleanIframe = `https:${cleanIframe}`;
-      if (cleanIframe.startsWith('http://')) cleanIframe = cleanIframe.replace('http://', 'https://');
-
-      const rawPlayer = v.data?.player || 'Server Kodik Cloud';
-      const rawDubbing = v.data?.dubbing || '';
-      const isSub = rawDubbing.toLowerCase().includes('субтитр') || 
-                    rawDubbing.toLowerCase().includes('sub') || 
-                    rawDubbing.toLowerCase().includes('kazoku');
-      
-      const cleanPlayer = cleanSourceTitle(rawPlayer);
-      const cleanDub = cleanSourceTitle(rawDubbing);
-      let titleLabel = cleanDub ? `${cleanDub} (${cleanPlayer})` : cleanPlayer;
-      if (isSub) {
-        titleLabel = `${titleLabel} [Audio Asli Jepang]`;
+    // 1. Resolve MyAnimeList ID (MAL ID) for Universal Japanese Audio VidLink Streams
+    let targetIdMal = idMal || animeObj?.idMal;
+    if (!targetIdMal) {
+      if (normLow.includes('k-on') || normLow.includes('keion')) {
+        targetIdMal = isS2 ? 7791 : 5680;
+      } else if (normLow.includes('blue box') || normLow.includes('ao no hako') || normLow.includes('kotak biru')) {
+        targetIdMal = 57181;
+      } else if (normLow.includes('solo leveling') || normLow.includes('ore dake level up')) {
+        targetIdMal = isS2 ? 58567 : 52299;
+      } else if (normLow.includes('dandadan')) {
+        targetIdMal = 57334;
+      } else if (normLow.includes('frieren') || normLow.includes('sousou no frieren')) {
+        targetIdMal = 52991;
+      } else if (normLow.includes('bocchi the rock')) {
+        targetIdMal = 47917;
+      } else if (normLow.includes('jujutsu kaisen')) {
+        targetIdMal = 40748;
+      } else if (normLow.includes('bleach')) {
+        targetIdMal = 269;
       }
+    }
 
+    // Dynamic AniList lookup for MAL ID if still missing
+    if (!targetIdMal && (title || altTitle)) {
+      try {
+        const cleanSearch = (title || altTitle).replace(/\s*(Season|2nd Season|Part \d+|S\d+).*$/i, '').trim();
+        const aniRes = await fetchAniList(`query ($search: String) { Media(search: $search, type: ANIME) { id idMal } }`, { search: cleanSearch });
+        if (aniRes?.Media?.idMal) {
+          targetIdMal = aniRes.Media.idMal;
+        }
+      } catch (_) {}
+    }
+
+    // A. Priority 1: High-Speed VidLink Cloud Stream (100% Genuine Japanese Audio + Subtitles)
+    if (targetIdMal) {
+      const vidlinkUrl = `https://vidlink.pro/anime/${targetIdMal}/${epStr}/sub?fallback=true`;
       sources.push({
-        title: titleLabel,
-        is_subtitles_original: isSub,
-        player_url: cleanIframe,
-        iframe_url: cleanIframe,
+        title: `Server Utama VIP (Audio Asli Jepang) - Episode ${epStr}`,
+        is_subtitles_original: true,
+        player_url: vidlinkUrl,
+        iframe_url: vidlinkUrl,
         is_embed: true,
         videos: [
-          {
-            quality: 720,
-            type: 'embed',
-            url: cleanIframe,
-            direct_url: cleanIframe
-          }
+          { quality: 1080, type: 'embed', url: vidlinkUrl, direct_url: vidlinkUrl }
         ]
       });
     }
 
-    // 3. High-Speed Anilibria HLS Cloud Direct Fallback (Native M3U8, No Proxy, 100% Free & Open)
-    if (sources.length === 0) {
-      const anilibriaQueries = [];
-      if (normLow.includes('blue box') || normLow.includes('ao no hako')) {
-        if (isS2) anilibriaQueries.push('Голубая шкатулка 2');
-        else anilibriaQueries.push('Голубая шкатулка');
-      } else if (normLow.includes('k-on') || normLow.includes('keion')) {
-        if (!isS2) anilibriaQueries.push('Кэйон', 'K-On');
-      } else if (normLow.includes('solo leveling')) {
-        anilibriaQueries.push('Поднятие уровня в одиночку', 'Solo Leveling');
-      } else if (normLow.includes('frieren')) {
-        anilibriaQueries.push('Провожающая в последний путь Фрирен', 'Frieren');
-      } else if (normLow.includes('dandadan')) {
-        anilibriaQueries.push('Дандадан', 'Dandadan');
-      } else {
-        anilibriaQueries.push(title);
-        if (altTitle && altTitle !== title) anilibriaQueries.push(altTitle);
+    // B. Priority 2: Direct Kodik Cloud API Search (Supports both Subtitles & Dubbing)
+    try {
+      const kodikSearchTitles = [];
+      if (title) kodikSearchTitles.push(title);
+      if (altTitle && altTitle !== title) kodikSearchTitles.push(altTitle);
+      const cleanBase = title ? title.replace(/\s*(Season|2nd Season|Part \d+|S\d+).*$/i, '').trim() : '';
+      if (cleanBase && !kodikSearchTitles.includes(cleanBase)) kodikSearchTitles.push(cleanBase);
+
+      for (const kq of kodikSearchTitles) {
+        const controller = new AbortController();
+        const tId = setTimeout(() => controller.abort(), 2800);
+        try {
+          const kRes = await fetch('https://kodik-api.com/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              token: '56a768d08f43091901c44b54fe970049',
+              title: kq,
+              types: 'anime-serial,anime',
+              with_episodes: 'true'
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(tId);
+          if (kRes.ok) {
+            const kData = await kRes.json();
+            const results = kData.results || [];
+            for (const r of results) {
+              const t = r.translation || {};
+              const tType = t.type || 'voice';
+              const tName = t.title || 'Kodik';
+              const isSub = tType === 'subtitles' || 
+                            tName.toLowerCase().includes('sub') || 
+                            tName.toLowerCase().includes('субтитр') || 
+                            tName.toLowerCase().includes('kazoku') || 
+                            tName.toLowerCase().includes('crunchyroll');
+
+              let epUrl = null;
+              if (r.seasons) {
+                const seasonKeys = Object.keys(r.seasons);
+                let targetSKey = isS2 ? (seasonKeys.find(k => k === '2') || seasonKeys[0]) : seasonKeys[0];
+                const sObj = r.seasons[targetSKey];
+                if (sObj?.episodes) {
+                  epUrl = sObj.episodes[epStr] || sObj.episodes[String(Number(epStr))];
+                }
+              } else if (r.link && (epStr === '1' || r.type === 'anime')) {
+                epUrl = r.link;
+              }
+
+              if (epUrl) {
+                let fullEpUrl = epUrl.startsWith('//') ? `https:${epUrl}` : epUrl;
+                if (!fullEpUrl.includes('min_age')) {
+                  fullEpUrl += (fullEpUrl.includes('?') ? '&' : '?') + 'min_age=16';
+                }
+                const cleanDubTitle = cleanSourceTitle(tName);
+                const sourceLabel = isSub 
+                  ? `Server Kodik VIP (Audio Asli Jepang) - ${cleanDubTitle}`
+                  : `Server Kodik (Sulih Suara) - ${cleanDubTitle}`;
+
+                // Avoid duplicate iframe URLs
+                if (!sources.some(s => s.player_url === fullEpUrl)) {
+                  sources.push({
+                    title: sourceLabel,
+                    is_subtitles_original: isSub,
+                    player_url: fullEpUrl,
+                    iframe_url: fullEpUrl,
+                    is_embed: true,
+                    videos: [{ quality: 720, type: 'embed', url: fullEpUrl, direct_url: fullEpUrl }]
+                  });
+                }
+              }
+            }
+          }
+        } catch (_) {
+          clearTimeout(tId);
+        }
+        if (sources.length > 2) break;
       }
+    } catch (kErr) {
+      console.warn('Kodik API cloud search error:', kErr);
+    }
+
+    // C. Fallback: Pre-mapped verified embeds
+    if (sources.length === 0) {
+      if (normLow.includes('k-on') || normLow.includes('keion')) {
+        const kodikMap = isS2 ? KON_S2_KODIK_MAP : KON_S1_KODIK_MAP;
+        const kodikUrl = kodikMap[epStr] || kodikMap['1'];
+        if (kodikUrl) {
+          sources.push({
+            title: `Server Kodik Alternatif (${isS2 ? 'K-ON!! S2' : 'K-ON! S1'}) - Episode ${epStr}`,
+            is_subtitles_original: false,
+            player_url: kodikUrl,
+            iframe_url: kodikUrl,
+            is_embed: true,
+            videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
+          });
+        }
+      }
+      if ((normLow.includes('blue box') || normLow.includes('ao no hako') || normLow.includes('kotak biru')) && isS2) {
+        const kodikUrl = BLUEBOX_S2_KODIK_MAP[epStr] || BLUEBOX_S2_KODIK_MAP['1'];
+        if (kodikUrl) {
+          sources.push({
+            title: `Server Kodik VIP (Kotak Biru Season 2) - Episode ${epStr}`,
+            is_subtitles_original: true,
+            player_url: kodikUrl,
+            iframe_url: kodikUrl,
+            is_embed: true,
+            videos: [{ quality: 720, type: 'embed', url: kodikUrl, direct_url: kodikUrl }]
+          });
+        }
+      }
+    }
+
+    // D. Anilibria HLS Native Stream Fallback
+    if (!sources.some(s => !s.is_embed)) {
+      const anilibriaQueries = [];
+      if (normLow.includes('solo leveling')) anilibriaQueries.push('Поднятие уровня в одиночку', 'Solo Leveling');
+      else if (normLow.includes('frieren')) anilibriaQueries.push('Провожающая в последний путь Фрирен', 'Frieren');
+      else if (normLow.includes('dandadan')) anilibriaQueries.push('Дандадан', 'Dandadan');
 
       for (const qStr of anilibriaQueries) {
         try {
@@ -2247,15 +2264,7 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
             const catData = await catRes.json();
             const releases = catData.data || [];
             if (releases.length > 0) {
-              let matchedRel = releases[0];
-              if (isS2) {
-                const s2Rel = releases.find(r => (r.name?.main || '').includes('2') || (r.name?.english || '').includes('2'));
-                if (s2Rel) {
-                  matchedRel = s2Rel;
-                } else {
-                  continue;
-                }
-              }
+              const matchedRel = releases[0];
               const relDetailRes = await fetch(`https://aniliberty.top/api/v1/anime/releases/${matchedRel.id}?include=id,episodes`);
               if (relDetailRes.ok) {
                 const relDetail = await relDetailRes.json();
@@ -2285,6 +2294,7 @@ export async function fetchClientDirectStreams(title, altTitle, ep, yummyId = nu
       }
     }
 
+    // Sort: Audio Asli Jepang (is_subtitles_original: true) ALWAYS at the top!
     sources.sort((a, b) => {
       if (a.is_subtitles_original && !b.is_subtitles_original) return -1;
       if (!a.is_subtitles_original && b.is_subtitles_original) return 1;
